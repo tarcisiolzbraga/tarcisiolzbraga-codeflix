@@ -5,7 +5,10 @@ import java.util.List;
 
 public class DomainException extends RuntimeException {
 
-    private final List<Error> errors;
+    private static final long serialVersionUID = 1L;
+
+    // transient: the exception is handled in-process (turned into an HTTP response), never serialized.
+    private final transient List<Error> errors;
 
     private DomainException(final String message, final List<Error> errors) {
         super(message, null, true, false);
