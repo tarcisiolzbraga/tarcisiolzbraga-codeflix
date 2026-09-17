@@ -8,6 +8,8 @@ public class CategoryValidator extends Validator {
 
     private static final int NAME_MIN_LENGTH = 3;
     private static final int NAME_MAX_LENGTH = 255;
+    private static final String NAME_LENGTH_MESSAGE =
+            "'name' must be between %d and %d characters".formatted(NAME_MIN_LENGTH, NAME_MAX_LENGTH);
 
     private final Category category;
 
@@ -33,7 +35,7 @@ public class CategoryValidator extends Validator {
         }
         final var length = name.trim().length();
         if (length < NAME_MIN_LENGTH || length > NAME_MAX_LENGTH) {
-            validationHandler().append(new ValidationError("'name' must be between 3 and 255 characters"));
+            validationHandler().append(new ValidationError(NAME_LENGTH_MESSAGE));
         }
     }
 }
