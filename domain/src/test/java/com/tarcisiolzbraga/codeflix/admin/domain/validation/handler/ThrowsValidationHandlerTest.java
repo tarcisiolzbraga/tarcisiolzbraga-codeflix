@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.DomainException;
-import com.tarcisiolzbraga.codeflix.admin.domain.validation.Error;
+import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationError;
 import org.junit.jupiter.api.Test;
 
 class ThrowsValidationHandlerTest {
@@ -15,7 +15,7 @@ class ThrowsValidationHandlerTest {
         final var expectedMessage = "erro de validação";
 
         final var actualException = assertThrows(
-                DomainException.class, () -> handler.append(new Error(expectedMessage)));
+                DomainException.class, () -> handler.append(new ValidationError(expectedMessage)));
 
         assertEquals(1, actualException.getErrors().size());
         assertEquals(expectedMessage, actualException.getErrors().getFirst().message());
@@ -26,8 +26,8 @@ class ThrowsValidationHandlerTest {
     void givenHandlerWithErrors_whenCallAppend_thenThrowDomainExceptionWithAllOfThem() {
         final var handler = new ThrowsValidationHandler();
         final var other = Notification.create()
-                .append(new Error("primeiro erro"))
-                .append(new Error("segundo erro"));
+                .append(new ValidationError("primeiro erro"))
+                .append(new ValidationError("segundo erro"));
 
         final var actualException = assertThrows(DomainException.class, () -> handler.append(other));
 

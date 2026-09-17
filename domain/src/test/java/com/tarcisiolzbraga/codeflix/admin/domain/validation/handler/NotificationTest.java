@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.tarcisiolzbraga.codeflix.admin.domain.validation.Error;
+import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationError;
 import org.junit.jupiter.api.Test;
 
 class NotificationTest {
@@ -23,8 +23,8 @@ class NotificationTest {
     void givenTwoErrors_whenCallAppend_thenAccumulateBothInOrder() {
         final var notification = Notification.create();
 
-        notification.append(new Error("primeiro erro"))
-                .append(new Error("segundo erro"));
+        notification.append(new ValidationError("primeiro erro"))
+                .append(new ValidationError("segundo erro"));
 
         assertTrue(notification.hasError());
         assertEquals(2, notification.getErrors().size());
@@ -35,7 +35,7 @@ class NotificationTest {
     @Test
     void givenOtherHandlerWithError_whenCallAppend_thenCopyItsErrors() {
         final var notification = Notification.create();
-        final var other = Notification.create().append(new Error("erro externo"));
+        final var other = Notification.create().append(new ValidationError("erro externo"));
 
         notification.append(other);
 

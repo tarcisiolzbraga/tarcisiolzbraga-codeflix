@@ -1,14 +1,14 @@
 package com.tarcisiolzbraga.codeflix.admin.domain.validation.handler;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.DomainException;
-import com.tarcisiolzbraga.codeflix.admin.domain.validation.Error;
+import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationError;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationHandler;
 import java.util.List;
 
 public class ThrowsValidationHandler implements ValidationHandler {
 
     @Override
-    public ValidationHandler append(final Error error) {
+    public ValidationHandler append(final ValidationError error) {
         throw DomainException.with(error);
     }
 
@@ -18,7 +18,7 @@ public class ThrowsValidationHandler implements ValidationHandler {
     }
 
     @Override
-    public List<Error> getErrors() {
+    public List<ValidationError> getErrors() {
         return List.of();
     }
 }
