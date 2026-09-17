@@ -3,7 +3,7 @@ package com.tarcisiolzbraga.codeflix.admin.domain.exceptions;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationError;
 import java.util.List;
 
-public class DomainException extends RuntimeException {
+public class DomainException extends NoStackTraceException {
 
     private static final long serialVersionUID = 1L;
 
@@ -11,7 +11,7 @@ public class DomainException extends RuntimeException {
     private final transient List<ValidationError> errors;
 
     private DomainException(final String message, final List<ValidationError> errors) {
-        super(message, null, true, false);
+        super(message);
         this.errors = errors;
     }
 
