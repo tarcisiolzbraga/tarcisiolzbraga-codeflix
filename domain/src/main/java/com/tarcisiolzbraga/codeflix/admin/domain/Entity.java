@@ -18,7 +18,7 @@ public abstract class Entity<ID extends Identifier> {
     }
 
     @Override
-    public boolean equals(final Object other) {
+    public final boolean equals(final Object other) {
         if (this == other) {
             return true;
         }
@@ -29,7 +29,7 @@ public abstract class Entity<ID extends Identifier> {
     }
 
     @Override
-    public int hashCode() {
+    public final int hashCode() {
         return Objects.hash(this.id);
     }
 }
