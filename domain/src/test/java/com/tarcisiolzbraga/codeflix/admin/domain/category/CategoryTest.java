@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.DomainException;
+import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.Notification;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.ThrowsValidationHandler;
 import org.junit.jupiter.api.Test;
 
@@ -80,6 +81,46 @@ class CategoryTest {
                 DomainException.class, () -> actualCategory.validate(new ThrowsValidationHandler()));
 
         assertEquals("'name' must be between 3 and 255 characters", actualException.getMessage());
+    }
+
+    @Test
+    void givenNameWithExactlyThreeChars_whenCallValidate_thenHaveNoErrors() {
+        final var category = Category.newCategory("Fil", EXPECTED_DESCRIPTION, true);
+        final var notification = Notification.create();
+
+        category.validate(notification);
+
+        assertTrue(notification.getErrors().isEmpty());
+    }
+
+    @Test
+    void givenNameWithExactly255Chars_whenCallValidate_thenHaveNoErrors() {
+        final var category = Category.newCategory("a".repeat(255), EXPECTED_DESCRIPTION, true);
+        final var notification = Notification.create();
+
+        category.validate(notification);
+
+        assertTrue(notification.getErrors().isEmpty());
+    }
+
+    @Test
+    void givenNullDescription_whenCallValidate_thenHaveNoErrors() {
+        final var category = Category.newCategory(EXPECTED_NAME, null, true);
+        final var notification = Notification.create();
+
+        category.validate(notification);
+
+        assertTrue(notification.getErrors().isEmpty());
+    }
+
+    @Test
+    void givenBlankDescription_whenCallValidate_thenHaveNoErrors() {
+        final var category = Category.newCategory(EXPECTED_NAME, "   ", true);
+        final var notification = Notification.create();
+
+        category.validate(notification);
+
+        assertTrue(notification.getErrors().isEmpty());
     }
 
     @Test
