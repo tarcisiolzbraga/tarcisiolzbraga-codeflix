@@ -20,6 +20,15 @@ class NotificationTest {
     }
 
     @Test
+    void givenNoError_whenCallFirstError_thenReturnEmpty() {
+        final var notification = Notification.create();
+
+        final var actualFirstError = notification.firstError();
+
+        assertTrue(actualFirstError.isEmpty());
+    }
+
+    @Test
     void givenTwoErrors_whenCallAppend_thenAccumulateBothInOrder() {
         final var notification = Notification.create();
 
@@ -28,7 +37,7 @@ class NotificationTest {
 
         assertTrue(notification.hasError());
         assertEquals(2, notification.getErrors().size());
-        assertEquals("primeiro erro", notification.firstError().message());
+        assertEquals("primeiro erro", notification.firstError().orElseThrow().message());
         assertEquals("segundo erro", notification.getErrors().get(1).message());
     }
 
@@ -40,6 +49,6 @@ class NotificationTest {
         notification.append(other);
 
         assertEquals(1, notification.getErrors().size());
-        assertEquals("erro externo", notification.firstError().message());
+        assertEquals("erro externo", notification.firstError().orElseThrow().message());
     }
 }

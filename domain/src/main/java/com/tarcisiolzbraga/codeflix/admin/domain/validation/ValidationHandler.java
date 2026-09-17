@@ -1,6 +1,7 @@
 package com.tarcisiolzbraga.codeflix.admin.domain.validation;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ValidationHandler {
 
@@ -14,7 +15,7 @@ public interface ValidationHandler {
         return !getErrors().isEmpty();
     }
 
-    default ValidationError firstError() {
-        return hasError() ? getErrors().getFirst() : null;
+    default Optional<ValidationError> firstError() {
+        return getErrors().stream().findFirst();
     }
 }
