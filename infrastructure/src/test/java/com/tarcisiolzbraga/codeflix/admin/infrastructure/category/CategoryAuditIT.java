@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.category.Category;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.CategoryJpaEntity;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.CategoryRepository;
 import jakarta.persistence.EntityManagerFactory;
@@ -13,9 +14,8 @@ import org.hibernate.envers.AuditReaderFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
+@IntegrationTest
 class CategoryAuditIT {
 
     @Autowired
