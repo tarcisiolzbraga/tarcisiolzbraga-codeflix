@@ -66,6 +66,21 @@ class CategoryAuditIT {
         assertNotNull(nameAt(category.getId().getValue(), revisions.getFirst()));
     }
 
+    @Test
+    void givenDeactivatedCategory_whenReadLastRevision_thenAuditTheInheritedFields() {
+        final var category = this.categoryGateway.create(Category.newCategory("Filmes", null, true));
+        this.categoryGateway.update(category.update("Filmes", null, false));
+        final var revisions = revisionsOf(category.getId().getValue());
+
+        final var audited = auditedAt(category.getId().getValue(), revisions.getLast());
+
+        assertEquals(category.getId().getValue(), audited.getId());
+        assertNotNull(audited.getCreatedAt());
+        assertNotNull(audited.getUpdatedAt());
+        assertNotNull(audited.getDeletedAt());
+        assertNull(auditedAt(category.getId().getValue(), revisions.getFirst()).getDeletedAt());
+    }
+
     private List<Number> revisionsOf(final String id) {
         try (var entityManager = this.entityManagerFactory.createEntityManager()) {
             return AuditReaderFactory.get(entityManager).getRevisions(CategoryJpaEntity.class, id);
@@ -73,10 +88,13 @@ class CategoryAuditIT {
     }
 
     private String nameAt(final String id, final Number revision) {
+        final var audited = auditedAt(id, revision);
+        return audited == null ? null : audited.getName();
+    }
+
+    private CategoryJpaEntity auditedAt(final String id, final Number revision) {
         try (var entityManager = this.entityManagerFactory.createEntityManager()) {
-            final var audited = AuditReaderFactory.get(entityManager)
-                    .find(CategoryJpaEntity.class, id, revision);
-            return audited == null ? null : audited.getName();
+            return AuditReaderFactory.get(entityManager).find(CategoryJpaEntity.class, id, revision);
         }
     }
 }
