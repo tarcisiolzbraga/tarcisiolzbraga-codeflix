@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -13,7 +14,7 @@ import static org.mockito.Mockito.when;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.category.Category;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryGateway;
-import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.DomainException;
+import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.Notification;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -33,14 +34,14 @@ class CreateCategoryUseCaseTest {
     private DefaultCreateCategoryUseCase useCase;
 
     @Test
-    void givenValidCommand_whenCallExecute_thenReturnCategoryId() {
+    void givenValidCommand_whenCallExecute_thenReturnRightWithCategoryId() {
         final var command = CreateCategoryCommand.with(EXPECTED_NAME, EXPECTED_DESCRIPTION, true);
         when(categoryGateway.create(any())).thenAnswer(returnsFirstArg());
 
-        final var actualOutput = useCase.execute(command);
+        final var actualResult = useCase.execute(command);
 
-        assertNotNull(actualOutput);
-        assertNotNull(actualOutput.id());
+        assertTrue(actualResult.isRight());
+        assertNotNull(actualResult.get().id());
         verify(categoryGateway).create(argThat(category -> isCreatedFrom(category, true)));
     }
 
@@ -49,29 +50,32 @@ class CreateCategoryUseCaseTest {
         final var command = CreateCategoryCommand.with(EXPECTED_NAME, EXPECTED_DESCRIPTION, false);
         when(categoryGateway.create(any())).thenAnswer(returnsFirstArg());
 
-        useCase.execute(command);
+        final var actualResult = useCase.execute(command);
 
+        assertTrue(actualResult.isRight());
         verify(categoryGateway).create(argThat(category -> isCreatedFrom(category, false)));
     }
 
     @Test
-    void givenNullName_whenCallExecute_thenThrowDomainExceptionAndNotCreate() {
+    void givenNullName_whenCallExecute_thenReturnLeftWithNotificationAndNotCreate() {
         final var command = CreateCategoryCommand.with(null, EXPECTED_DESCRIPTION, true);
 
-        final var actualException = assertThrows(DomainException.class, () -> useCase.execute(command));
+        final var actualResult = useCase.execute(command);
 
-        assertEquals(1, actualException.getErrors().size());
-        assertEquals("'name' should not be null", actualException.getMessage());
+        assertTrue(actualResult.isLeft());
+        assertEquals(1, actualResult.getLeft().getErrors().size());
+        assertEquals("'name' should not be null", firstErrorOf(actualResult.getLeft()));
         verify(categoryGateway, never()).create(any());
     }
 
     @Test
-    void givenBlankName_whenCallExecute_thenThrowDomainExceptionAndNotCreate() {
+    void givenBlankName_whenCallExecute_thenReturnLeftWithNotificationAndNotCreate() {
         final var command = CreateCategoryCommand.with("   ", EXPECTED_DESCRIPTION, true);
 
-        final var actualException = assertThrows(DomainException.class, () -> useCase.execute(command));
+        final var actualResult = useCase.execute(command);
 
-        assertEquals("'name' should not be empty", actualException.getMessage());
+        assertTrue(actualResult.isLeft());
+        assertEquals("'name' should not be empty", firstErrorOf(actualResult.getLeft()));
         verify(categoryGateway, never()).create(any());
     }
 
@@ -85,6 +89,10 @@ class CreateCategoryUseCaseTest {
 
         assertSame(expectedException, actualException);
         verify(categoryGateway).create(any());
+    }
+
+    private String firstErrorOf(final Notification notification) {
+        return notification.firstError().orElseThrow().message();
     }
 
     private boolean isCreatedFrom(final Category category, final boolean isActive) {
