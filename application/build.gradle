@@ -1,5 +1,7 @@
 import org.gradle.process.CommandLineArgumentProvider
 
+apply plugin: 'java-library'
+
 def mockitoVersion = '5.20.0'
 
 configurations {
@@ -9,7 +11,8 @@ configurations {
 }
 
 dependencies {
-    implementation project(':domain')
+    api project(':domain')
+    api 'io.vavr:vavr:0.10.6'
 
     testImplementation "org.mockito:mockito-junit-jupiter:$mockitoVersion"
     mockitoAgent "org.mockito:mockito-core:$mockitoVersion"
