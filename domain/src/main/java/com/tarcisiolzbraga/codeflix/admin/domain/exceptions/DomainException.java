@@ -10,7 +10,7 @@ public class DomainException extends NoStackTraceException {
     // transient: the exception is handled in-process (turned into an HTTP response), never serialized.
     private final transient List<ValidationError> errors;
 
-    private DomainException(final String message, final List<ValidationError> errors) {
+    protected DomainException(final String message, final List<ValidationError> errors) {
         super(message);
         this.errors = errors;
     }
