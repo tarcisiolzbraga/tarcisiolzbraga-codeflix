@@ -2,24 +2,16 @@ package com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.category.Category;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.persistence.BaseJpaEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.Instant;
-import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.envers.Audited;
-import org.hibernate.type.SqlTypes;
 
 @Audited
 @Entity(name = "Category")
 @Table(name = "category")
-public class CategoryJpaEntity {
-
-    @Id
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(name = "id", length = 36)
-    private String id;
+public class CategoryJpaEntity extends BaseJpaEntity {
 
     @Column(name = "name", nullable = false)
     private String name;
@@ -30,26 +22,14 @@ public class CategoryJpaEntity {
     @Column(name = "active", nullable = false)
     private boolean active;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
-
-    @Column(name = "deleted_at")
-    private Instant deletedAt;
-
     protected CategoryJpaEntity() {
     }
 
     private CategoryJpaEntity(final Category category) {
-        this.id = category.getId().getValue();
+        super(category.getId().getValue(), category.getCreatedAt(), category.getUpdatedAt(), category.getDeletedAt());
         this.name = category.getName();
         this.description = category.getDescription();
         this.active = category.isActive();
-        this.createdAt = category.getCreatedAt();
-        this.updatedAt = category.getUpdatedAt();
-        this.deletedAt = category.getDeletedAt();
     }
 
     public static CategoryJpaEntity from(final Category category) {
@@ -58,17 +38,13 @@ public class CategoryJpaEntity {
 
     public Category toAggregate() {
         return Category.with(
-                CategoryID.from(this.id),
+                CategoryID.from(getId()),
                 this.name,
                 this.description,
                 this.active,
-                this.createdAt,
-                this.updatedAt,
-                this.deletedAt);
-    }
-
-    public String getId() {
-        return this.id;
+                getCreatedAt(),
+                getUpdatedAt(),
+                getDeletedAt());
     }
 
     public String getName() {
@@ -81,17 +57,5 @@ public class CategoryJpaEntity {
 
     public boolean isActive() {
         return this.active;
-    }
-
-    public Instant getCreatedAt() {
-        return this.createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return this.updatedAt;
-    }
-
-    public Instant getDeletedAt() {
-        return this.deletedAt;
     }
 }
