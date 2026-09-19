@@ -10,12 +10,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.DomainException;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.Notification;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.ThrowsValidationHandler;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
 class CategoryTest {
 
     private static final String EXPECTED_NAME = "Filmes";
     private static final String EXPECTED_DESCRIPTION = "A categoria mais assistida";
+    private static final int NANOS_PER_MICRO = 1_000;
 
     @Test
     void givenValidParams_whenCallNewCategory_thenInstantiateActiveCategory() {
@@ -124,6 +126,36 @@ class CategoryTest {
     }
 
     @Test
+    void givenInactiveFlag_whenCallNewCategory_thenTruncateTimestampsToMicroseconds() {
+        final var expectedIsActive = false;
+
+        final var actualCategory = Category.newCategory(EXPECTED_NAME, EXPECTED_DESCRIPTION, expectedIsActive);
+
+        assertTrue(hasMicrosecondPrecision(actualCategory.getCreatedAt()));
+        assertTrue(hasMicrosecondPrecision(actualCategory.getUpdatedAt()));
+        assertTrue(hasMicrosecondPrecision(actualCategory.getDeletedAt()));
+    }
+
+    @Test
+    void givenActiveCategory_whenCallDeactivate_thenTruncateTimestampsToMicroseconds() {
+        final var category = Category.newCategory(EXPECTED_NAME, EXPECTED_DESCRIPTION, true);
+
+        final var actualCategory = category.deactivate();
+
+        assertTrue(hasMicrosecondPrecision(actualCategory.getUpdatedAt()));
+        assertTrue(hasMicrosecondPrecision(actualCategory.getDeletedAt()));
+    }
+
+    @Test
+    void givenInactiveCategory_whenCallUpdate_thenTruncateUpdatedAtToMicroseconds() {
+        final var category = Category.newCategory(EXPECTED_NAME, EXPECTED_DESCRIPTION, false);
+
+        final var actualCategory = category.update(EXPECTED_NAME, EXPECTED_DESCRIPTION, true);
+
+        assertTrue(hasMicrosecondPrecision(actualCategory.getUpdatedAt()));
+    }
+
+    @Test
     void givenActiveCategory_whenCallDeactivate_thenReturnInactiveCategory() {
         final var category = Category.newCategory(EXPECTED_NAME, EXPECTED_DESCRIPTION, true);
         final var createdAt = category.getCreatedAt();
@@ -180,5 +212,9 @@ class CategoryTest {
 
         assertTrue(actualEquals);
         assertEquals(category.hashCode(), sameId.hashCode());
+    }
+
+    private boolean hasMicrosecondPrecision(final Instant instant) {
+        return instant.getNano() % NANOS_PER_MICRO == 0;
     }
 }

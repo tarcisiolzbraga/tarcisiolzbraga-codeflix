@@ -1,6 +1,7 @@
 package com.tarcisiolzbraga.codeflix.admin.domain.category;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.AggregateRoot;
+import com.tarcisiolzbraga.codeflix.admin.domain.util.InstantUtils;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationHandler;
 import java.time.Instant;
 
@@ -31,7 +32,7 @@ public class Category extends AggregateRoot<CategoryID> {
     }
 
     public static Category newCategory(final String name, final String description, final boolean isActive) {
-        final var now = Instant.now();
+        final var now = InstantUtils.now();
         final var deletedAt = isActive ? null : now;
         return new Category(CategoryID.unique(), name, description, isActive, now, now, deletedAt);
     }
@@ -55,16 +56,16 @@ public class Category extends AggregateRoot<CategoryID> {
     public Category activate() {
         this.deletedAt = null;
         this.active = true;
-        this.updatedAt = Instant.now();
+        this.updatedAt = InstantUtils.now();
         return this;
     }
 
     public Category deactivate() {
         if (this.deletedAt == null) {
-            this.deletedAt = Instant.now();
+            this.deletedAt = InstantUtils.now();
         }
         this.active = false;
-        this.updatedAt = Instant.now();
+        this.updatedAt = InstantUtils.now();
         return this;
     }
 
@@ -76,7 +77,6 @@ public class Category extends AggregateRoot<CategoryID> {
         }
         this.name = name;
         this.description = description;
-        this.updatedAt = Instant.now();
         return this;
     }
 

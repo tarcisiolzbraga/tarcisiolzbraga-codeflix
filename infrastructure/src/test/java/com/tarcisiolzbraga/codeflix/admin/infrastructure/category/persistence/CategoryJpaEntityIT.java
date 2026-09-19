@@ -2,13 +2,10 @@ package com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.category.Category;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,7 +30,8 @@ class CategoryJpaEntityIT {
         assertEquals(category.getId(), actualCategory.getId());
         assertEquals("Filmes", actualCategory.getName());
         assertEquals("A mais assistida", actualCategory.getDescription());
-        assertEquals(truncate(category.getCreatedAt()), truncate(actualCategory.getCreatedAt()));
+        assertEquals(category.getCreatedAt(), actualCategory.getCreatedAt());
+        assertEquals(category.getUpdatedAt(), actualCategory.getUpdatedAt());
         assertNull(actualCategory.getDeletedAt());
     }
 
@@ -45,7 +43,7 @@ class CategoryJpaEntityIT {
 
         assertFalse(actualCategory.isActive());
         assertNull(actualCategory.getDescription());
-        assertNotNull(actualCategory.getDeletedAt());
+        assertEquals(category.getDeletedAt(), actualCategory.getDeletedAt());
     }
 
     private Category saveAndReload(final Category category) {
@@ -54,9 +52,5 @@ class CategoryJpaEntityIT {
                 .findById(category.getId().getValue())
                 .map(CategoryJpaEntity::toAggregate)
                 .orElseThrow();
-    }
-
-    private Instant truncate(final Instant instant) {
-        return instant.truncatedTo(ChronoUnit.MILLIS);
     }
 }
