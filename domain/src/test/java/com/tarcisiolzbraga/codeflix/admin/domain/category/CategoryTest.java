@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.DomainException;
+import com.tarcisiolzbraga.codeflix.admin.domain.util.InstantUtils;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.Notification;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.ThrowsValidationHandler;
 import java.time.Instant;
@@ -153,6 +154,30 @@ class CategoryTest {
         final var actualCategory = category.update(EXPECTED_NAME, EXPECTED_DESCRIPTION, true);
 
         assertTrue(hasMicrosecondPrecision(actualCategory.getUpdatedAt()));
+    }
+
+    @Test
+    void givenNullCreatedAt_whenCallWith_thenThrowNullPointerException() {
+        final var id = CategoryID.unique();
+        final var updatedAt = InstantUtils.now();
+
+        final var actualException = assertThrows(
+                NullPointerException.class,
+                () -> Category.with(id, EXPECTED_NAME, EXPECTED_DESCRIPTION, true, null, updatedAt, null));
+
+        assertEquals("'createdAt' should not be null", actualException.getMessage());
+    }
+
+    @Test
+    void givenNullUpdatedAt_whenCallWith_thenThrowNullPointerException() {
+        final var id = CategoryID.unique();
+        final var createdAt = InstantUtils.now();
+
+        final var actualException = assertThrows(
+                NullPointerException.class,
+                () -> Category.with(id, EXPECTED_NAME, EXPECTED_DESCRIPTION, true, createdAt, null, null));
+
+        assertEquals("'updatedAt' should not be null", actualException.getMessage());
     }
 
     @Test
