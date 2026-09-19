@@ -39,12 +39,14 @@ class UpdateCategoryUseCaseTest {
     void givenValidCommand_whenCallExecute_thenReturnRightWithUpdatedCategory() {
         final var category = givenStoredCategory(true);
         final var command = commandFor(category, EXPECTED_NAME, true);
+        final var previousUpdatedAt = category.getUpdatedAt();
         when(categoryGateway.update(any())).thenAnswer(returnsFirstArg());
 
         final var actualResult = useCase.execute(command);
 
         assertTrue(actualResult.isRight());
         assertEquals(category.getId().getValue(), actualResult.get().id());
+        assertTrue(previousUpdatedAt.isBefore(category.getUpdatedAt()));
         verify(categoryGateway).update(argThat(updated -> isUpdatedFrom(updated, category, true)));
     }
 
@@ -52,11 +54,13 @@ class UpdateCategoryUseCaseTest {
     void givenInactiveCommand_whenCallExecute_thenDeactivateTheCategory() {
         final var category = givenStoredCategory(true);
         final var command = commandFor(category, EXPECTED_NAME, false);
+        final var previousUpdatedAt = category.getUpdatedAt();
         when(categoryGateway.update(any())).thenAnswer(returnsFirstArg());
 
         final var actualResult = useCase.execute(command);
 
         assertTrue(actualResult.isRight());
+        assertTrue(previousUpdatedAt.isBefore(category.getUpdatedAt()));
         verify(categoryGateway).update(argThat(updated -> isUpdatedFrom(updated, category, false)));
     }
 
@@ -64,11 +68,13 @@ class UpdateCategoryUseCaseTest {
     void givenInactiveCategory_whenCallExecuteWithActiveCommand_thenActivateIt() {
         final var category = givenStoredCategory(false);
         final var command = commandFor(category, EXPECTED_NAME, true);
+        final var previousUpdatedAt = category.getUpdatedAt();
         when(categoryGateway.update(any())).thenAnswer(returnsFirstArg());
 
         final var actualResult = useCase.execute(command);
 
         assertTrue(actualResult.isRight());
+        assertTrue(previousUpdatedAt.isBefore(category.getUpdatedAt()));
         verify(categoryGateway).update(argThat(updated -> isUpdatedFrom(updated, category, true)));
     }
 
