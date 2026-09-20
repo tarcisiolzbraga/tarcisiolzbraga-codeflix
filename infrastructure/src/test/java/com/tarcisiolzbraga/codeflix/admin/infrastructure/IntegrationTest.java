@@ -13,7 +13,10 @@ import org.springframework.core.annotation.AliasFor;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Inherited
-@SpringBootTest
+// classes explícito porque os UseCaseIT ficam no pacote da application, de onde a busca por
+// @SpringBootConfiguration subindo pelos pacotes não alcança a Main. Como o classes desliga essa
+// busca, @TestConfiguration aninhada no teste também deixa de ser vista: precisa de @Import.
+@SpringBootTest(classes = Main.class)
 @Import(MySQLContainerConfiguration.class)
 public @interface IntegrationTest {
 

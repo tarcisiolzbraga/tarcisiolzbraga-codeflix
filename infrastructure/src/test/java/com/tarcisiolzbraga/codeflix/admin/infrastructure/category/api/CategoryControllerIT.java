@@ -1,12 +1,8 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.category.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -21,6 +17,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+// Fumaça da fiação HTTP -> caso de uso -> banco. O comportamento de cada caso de uso
+// é coberto pelos UseCaseIT, e o contrato HTTP pelo CategoryControllerTest.
 @IntegrationTest
 @AutoConfigureMockMvc
 class CategoryControllerIT {
@@ -53,97 +51,16 @@ class CategoryControllerIT {
     }
 
     @Test
-    void givenInvalidName_whenCallCreate_thenReturn422AndPersistNothing() throws Exception {
-        final var response = this.mockMvc.perform(post(CATEGORIES_PATH)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"description":"A mais assistida","active":true}"""));
-
-        response.andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.errors[0]").value("'name' should not be null"));
-        assertEquals(0, this.categoryRepository.count());
-    }
-
-    @Test
     void givenPersistedCategory_whenCallGetById_thenReturnIt() throws Exception {
-        final var category = givenPersistedCategory("Filmes", true);
+        final var category =
+                this.categoryGateway.create(Category.newCategory("Filmes", "A mais assistida", true));
 
-        final var response = this.mockMvc.perform(get(CATEGORIES_PATH + "/" + category.getId().getValue()));
+        final var response =
+                this.mockMvc.perform(get(CATEGORIES_PATH + "/" + category.getId().getValue()));
 
         response.andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(category.getId().getValue()))
                 .andExpect(jsonPath("$.name").value("Filmes"))
                 .andExpect(jsonPath("$.active").value(true));
-    }
-
-    @Test
-    void givenUnknownId_whenCallGetById_thenReturn404() throws Exception {
-        final var response = this.mockMvc.perform(get(CATEGORIES_PATH + "/nao-existe"));
-
-        response.andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.message").value("Category with ID nao-existe was not found"));
-    }
-
-    @Test
-    void givenPersistedCategories_whenCallList_thenReturnFilteredPagination() throws Exception {
-        givenPersistedCategory("Filmes", true);
-        givenPersistedCategory("Séries", true);
-
-        final var response = this.mockMvc.perform(get(CATEGORIES_PATH).queryParam("search", "fil"));
-
-        response.andExpect(status().isOk())
-                .andExpect(jsonPath("$.total").value(1))
-                .andExpect(jsonPath("$.items[0].name").value("Filmes"));
-    }
-
-    @Test
-    void givenPersistedCategory_whenCallUpdate_thenSaveTheNewValues() throws Exception {
-        final var category = givenPersistedCategory("Flmes", true);
-
-        final var response = this.mockMvc.perform(put(CATEGORIES_PATH + "/" + category.getId().getValue())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                        {"name":"Filmes","description":"A mais assistida"}"""));
-
-        response.andExpect(status().isOk());
-        final var actualCategory = this.categoryGateway.findById(category.getId()).orElseThrow();
-        assertEquals("Filmes", actualCategory.getName());
-        assertTrue(actualCategory.isActive());
-    }
-
-    @Test
-    void givenInactiveCategory_whenCallActivate_thenPersistItActive() throws Exception {
-        final var category = givenPersistedCategory("Filmes", false);
-
-        final var response =
-                this.mockMvc.perform(put(CATEGORIES_PATH + "/" + category.getId().getValue() + "/activate"));
-
-        response.andExpect(status().isOk()).andExpect(jsonPath("$.active").value(true));
-        assertTrue(this.categoryGateway.findById(category.getId()).orElseThrow().isActive());
-    }
-
-    @Test
-    void givenActiveCategory_whenCallDeactivate_thenPersistItInactiveWithoutRemovingIt() throws Exception {
-        final var category = givenPersistedCategory("Filmes", true);
-
-        final var response =
-                this.mockMvc.perform(put(CATEGORIES_PATH + "/" + category.getId().getValue() + "/deactivate"));
-
-        response.andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false));
-        assertFalse(this.categoryGateway.findById(category.getId()).orElseThrow().isActive());
-        assertEquals(1, this.categoryRepository.count());
-    }
-
-    @Test
-    void givenPersistedCategory_whenCallDelete_thenRemoveItAndReturn204() throws Exception {
-        final var category = givenPersistedCategory("Filmes", true);
-
-        final var response = this.mockMvc.perform(delete(CATEGORIES_PATH + "/" + category.getId().getValue()));
-
-        response.andExpect(status().isNoContent());
-        assertEquals(0, this.categoryRepository.count());
-    }
-
-    private Category givenPersistedCategory(final String name, final boolean isActive) {
-        return this.categoryGateway.create(Category.newCategory(name, "descricao de " + name, isActive));
     }
 }
