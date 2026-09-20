@@ -1,0 +1,11 @@
+# Produção: variáveis de ambiente no lugar do .env e documentação da API fora do ar,
+# para não expor o contrato publicamente.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    com.tarcisiolzbraga.codeflix.admin: info
