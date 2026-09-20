@@ -16,6 +16,8 @@ docker compose up -d
 ./gradlew bootRun
 ```
 
+Com a aplicação no ar, a documentação da API (Swagger UI) fica em http://localhost:8080/swagger-ui.html, e o JSON do OpenAPI em http://localhost:8080/v3/api-docs.
+
 ## Testes
 ```bash
 ./gradlew test
