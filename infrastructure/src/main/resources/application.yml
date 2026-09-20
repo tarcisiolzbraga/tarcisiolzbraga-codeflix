@@ -18,11 +18,49 @@ spring:
     url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
+    hikari:
+      pool-name: adm-videos-pool
+      # Com virtual threads, o pool é o que limita as consultas simultâneas. Fixo (mínimo
+      # igual ao máximo), como recomenda o HikariCP: nada de abrir conexão no pico.
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+      minimum-idle: ${DB_POOL_SIZE:20}
+      # Espera máxima por uma conexão livre (ms): no pico, falha rápido em vez de enfileirar.
+      connection-timeout: 2000
+      # Recicla a conexão (10 min) bem antes do wait_timeout do MySQL (8 h).
+      max-lifetime: 600000
+      # O Hibernate controla a transação; ver provider_disables_autocommit abaixo.
+      auto-commit: false
+      # Recomendações do HikariCP para o MySQL Connector/J.
+      data-source-properties:
+        cachePrepStmts: true
+        prepStmtCacheSize: 250
+        prepStmtCacheSqlLimit: 2048
+        useServerPrepStmts: true
+        useLocalSessionState: true
+        useLocalTransactionState: true
+        rewriteBatchedStatements: true
+        cacheResultSetMetadata: true
+        cacheServerConfiguration: true
+        elideSetAutoCommits: true
+        maintainTimeStats: false
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
     properties:
       org.hibernate.envers.audit_table_suffix: _aud
+      # O pool já entrega a conexão sem auto-commit: o Hibernate só a pega na primeira
+      # consulta, não na abertura da transação.
+      hibernate.connection.provider_disables_autocommit: true
+      # Agrupa inserts e updates num só envio (com o rewriteBatchedStatements do driver).
+      hibernate.jdbc.batch_size: 50
+      hibernate.order_inserts: true
+      hibernate.order_updates: true
+      # Carrega associações lazy em lotes, evitando o N+1.
+      hibernate.default_batch_fetch_size: 16
+      # IN com quantidade de parâmetros arredondada para potência de 2: menos planos em cache.
+      hibernate.query.in_clause_parameter_padding: true
+      # Paginar com fetch de coleção faria o Hibernate paginar em memória: vira erro.
+      hibernate.query.fail_on_pagination_over_collection_fetch: true
   flyway:
     locations: classpath:db/migration

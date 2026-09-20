@@ -23,7 +23,7 @@ docker compose up -d
 | `homolog` | ambiente de homologação | variáveis de ambiente (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) | sim |
 | `production` | produção | variáveis de ambiente, todas obrigatórias | não |
 
-O perfil é escolhido por `SPRING_PROFILES_ACTIVE`:
+O tamanho do pool de conexões vem de `DB_POOL_SIZE` (padrão 5 no `development` e 20 nos outros). O perfil é escolhido por `SPRING_PROFILES_ACTIVE`:
 
 ```bash
 SPRING_PROFILES_ACTIVE=homolog java -jar build/libs/application.jar
