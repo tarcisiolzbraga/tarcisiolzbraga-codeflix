@@ -11,7 +11,6 @@ import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.CategoryRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -27,11 +26,6 @@ class DeleteCategoryUseCaseIT {
 
     @MockitoSpyBean
     private CategoryGateway categoryGateway;
-
-    @BeforeEach
-    void cleanUp() {
-        this.categoryRepository.deleteAll();
-    }
 
     @Test
     void givenPersistedCategory_whenCallExecute_thenRemoveIt() {

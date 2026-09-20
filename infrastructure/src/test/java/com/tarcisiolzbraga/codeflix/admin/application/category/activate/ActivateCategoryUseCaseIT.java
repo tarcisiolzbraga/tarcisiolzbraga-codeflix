@@ -10,7 +10,6 @@ import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.NotFoundException;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.CategoryRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -25,11 +24,6 @@ class ActivateCategoryUseCaseIT {
 
     @Autowired
     private CategoryRepository categoryRepository;
-
-    @BeforeEach
-    void cleanUp() {
-        this.categoryRepository.deleteAll();
-    }
 
     @Test
     void givenInactiveCategory_whenCallExecute_thenPersistItAsActiveWithoutRemovingIt() {

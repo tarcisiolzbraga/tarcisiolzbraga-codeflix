@@ -9,11 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.Category;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.CategoryJpaEntity;
-import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.CategoryRepository;
 import jakarta.persistence.EntityManagerFactory;
 import java.util.List;
 import org.hibernate.envers.AuditReaderFactory;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -24,15 +22,7 @@ class CategoryAuditIT {
     private CategoryMySQLGateway categoryGateway;
 
     @Autowired
-    private CategoryRepository categoryRepository;
-
-    @Autowired
     private EntityManagerFactory entityManagerFactory;
-
-    @BeforeEach
-    void cleanUp() {
-        this.categoryRepository.deleteAll();
-    }
 
     @Test
     void givenCreatedCategory_whenReadRevisions_thenHaveOneRevision() {

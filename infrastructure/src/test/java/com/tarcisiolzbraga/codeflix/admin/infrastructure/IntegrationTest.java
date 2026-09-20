@@ -7,6 +7,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.annotation.AliasFor;
 
@@ -18,6 +19,7 @@ import org.springframework.core.annotation.AliasFor;
 // busca, @TestConfiguration aninhada no teste também deixa de ser vista: precisa de @Import.
 @SpringBootTest(classes = Main.class)
 @Import(MySQLContainerConfiguration.class)
+@ExtendWith(MySQLCleanUpExtension.class)
 public @interface IntegrationTest {
 
     // MOCK por padrão; RANDOM_PORT sobe o Tomcat de verdade, para testar o que passa por ele.

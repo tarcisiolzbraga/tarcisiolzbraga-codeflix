@@ -10,7 +10,6 @@ import com.tarcisiolzbraga.codeflix.admin.domain.pagination.SearchQuery;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.CategoryRepository;
 import java.util.List;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -22,11 +21,6 @@ class CategoryMySQLGatewayIT {
 
     @Autowired
     private CategoryRepository categoryRepository;
-
-    @BeforeEach
-    void cleanUp() {
-        this.categoryRepository.deleteAll();
-    }
 
     @Test
     void givenCategory_whenCallCreate_thenPersistIt() {
