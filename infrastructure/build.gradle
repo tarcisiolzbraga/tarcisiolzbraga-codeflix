@@ -1,6 +1,7 @@
 plugins {
     id 'org.springframework.boot'
     id 'io.spring.dependency-management'
+    id 'jacoco-report-aggregation'
 }
 
 tasks.named('bootJar') {
@@ -35,4 +36,19 @@ dependencies {
 
 tasks.named('bootRun') {
     workingDir = rootProject.projectDir
+}
+
+// Cobertura dos três módulos num relatório só (a infrastructure depende dos outros dois).
+tasks.named('testCodeCoverageReport', JacocoReport) {
+    reports {
+        html.required = true
+        html.outputLocation = rootProject.layout.buildDirectory.dir('reports/jacoco/html')
+        xml.required = true
+        xml.outputLocation = rootProject.layout.buildDirectory.file('reports/jacoco/jacoco.xml')
+    }
+}
+
+// O build já roda os testes; gerar o relatório junto sai quase de graça e mantém ele atualizado.
+tasks.named('check') {
+    dependsOn tasks.named('testCodeCoverageReport')
 }

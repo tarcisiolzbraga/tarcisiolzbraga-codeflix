@@ -20,3 +20,5 @@ docker compose up -d
 ```bash
 ./gradlew test
 ```
+
+O `./gradlew build` também gera o relatório de cobertura (JaCoCo) dos três módulos em `build/reports/jacoco/html/index.html`.
