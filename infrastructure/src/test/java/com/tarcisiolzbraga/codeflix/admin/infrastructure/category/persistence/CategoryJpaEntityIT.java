@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.category.Category;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -16,11 +15,6 @@ class CategoryJpaEntityIT {
 
     @Autowired
     private CategoryRepository categoryRepository;
-
-    @BeforeEach
-    void cleanUp() {
-        this.categoryRepository.deleteAll();
-    }
 
     @Test
     void givenActiveCategory_whenSaveAndReload_thenKeepAllFields() {

@@ -7,8 +7,6 @@ import com.tarcisiolzbraga.codeflix.admin.domain.category.Category;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.SearchQuery;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
-import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.CategoryRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -20,14 +18,6 @@ class ListCategoriesUseCaseIT {
 
     @Autowired
     private CategoryGateway categoryGateway;
-
-    @Autowired
-    private CategoryRepository categoryRepository;
-
-    @BeforeEach
-    void cleanUp() {
-        this.categoryRepository.deleteAll();
-    }
 
     @Test
     void givenPersistedCategories_whenCallExecute_thenReturnThemSortedByName() {
