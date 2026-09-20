@@ -4,6 +4,11 @@ spring:
     import: optional:file:.env[.properties]
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:adm_videos}
+    hikari:
+      # Na máquina local, poucas conexões bastam; e conexão presa por mais de 2 s vira aviso no log.
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+      minimum-idle: ${DB_POOL_SIZE:5}
+      leak-detection-threshold: 2000
 
 logging:
   level:

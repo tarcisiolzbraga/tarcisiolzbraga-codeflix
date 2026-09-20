@@ -1,10 +1,14 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.configuration;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
+import com.zaxxer.hikari.HikariDataSource;
+import java.sql.SQLException;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,11 +30,21 @@ class ApplicationProfileIT {
         @Autowired
         private Environment environment;
 
+        @Autowired
+        private DataSource dataSource;
+
         @Test
         void givenNoActiveProfile_whenStartApp_thenUseDevelopment() {
             final var profileMatches = this.environment.matchesProfiles("development");
 
             assertTrue(profileMatches);
+        }
+
+        @Test
+        void givenDevelopmentProfile_whenReadPool_thenDetectConnectionLeaks() throws SQLException {
+            final var pool = this.dataSource.unwrap(HikariDataSource.class);
+
+            assertEquals(2000, pool.getLeakDetectionThreshold());
         }
     }
 
@@ -59,6 +73,17 @@ class ApplicationProfileIT {
 
         @Autowired
         private MockMvc mockMvc;
+
+        @Autowired
+        private DataSource dataSource;
+
+        @Test
+        void givenProductionProfile_whenReadPool_thenKeepTwentyConnections() throws SQLException {
+            final var pool = this.dataSource.unwrap(HikariDataSource.class);
+
+            assertEquals(20, pool.getMaximumPoolSize());
+            assertEquals(0, pool.getLeakDetectionThreshold());
+        }
 
         @Test
         void givenProductionProfile_whenCallApiDocs_thenNotFound() throws Exception {
