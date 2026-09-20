@@ -1,16 +1,21 @@
+# Configuração comum aos três perfis: development, homolog e production.
+# Sem perfil ativo (bootRun, testes), vale o development; nos outros ambientes o perfil
+# vem de SPRING_PROFILES_ACTIVE.
 server:
   port: 8080
 
 spring:
-  config:
-    import: optional:file:.env[.properties]
+  profiles:
+    default: development
   threads:
     virtual:
       # Cada requisição roda numa virtual thread: esperar o JDBC não prende thread do SO.
       # O teto de consultas simultâneas continua sendo o pool de conexões (Hikari).
       enabled: true
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:adm_videos}
+    # Sem valor padrão: fora do development, variável faltando derruba a subida em vez
+    # de apontar para um banco errado.
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
   jpa:

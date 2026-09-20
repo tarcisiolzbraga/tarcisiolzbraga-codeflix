@@ -1,0 +1,11 @@
+# Máquina do desenvolvedor: credenciais do .env (o mesmo do docker compose) e banco local.
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:adm_videos}
+
+logging:
+  level:
+    com.tarcisiolzbraga.codeflix.admin: debug
+    org.hibernate.SQL: debug

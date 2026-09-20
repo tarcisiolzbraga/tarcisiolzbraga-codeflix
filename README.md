@@ -16,6 +16,19 @@ docker compose up -d
 ./gradlew bootRun
 ```
 
+### Perfis
+| Perfil | Quando | Configuração do banco | Swagger UI |
+|---|---|---|---|
+| `development` | padrão, sem perfil ativo (`bootRun`, testes) | `.env`, com `localhost` como padrão | sim |
+| `homolog` | ambiente de homologação | variáveis de ambiente (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) | sim |
+| `production` | produção | variáveis de ambiente, todas obrigatórias | não |
+
+O perfil é escolhido por `SPRING_PROFILES_ACTIVE`:
+
+```bash
+SPRING_PROFILES_ACTIVE=homolog java -jar build/libs/application.jar
+```
+
 Com a aplicação no ar, a documentação da API (Swagger UI) fica em http://localhost:8080/swagger-ui.html, e o JSON do OpenAPI em http://localhost:8080/v3/api-docs.
 
 ## Testes

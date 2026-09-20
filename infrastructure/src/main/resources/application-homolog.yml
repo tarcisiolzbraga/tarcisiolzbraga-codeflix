@@ -1,0 +1,5 @@
+# Homologação: espelha a produção, com variáveis de ambiente no lugar do .env,
+# mas mantém o Swagger UI para quem valida a API.
+logging:
+  level:
+    com.tarcisiolzbraga.codeflix.admin: info
