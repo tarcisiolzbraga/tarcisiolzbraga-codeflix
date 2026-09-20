@@ -3,6 +3,7 @@ package com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.category.Category;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
@@ -32,18 +33,17 @@ class CategoryJpaEntityIT {
         assertEquals("A mais assistida", actualCategory.getDescription());
         assertEquals(category.getCreatedAt(), actualCategory.getCreatedAt());
         assertEquals(category.getUpdatedAt(), actualCategory.getUpdatedAt());
-        assertNull(actualCategory.getDeletedAt());
+        assertTrue(actualCategory.isActive());
     }
 
     @Test
-    void givenInactiveCategory_whenSaveAndReload_thenKeepDeletedAt() {
+    void givenInactiveCategory_whenSaveAndReload_thenKeepItInactive() {
         final var category = Category.newCategory("Series", null, false);
 
         final var actualCategory = saveAndReload(category);
 
         assertFalse(actualCategory.isActive());
         assertNull(actualCategory.getDescription());
-        assertEquals(category.getDeletedAt(), actualCategory.getDeletedAt());
     }
 
     private Category saveAndReload(final Category category) {

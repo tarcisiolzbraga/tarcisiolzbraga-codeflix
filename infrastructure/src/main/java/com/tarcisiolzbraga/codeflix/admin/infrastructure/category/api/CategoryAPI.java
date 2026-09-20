@@ -9,10 +9,15 @@ import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseD
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.UNPROCESSABLE;
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.UNPROCESSABLE_DESCRIPTION;
 
-import com.tarcisiolzbraga.codeflix.admin.application.category.create.CreateCategoryOutput;
-import com.tarcisiolzbraga.codeflix.admin.application.category.update.UpdateCategoryOutput;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiError;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.CategoryListResponse;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.CategoryResponse;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.CategorySearchRequest;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.CreateCategoryRequest;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.CreateCategoryResponse;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.UpdateCategoryRequest;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.UpdateCategoryResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -40,7 +45,7 @@ public interface CategoryAPI {
     @PostMapping
     @Operation(summary = "Cria uma categoria", description = "Sem o campo active, a categoria nasce ativa.")
     @ApiResponse(responseCode = CREATED, description = "Criada; a URL do recurso vem no header Location",
-            content = @Content(schema = @Schema(implementation = CreateCategoryOutput.class)))
+            content = @Content(schema = @Schema(implementation = CreateCategoryResponse.class)))
     @ApiResponse(responseCode = UNPROCESSABLE, description = UNPROCESSABLE_DESCRIPTION,
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     ResponseEntity<Object> create(@RequestBody CreateCategoryRequest request);
@@ -58,9 +63,9 @@ public interface CategoryAPI {
     CategoryResponse getById(@Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id);
 
     @PutMapping("/{id}")
-    @Operation(summary = "Atualiza uma categoria", description = "Substitui nome, descrição e situação.")
+    @Operation(summary = "Atualiza uma categoria", description = "Substitui nome e descrição; a ativação tem rotas próprias.")
     @ApiResponse(responseCode = OK, description = "Atualizada",
-            content = @Content(schema = @Schema(implementation = UpdateCategoryOutput.class)))
+            content = @Content(schema = @Schema(implementation = UpdateCategoryResponse.class)))
     @ApiResponse(responseCode = NOT_FOUND, description = NOT_FOUND_DESCRIPTION,
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = UNPROCESSABLE, description = UNPROCESSABLE_DESCRIPTION,
@@ -68,6 +73,20 @@ public interface CategoryAPI {
     ResponseEntity<Object> update(
             @Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id,
             @RequestBody UpdateCategoryRequest request);
+
+    @PutMapping("/{id}/activate")
+    @Operation(summary = "Ativa uma categoria", description = "Idempotente: uma categoria já ativa segue ativa.")
+    @ApiResponse(responseCode = OK, description = "Categoria ativa")
+    @ApiResponse(responseCode = NOT_FOUND, description = NOT_FOUND_DESCRIPTION,
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    CategoryResponse activate(@Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id);
+
+    @PutMapping("/{id}/deactivate")
+    @Operation(summary = "Desativa uma categoria", description = "Tira do catálogo sem apagar o registro.")
+    @ApiResponse(responseCode = OK, description = "Categoria inativa")
+    @ApiResponse(responseCode = NOT_FOUND, description = NOT_FOUND_DESCRIPTION,
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    CategoryResponse deactivate(@Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id);
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

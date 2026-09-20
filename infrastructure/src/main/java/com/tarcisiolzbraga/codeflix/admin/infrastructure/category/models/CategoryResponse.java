@@ -1,6 +1,6 @@
-package com.tarcisiolzbraga.codeflix.admin.infrastructure.category.api;
+package com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models;
 
-import com.tarcisiolzbraga.codeflix.admin.application.category.get.CategoryOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.category.CategoryOutput;
 import java.time.Instant;
 
 public record CategoryResponse(
@@ -9,8 +9,7 @@ public record CategoryResponse(
         String description,
         boolean active,
         Instant createdAt,
-        Instant updatedAt,
-        Instant deletedAt) {
+        Instant updatedAt) {
 
     public static CategoryResponse from(final CategoryOutput output) {
         return new CategoryResponse(
@@ -19,7 +18,6 @@ public record CategoryResponse(
                 output.description(),
                 output.isActive(),
                 output.createdAt(),
-                output.updatedAt(),
-                output.deletedAt());
+                output.updatedAt());
     }
 }

@@ -23,7 +23,7 @@ public class DefaultUpdateCategoryUseCase extends UpdateCategoryUseCase {
     public Either<Notification, UpdateCategoryOutput> execute(final UpdateCategoryCommand input) {
         final var category = findById(CategoryID.from(input.id()));
         final var notification = Notification.create();
-        category.update(input.name(), input.description(), input.isActive()).validate(notification);
+        category.update(input.name(), input.description()).validate(notification);
 
         return notification.hasError() ? Left(notification) : update(category);
     }

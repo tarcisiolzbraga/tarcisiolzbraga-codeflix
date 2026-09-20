@@ -17,28 +17,32 @@ public abstract class BaseJpaEntity {
     @Column(name = "id", length = 36)
     private String id;
 
+    @Column(name = "active", nullable = false)
+    private boolean active;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    @Column(name = "deleted_at")
-    private Instant deletedAt;
-
     protected BaseJpaEntity() {
     }
 
     protected BaseJpaEntity(
-            final String id, final Instant createdAt, final Instant updatedAt, final Instant deletedAt) {
+            final String id, final boolean active, final Instant createdAt, final Instant updatedAt) {
         this.id = id;
+        this.active = active;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
-        this.deletedAt = deletedAt;
     }
 
     public String getId() {
         return this.id;
+    }
+
+    public boolean isActive() {
+        return this.active;
     }
 
     public Instant getCreatedAt() {
@@ -47,9 +51,5 @@ public abstract class BaseJpaEntity {
 
     public Instant getUpdatedAt() {
         return this.updatedAt;
-    }
-
-    public Instant getDeletedAt() {
-        return this.deletedAt;
     }
 }

@@ -15,10 +15,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.tarcisiolzbraga.codeflix.admin.application.category.CategoryOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.category.activate.ActivateCategoryUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.category.create.CreateCategoryOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.category.create.CreateCategoryUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.category.deactivate.DeactivateCategoryUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.category.delete.DeleteCategoryUseCase;
-import com.tarcisiolzbraga.codeflix.admin.application.category.get.CategoryOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.category.get.GetCategoryByIdUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.category.list.CategoryListOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.category.list.ListCategoriesUseCase;
@@ -49,6 +51,10 @@ class CategoryControllerTest {
             """
             {"name":"Filmes","description":"A mais assistida","active":true}""";
 
+    private static final String VALID_UPDATE_BODY =
+            """
+            {"name":"Filmes","description":"A mais assistida"}""";
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -66,6 +72,12 @@ class CategoryControllerTest {
 
     @MockitoBean
     private ListCategoriesUseCase listCategoriesUseCase;
+
+    @MockitoBean
+    private ActivateCategoryUseCase activateCategoryUseCase;
+
+    @MockitoBean
+    private DeactivateCategoryUseCase deactivateCategoryUseCase;
 
     @Test
     void givenValidBody_whenCallCreate_thenReturn201WithLocation() throws Exception {
@@ -105,7 +117,7 @@ class CategoryControllerTest {
                 .andExpect(jsonPath("$.id").value(category.getId().getValue()))
                 .andExpect(jsonPath("$.name").value("Filmes"))
                 .andExpect(jsonPath("$.active").value(true))
-                .andExpect(jsonPath("$.deletedAt").doesNotExist());
+                .andExpect(jsonPath("$.updatedAt").exists());
     }
 
     @Test
@@ -168,7 +180,7 @@ class CategoryControllerTest {
 
         final var response = this.mockMvc.perform(put(CATEGORIES_PATH + "/" + EXPECTED_ID)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(VALID_BODY));
+                .content(VALID_UPDATE_BODY));
 
         response.andExpect(status().isOk()).andExpect(jsonPath("$.id").value(EXPECTED_ID));
     }
@@ -181,10 +193,30 @@ class CategoryControllerTest {
         final var response = this.mockMvc.perform(put(CATEGORIES_PATH + "/" + EXPECTED_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"name":"   ","description":"A mais assistida","active":true}"""));
+                        {"name":"   ","description":"A mais assistida"}"""));
 
         response.andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.errors[0]").value("'name' should not be empty"));
+    }
+
+    @Test
+    void givenValidId_whenCallActivate_thenReturn200WithTheActiveCategory() throws Exception {
+        final var category = Category.newCategory("Filmes", "A mais assistida", true);
+        when(activateCategoryUseCase.execute(EXPECTED_ID)).thenReturn(CategoryOutput.from(category));
+
+        final var response = this.mockMvc.perform(put(CATEGORIES_PATH + "/" + EXPECTED_ID + "/activate"));
+
+        response.andExpect(status().isOk()).andExpect(jsonPath("$.active").value(true));
+    }
+
+    @Test
+    void givenValidId_whenCallDeactivate_thenReturn200WithTheInactiveCategory() throws Exception {
+        final var category = Category.newCategory("Filmes", "A mais assistida", false);
+        when(deactivateCategoryUseCase.execute(EXPECTED_ID)).thenReturn(CategoryOutput.from(category));
+
+        final var response = this.mockMvc.perform(put(CATEGORIES_PATH + "/" + EXPECTED_ID + "/deactivate"));
+
+        response.andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false));
     }
 
     @Test

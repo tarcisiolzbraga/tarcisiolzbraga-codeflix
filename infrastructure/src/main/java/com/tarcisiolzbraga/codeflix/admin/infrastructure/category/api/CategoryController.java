@@ -1,16 +1,26 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.category.api;
 
+import com.tarcisiolzbraga.codeflix.admin.application.category.activate.ActivateCategoryUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.category.create.CreateCategoryCommand;
 import com.tarcisiolzbraga.codeflix.admin.application.category.create.CreateCategoryOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.category.create.CreateCategoryUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.category.deactivate.DeactivateCategoryUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.category.delete.DeleteCategoryUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.category.get.GetCategoryByIdUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.category.list.ListCategoriesUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.category.update.UpdateCategoryCommand;
+import com.tarcisiolzbraga.codeflix.admin.application.category.update.UpdateCategoryOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.category.update.UpdateCategoryUseCase;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.Notification;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiError;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.CategoryListResponse;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.CategoryResponse;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.CategorySearchRequest;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.CreateCategoryRequest;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.CreateCategoryResponse;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.UpdateCategoryRequest;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.UpdateCategoryResponse;
 import java.net.URI;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,18 +35,24 @@ public class CategoryController implements CategoryAPI {
     private final UpdateCategoryUseCase updateCategoryUseCase;
     private final DeleteCategoryUseCase deleteCategoryUseCase;
     private final ListCategoriesUseCase listCategoriesUseCase;
+    private final ActivateCategoryUseCase activateCategoryUseCase;
+    private final DeactivateCategoryUseCase deactivateCategoryUseCase;
 
     public CategoryController(
             final CreateCategoryUseCase createCategoryUseCase,
             final GetCategoryByIdUseCase getCategoryByIdUseCase,
             final UpdateCategoryUseCase updateCategoryUseCase,
             final DeleteCategoryUseCase deleteCategoryUseCase,
-            final ListCategoriesUseCase listCategoriesUseCase) {
+            final ListCategoriesUseCase listCategoriesUseCase,
+            final ActivateCategoryUseCase activateCategoryUseCase,
+            final DeactivateCategoryUseCase deactivateCategoryUseCase) {
         this.createCategoryUseCase = createCategoryUseCase;
         this.getCategoryByIdUseCase = getCategoryByIdUseCase;
         this.updateCategoryUseCase = updateCategoryUseCase;
         this.deleteCategoryUseCase = deleteCategoryUseCase;
         this.listCategoriesUseCase = listCategoriesUseCase;
+        this.activateCategoryUseCase = activateCategoryUseCase;
+        this.deactivateCategoryUseCase = deactivateCategoryUseCase;
     }
 
     @Override
@@ -57,9 +73,18 @@ public class CategoryController implements CategoryAPI {
 
     @Override
     public ResponseEntity<Object> update(final String id, final UpdateCategoryRequest request) {
-        final var command =
-                UpdateCategoryCommand.with(id, request.name(), request.description(), request.isActive());
-        return this.updateCategoryUseCase.execute(command).fold(this::unprocessableContent, ResponseEntity::ok);
+        final var command = UpdateCategoryCommand.with(id, request.name(), request.description());
+        return this.updateCategoryUseCase.execute(command).fold(this::unprocessableContent, this::updated);
+    }
+
+    @Override
+    public CategoryResponse activate(final String id) {
+        return CategoryResponse.from(this.activateCategoryUseCase.execute(id));
+    }
+
+    @Override
+    public CategoryResponse deactivate(final String id) {
+        return CategoryResponse.from(this.deactivateCategoryUseCase.execute(id));
     }
 
     @Override
@@ -72,6 +97,11 @@ public class CategoryController implements CategoryAPI {
     }
 
     private ResponseEntity<Object> created(final CreateCategoryOutput output) {
-        return ResponseEntity.created(URI.create(RESOURCE_PATH + output.id())).body(output);
+        return ResponseEntity.created(URI.create(RESOURCE_PATH + output.id()))
+                .body(CreateCategoryResponse.from(output));
+    }
+
+    private ResponseEntity<Object> updated(final UpdateCategoryOutput output) {
+        return ResponseEntity.ok(UpdateCategoryResponse.from(output));
     }
 }

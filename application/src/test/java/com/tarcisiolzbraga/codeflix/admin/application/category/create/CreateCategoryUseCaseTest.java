@@ -102,6 +102,6 @@ class CreateCategoryUseCaseTest {
                 && category.getId() != null
                 && category.getCreatedAt() != null
                 && category.getUpdatedAt() != null;
-        return hasExpectedFields && (isActive == (category.getDeletedAt() == null));
+        return hasExpectedFields;
     }
 }

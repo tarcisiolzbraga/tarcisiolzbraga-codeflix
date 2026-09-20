@@ -3,7 +3,6 @@ package com.tarcisiolzbraga.codeflix.admin.domain.category;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,17 +32,15 @@ class CategoryTest {
         assertEquals(expectedIsActive, actualCategory.isActive());
         assertNotNull(actualCategory.getCreatedAt());
         assertEquals(actualCategory.getCreatedAt(), actualCategory.getUpdatedAt());
-        assertNull(actualCategory.getDeletedAt());
     }
 
     @Test
-    void givenInactiveFlag_whenCallNewCategory_thenInstantiateDeletedCategory() {
+    void givenInactiveFlag_whenCallNewCategory_thenInstantiateInactiveCategory() {
         final var expectedIsActive = false;
 
         final var actualCategory = Category.newCategory(EXPECTED_NAME, EXPECTED_DESCRIPTION, expectedIsActive);
 
         assertFalse(actualCategory.isActive());
-        assertNotNull(actualCategory.getDeletedAt());
     }
 
     @Test
@@ -134,24 +131,22 @@ class CategoryTest {
 
         assertTrue(hasMicrosecondPrecision(actualCategory.getCreatedAt()));
         assertTrue(hasMicrosecondPrecision(actualCategory.getUpdatedAt()));
-        assertTrue(hasMicrosecondPrecision(actualCategory.getDeletedAt()));
     }
 
     @Test
-    void givenActiveCategory_whenCallDeactivate_thenTruncateTimestampsToMicroseconds() {
+    void givenActiveCategory_whenCallDeactivate_thenTruncateUpdatedAtToMicroseconds() {
         final var category = Category.newCategory(EXPECTED_NAME, EXPECTED_DESCRIPTION, true);
 
         final var actualCategory = category.deactivate();
 
         assertTrue(hasMicrosecondPrecision(actualCategory.getUpdatedAt()));
-        assertTrue(hasMicrosecondPrecision(actualCategory.getDeletedAt()));
     }
 
     @Test
     void givenInactiveCategory_whenCallUpdate_thenTruncateUpdatedAtToMicroseconds() {
         final var category = Category.newCategory(EXPECTED_NAME, EXPECTED_DESCRIPTION, false);
 
-        final var actualCategory = category.update(EXPECTED_NAME, EXPECTED_DESCRIPTION, true);
+        final var actualCategory = category.update(EXPECTED_NAME, EXPECTED_DESCRIPTION);
 
         assertTrue(hasMicrosecondPrecision(actualCategory.getUpdatedAt()));
     }
@@ -163,7 +158,7 @@ class CategoryTest {
 
         final var actualException = assertThrows(
                 NullPointerException.class,
-                () -> Category.with(id, EXPECTED_NAME, EXPECTED_DESCRIPTION, true, null, updatedAt, null));
+                () -> Category.with(id, EXPECTED_NAME, EXPECTED_DESCRIPTION, true, null, updatedAt));
 
         assertEquals("'createdAt' should not be null", actualException.getMessage());
     }
@@ -175,7 +170,7 @@ class CategoryTest {
 
         final var actualException = assertThrows(
                 NullPointerException.class,
-                () -> Category.with(id, EXPECTED_NAME, EXPECTED_DESCRIPTION, true, createdAt, null, null));
+                () -> Category.with(id, EXPECTED_NAME, EXPECTED_DESCRIPTION, true, createdAt, null));
 
         assertEquals("'updatedAt' should not be null", actualException.getMessage());
     }
@@ -188,7 +183,6 @@ class CategoryTest {
         final var actualCategory = category.deactivate();
 
         assertFalse(actualCategory.isActive());
-        assertNotNull(actualCategory.getDeletedAt());
         assertEquals(createdAt, actualCategory.getCreatedAt());
         assertTrue(actualCategory.getUpdatedAt().isAfter(createdAt));
     }
@@ -200,7 +194,7 @@ class CategoryTest {
         final var actualCategory = category.activate();
 
         assertTrue(actualCategory.isActive());
-        assertNull(actualCategory.getDeletedAt());
+        assertTrue(actualCategory.getUpdatedAt().isAfter(category.getCreatedAt()));
     }
 
     @Test
@@ -208,7 +202,7 @@ class CategoryTest {
         final var category = Category.newCategory("Serie", "A descrição antiga", true);
         final var updatedAt = category.getUpdatedAt();
 
-        final var actualCategory = category.update(EXPECTED_NAME, EXPECTED_DESCRIPTION, true);
+        final var actualCategory = category.update(EXPECTED_NAME, EXPECTED_DESCRIPTION);
 
         assertEquals(EXPECTED_NAME, actualCategory.getName());
         assertEquals(EXPECTED_DESCRIPTION, actualCategory.getDescription());
@@ -217,13 +211,13 @@ class CategoryTest {
     }
 
     @Test
-    void givenValidCategory_whenCallUpdateToInactive_thenReturnCategoryDeactivated() {
-        final var category = Category.newCategory(EXPECTED_NAME, EXPECTED_DESCRIPTION, true);
+    void givenInactiveCategory_whenCallUpdate_thenKeepItInactive() {
+        final var category = Category.newCategory(EXPECTED_NAME, EXPECTED_DESCRIPTION, false);
 
-        final var actualCategory = category.update(EXPECTED_NAME, EXPECTED_DESCRIPTION, false);
+        final var actualCategory = category.update(EXPECTED_NAME, EXPECTED_DESCRIPTION);
 
+        assertEquals(EXPECTED_NAME, actualCategory.getName());
         assertFalse(actualCategory.isActive());
-        assertNotNull(actualCategory.getDeletedAt());
     }
 
     @Test
@@ -231,7 +225,7 @@ class CategoryTest {
         final var category = Category.newCategory(EXPECTED_NAME, EXPECTED_DESCRIPTION, true);
         final var sameId = Category.with(
                 category.getId(), "Outro nome", "Outra descrição", true,
-                category.getCreatedAt(), category.getUpdatedAt(), null);
+                category.getCreatedAt(), category.getUpdatedAt());
 
         final var actualEquals = category.equals(sameId);
 

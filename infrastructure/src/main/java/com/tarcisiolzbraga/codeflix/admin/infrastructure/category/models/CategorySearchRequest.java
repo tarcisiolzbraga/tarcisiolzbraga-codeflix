@@ -1,4 +1,4 @@
-package com.tarcisiolzbraga.codeflix.admin.infrastructure.category.api;
+package com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.SearchQuery;
 import io.swagger.v3.oas.annotations.media.Schema;

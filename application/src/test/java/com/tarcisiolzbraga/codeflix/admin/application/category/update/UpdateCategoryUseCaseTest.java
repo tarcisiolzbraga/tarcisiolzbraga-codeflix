@@ -38,7 +38,7 @@ class UpdateCategoryUseCaseTest {
     @Test
     void givenValidCommand_whenCallExecute_thenReturnRightWithUpdatedCategory() {
         final var category = givenStoredCategory(true);
-        final var command = commandFor(category, EXPECTED_NAME, true);
+        final var command = commandFor(category, EXPECTED_NAME);
         final var previousUpdatedAt = category.getUpdatedAt();
         when(categoryGateway.update(any())).thenAnswer(returnsFirstArg());
 
@@ -51,9 +51,9 @@ class UpdateCategoryUseCaseTest {
     }
 
     @Test
-    void givenInactiveCommand_whenCallExecute_thenDeactivateTheCategory() {
-        final var category = givenStoredCategory(true);
-        final var command = commandFor(category, EXPECTED_NAME, false);
+    void givenInactiveCategory_whenCallExecute_thenKeepItInactive() {
+        final var category = givenStoredCategory(false);
+        final var command = commandFor(category, EXPECTED_NAME);
         final var previousUpdatedAt = category.getUpdatedAt();
         when(categoryGateway.update(any())).thenAnswer(returnsFirstArg());
 
@@ -65,23 +65,9 @@ class UpdateCategoryUseCaseTest {
     }
 
     @Test
-    void givenInactiveCategory_whenCallExecuteWithActiveCommand_thenActivateIt() {
-        final var category = givenStoredCategory(false);
-        final var command = commandFor(category, EXPECTED_NAME, true);
-        final var previousUpdatedAt = category.getUpdatedAt();
-        when(categoryGateway.update(any())).thenAnswer(returnsFirstArg());
-
-        final var actualResult = useCase.execute(command);
-
-        assertTrue(actualResult.isRight());
-        assertTrue(previousUpdatedAt.isBefore(category.getUpdatedAt()));
-        verify(categoryGateway).update(argThat(updated -> isUpdatedFrom(updated, category, true)));
-    }
-
-    @Test
     void givenNullName_whenCallExecute_thenReturnLeftWithNotificationAndNotUpdate() {
         final var category = givenStoredCategory(true);
-        final var command = commandFor(category, null, true);
+        final var command = commandFor(category, null);
 
         final var actualResult = useCase.execute(command);
 
@@ -94,7 +80,7 @@ class UpdateCategoryUseCaseTest {
     @Test
     void givenUnknownId_whenCallExecute_thenThrowNotFoundAndNotUpdate() {
         final var expectedId = CategoryID.unique();
-        final var command = UpdateCategoryCommand.with(expectedId.getValue(), EXPECTED_NAME, EXPECTED_DESCRIPTION, true);
+        final var command = UpdateCategoryCommand.with(expectedId.getValue(), EXPECTED_NAME, EXPECTED_DESCRIPTION);
         when(categoryGateway.findById(expectedId)).thenReturn(Optional.empty());
 
         final var actualException = assertThrows(NotFoundException.class, () -> useCase.execute(command));
@@ -107,7 +93,7 @@ class UpdateCategoryUseCaseTest {
     @Test
     void givenFailingGateway_whenCallExecute_thenPropagateTheException() {
         final var category = givenStoredCategory(true);
-        final var command = commandFor(category, EXPECTED_NAME, true);
+        final var command = commandFor(category, EXPECTED_NAME);
         final var expectedException = new IllegalStateException("gateway indisponível");
         when(categoryGateway.update(any())).thenThrow(expectedException);
 
@@ -123,8 +109,8 @@ class UpdateCategoryUseCaseTest {
         return category;
     }
 
-    private UpdateCategoryCommand commandFor(final Category category, final String name, final boolean isActive) {
-        return UpdateCategoryCommand.with(category.getId().getValue(), name, EXPECTED_DESCRIPTION, isActive);
+    private UpdateCategoryCommand commandFor(final Category category, final String name) {
+        return UpdateCategoryCommand.with(category.getId().getValue(), name, EXPECTED_DESCRIPTION);
     }
 
     private String firstErrorOf(final Notification notification) {
@@ -137,6 +123,6 @@ class UpdateCategoryUseCaseTest {
                 && updated.isActive() == isActive
                 && updated.getId().equals(stored.getId())
                 && updated.getCreatedAt().equals(stored.getCreatedAt());
-        return hasExpectedFields && (isActive == (updated.getDeletedAt() == null));
+        return hasExpectedFields;
     }
 }

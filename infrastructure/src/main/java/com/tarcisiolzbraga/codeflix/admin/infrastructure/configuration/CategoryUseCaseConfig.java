@@ -1,7 +1,11 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.configuration;
 
+import com.tarcisiolzbraga.codeflix.admin.application.category.activate.ActivateCategoryUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.category.activate.DefaultActivateCategoryUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.category.create.CreateCategoryUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.category.create.DefaultCreateCategoryUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.category.deactivate.DeactivateCategoryUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.category.deactivate.DefaultDeactivateCategoryUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.category.delete.DefaultDeleteCategoryUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.category.delete.DeleteCategoryUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.category.get.DefaultGetCategoryByIdUseCase;
@@ -42,6 +46,16 @@ public class CategoryUseCaseConfig {
     @Bean
     DeleteCategoryUseCase deleteCategoryUseCase() {
         return new DefaultDeleteCategoryUseCase(this.categoryGateway);
+    }
+
+    @Bean
+    ActivateCategoryUseCase activateCategoryUseCase() {
+        return new DefaultActivateCategoryUseCase(this.categoryGateway);
+    }
+
+    @Bean
+    DeactivateCategoryUseCase deactivateCategoryUseCase() {
+        return new DefaultDeactivateCategoryUseCase(this.categoryGateway);
     }
 
     @Bean

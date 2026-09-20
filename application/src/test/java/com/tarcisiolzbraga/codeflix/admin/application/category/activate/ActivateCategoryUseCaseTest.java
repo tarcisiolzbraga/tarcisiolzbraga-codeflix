@@ -1,10 +1,13 @@
-package com.tarcisiolzbraga.codeflix.admin.application.category.get;
+package com.tarcisiolzbraga.codeflix.admin.application.category.activate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.AdditionalAnswers.returnsFirstArg;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.category.Category;
@@ -19,7 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-class GetCategoryByIdUseCaseTest {
+class ActivateCategoryUseCaseTest {
 
     private static final String EXPECTED_NAME = "Filmes";
     private static final String EXPECTED_DESCRIPTION = "A categoria mais assistida";
@@ -28,34 +31,35 @@ class GetCategoryByIdUseCaseTest {
     private CategoryGateway categoryGateway;
 
     @InjectMocks
-    private DefaultGetCategoryByIdUseCase useCase;
+    private DefaultActivateCategoryUseCase useCase;
 
     @Test
-    void givenValidId_whenCallExecute_thenReturnTheCategory() {
-        final var category = givenStoredCategory(true);
+    void givenInactiveCategory_whenCallExecute_thenReturnItAsActive() {
+        final var category = givenStoredCategory(false);
+        final var previousUpdatedAt = category.getUpdatedAt();
+        when(categoryGateway.update(any())).thenAnswer(returnsFirstArg());
 
         final var actualOutput = useCase.execute(category.getId().getValue());
 
         assertEquals(category.getId().getValue(), actualOutput.id());
         assertEquals(EXPECTED_NAME, actualOutput.name());
-        assertEquals(EXPECTED_DESCRIPTION, actualOutput.description());
         assertTrue(actualOutput.isActive());
-        assertEquals(category.getCreatedAt(), actualOutput.createdAt());
-        assertEquals(category.getUpdatedAt(), actualOutput.updatedAt());
+        assertTrue(actualOutput.updatedAt().isAfter(previousUpdatedAt));
     }
 
     @Test
-    void givenInactiveCategory_whenCallExecute_thenReturnItInactive() {
-        final var category = givenStoredCategory(false);
+    void givenActiveCategory_whenCallExecute_thenKeepItAsActive() {
+        final var category = givenStoredCategory(true);
+        when(categoryGateway.update(any())).thenAnswer(returnsFirstArg());
 
         final var actualOutput = useCase.execute(category.getId().getValue());
 
-        assertEquals(category.getId().getValue(), actualOutput.id());
-        assertFalse(actualOutput.isActive());
+        assertTrue(actualOutput.isActive());
+        verify(categoryGateway).update(category);
     }
 
     @Test
-    void givenUnknownId_whenCallExecute_thenThrowNotFound() {
+    void givenUnknownId_whenCallExecute_thenThrowNotFoundAndNotUpdate() {
         final var expectedId = CategoryID.unique();
         when(categoryGateway.findById(expectedId)).thenReturn(Optional.empty());
 
@@ -64,16 +68,17 @@ class GetCategoryByIdUseCaseTest {
 
         assertEquals(
                 "Category with ID %s was not found".formatted(expectedId.getValue()), actualException.getMessage());
+        verify(categoryGateway, never()).update(any());
     }
 
     @Test
     void givenFailingGateway_whenCallExecute_thenPropagateTheException() {
-        final var expectedId = CategoryID.unique();
+        final var category = givenStoredCategory(false);
         final var expectedException = new IllegalStateException("gateway indisponível");
-        when(categoryGateway.findById(expectedId)).thenThrow(expectedException);
+        when(categoryGateway.update(any())).thenThrow(expectedException);
 
         final var actualException =
-                assertThrows(IllegalStateException.class, () -> useCase.execute(expectedId.getValue()));
+                assertThrows(IllegalStateException.class, () -> useCase.execute(category.getId().getValue()));
 
         assertSame(expectedException, actualException);
     }

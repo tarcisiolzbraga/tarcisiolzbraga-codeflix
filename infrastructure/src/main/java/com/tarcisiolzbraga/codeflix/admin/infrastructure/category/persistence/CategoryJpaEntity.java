@@ -19,17 +19,13 @@ public class CategoryJpaEntity extends BaseJpaEntity {
     @Column(name = "description", length = 4000)
     private String description;
 
-    @Column(name = "active", nullable = false)
-    private boolean active;
-
     protected CategoryJpaEntity() {
     }
 
     private CategoryJpaEntity(final Category category) {
-        super(category.getId().getValue(), category.getCreatedAt(), category.getUpdatedAt(), category.getDeletedAt());
+        super(category.getId().getValue(), category.isActive(), category.getCreatedAt(), category.getUpdatedAt());
         this.name = category.getName();
         this.description = category.getDescription();
-        this.active = category.isActive();
     }
 
     public static CategoryJpaEntity from(final Category category) {
@@ -41,10 +37,9 @@ public class CategoryJpaEntity extends BaseJpaEntity {
                 CategoryID.from(getId()),
                 this.name,
                 this.description,
-                this.active,
+                isActive(),
                 getCreatedAt(),
-                getUpdatedAt(),
-                getDeletedAt());
+                getUpdatedAt());
     }
 
     public String getName() {
@@ -53,9 +48,5 @@ public class CategoryJpaEntity extends BaseJpaEntity {
 
     public String getDescription() {
         return this.description;
-    }
-
-    public boolean isActive() {
-        return this.active;
     }
 }

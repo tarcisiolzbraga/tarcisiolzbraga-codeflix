@@ -1,6 +1,8 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.category.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -100,11 +102,35 @@ class CategoryControllerIT {
         final var response = this.mockMvc.perform(put(CATEGORIES_PATH + "/" + category.getId().getValue())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"name":"Filmes","description":"A mais assistida","active":false}"""));
+                        {"name":"Filmes","description":"A mais assistida"}"""));
 
         response.andExpect(status().isOk());
         final var actualCategory = this.categoryGateway.findById(category.getId()).orElseThrow();
         assertEquals("Filmes", actualCategory.getName());
+        assertTrue(actualCategory.isActive());
+    }
+
+    @Test
+    void givenInactiveCategory_whenCallActivate_thenPersistItActive() throws Exception {
+        final var category = givenPersistedCategory("Filmes", false);
+
+        final var response =
+                this.mockMvc.perform(put(CATEGORIES_PATH + "/" + category.getId().getValue() + "/activate"));
+
+        response.andExpect(status().isOk()).andExpect(jsonPath("$.active").value(true));
+        assertTrue(this.categoryGateway.findById(category.getId()).orElseThrow().isActive());
+    }
+
+    @Test
+    void givenActiveCategory_whenCallDeactivate_thenPersistItInactiveWithoutRemovingIt() throws Exception {
+        final var category = givenPersistedCategory("Filmes", true);
+
+        final var response =
+                this.mockMvc.perform(put(CATEGORIES_PATH + "/" + category.getId().getValue() + "/deactivate"));
+
+        response.andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false));
+        assertFalse(this.categoryGateway.findById(category.getId()).orElseThrow().isActive());
+        assertEquals(1, this.categoryRepository.count());
     }
 
     @Test
