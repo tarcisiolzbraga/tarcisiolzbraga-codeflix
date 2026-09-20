@@ -7,12 +7,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.RouterFunctions;
 import org.springframework.web.servlet.function.ServerResponse;
 
 @IntegrationTest(webEnvironment = WebEnvironment.RANDOM_PORT)
+@Import(VirtualThreadsIT.ThreadRouteConfiguration.class)
 class VirtualThreadsIT {
 
     private static final String THREAD_PATH = "/test/thread";
