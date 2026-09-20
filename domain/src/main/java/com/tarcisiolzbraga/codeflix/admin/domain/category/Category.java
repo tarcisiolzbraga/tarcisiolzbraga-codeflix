@@ -13,7 +13,6 @@ public class Category extends AggregateRoot<CategoryID> {
     private boolean active;
     private final Instant createdAt;
     private Instant updatedAt;
-    private Instant deletedAt;
 
     private Category(
             final CategoryID id,
@@ -21,21 +20,18 @@ public class Category extends AggregateRoot<CategoryID> {
             final String description,
             final boolean active,
             final Instant createdAt,
-            final Instant updatedAt,
-            final Instant deletedAt) {
+            final Instant updatedAt) {
         super(id);
         this.name = name;
         this.description = description;
         this.active = active;
         this.createdAt = Objects.requireNonNull(createdAt, "'createdAt' should not be null");
         this.updatedAt = Objects.requireNonNull(updatedAt, "'updatedAt' should not be null");
-        this.deletedAt = deletedAt;
     }
 
     public static Category newCategory(final String name, final String description, final boolean isActive) {
         final var now = InstantUtils.now();
-        final var deletedAt = isActive ? null : now;
-        return new Category(CategoryID.unique(), name, description, isActive, now, now, deletedAt);
+        return new Category(CategoryID.unique(), name, description, isActive, now, now);
     }
 
     public static Category with(
@@ -44,9 +40,8 @@ public class Category extends AggregateRoot<CategoryID> {
             final String description,
             final boolean active,
             final Instant createdAt,
-            final Instant updatedAt,
-            final Instant deletedAt) {
-        return new Category(id, name, description, active, createdAt, updatedAt, deletedAt);
+            final Instant updatedAt) {
+        return new Category(id, name, description, active, createdAt, updatedAt);
     }
 
     @Override
@@ -55,29 +50,22 @@ public class Category extends AggregateRoot<CategoryID> {
     }
 
     public Category activate() {
-        this.deletedAt = null;
         this.active = true;
         this.updatedAt = InstantUtils.now();
         return this;
     }
 
     public Category deactivate() {
-        if (this.deletedAt == null) {
-            this.deletedAt = InstantUtils.now();
-        }
         this.active = false;
         this.updatedAt = InstantUtils.now();
         return this;
     }
 
-    public Category update(final String name, final String description, final boolean isActive) {
-        if (isActive) {
-            activate();
-        } else {
-            deactivate();
-        }
+    // Não mexe na ativação: isso é responsabilidade do activate() e do deactivate().
+    public Category update(final String name, final String description) {
         this.name = name;
         this.description = description;
+        this.updatedAt = InstantUtils.now();
         return this;
     }
 
@@ -99,9 +87,5 @@ public class Category extends AggregateRoot<CategoryID> {
 
     public Instant getUpdatedAt() {
         return this.updatedAt;
-    }
-
-    public Instant getDeletedAt() {
-        return this.deletedAt;
     }
 }

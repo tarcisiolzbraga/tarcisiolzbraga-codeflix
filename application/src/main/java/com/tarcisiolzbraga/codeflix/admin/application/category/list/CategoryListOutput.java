@@ -4,7 +4,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.category.Category;
 import java.time.Instant;
 
 public record CategoryListOutput(
-        String id, String name, String description, boolean isActive, Instant createdAt, Instant deletedAt) {
+        String id, String name, String description, boolean isActive, Instant createdAt) {
 
     public static CategoryListOutput from(final Category category) {
         return new CategoryListOutput(
@@ -12,7 +12,6 @@ public record CategoryListOutput(
                 category.getName(),
                 category.getDescription(),
                 category.isActive(),
-                category.getCreatedAt(),
-                category.getDeletedAt());
+                category.getCreatedAt());
     }
 }

@@ -1,8 +1,10 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.category;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.category.Category;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
@@ -45,7 +47,7 @@ class CategoryAuditIT {
     @Test
     void givenUpdatedCategory_whenReadRevisions_thenKeepThePreviousName() {
         final var category = this.categoryGateway.create(Category.newCategory("Flmes", null, true));
-        this.categoryGateway.update(category.update("Filmes", "A mais assistida", true));
+        this.categoryGateway.update(category.update("Filmes", "A mais assistida"));
 
         final var revisions = revisionsOf(category.getId().getValue());
 
@@ -69,7 +71,7 @@ class CategoryAuditIT {
     @Test
     void givenDeactivatedCategory_whenReadLastRevision_thenAuditTheInheritedFields() {
         final var category = this.categoryGateway.create(Category.newCategory("Filmes", null, true));
-        this.categoryGateway.update(category.update("Filmes", null, false));
+        this.categoryGateway.update(category.deactivate());
         final var revisions = revisionsOf(category.getId().getValue());
 
         final var audited = auditedAt(category.getId().getValue(), revisions.getLast());
@@ -77,8 +79,8 @@ class CategoryAuditIT {
         assertEquals(category.getId().getValue(), audited.getId());
         assertNotNull(audited.getCreatedAt());
         assertNotNull(audited.getUpdatedAt());
-        assertNotNull(audited.getDeletedAt());
-        assertNull(auditedAt(category.getId().getValue(), revisions.getFirst()).getDeletedAt());
+        assertFalse(audited.isActive());
+        assertTrue(auditedAt(category.getId().getValue(), revisions.getFirst()).isActive());
     }
 
     private List<Number> revisionsOf(final String id) {

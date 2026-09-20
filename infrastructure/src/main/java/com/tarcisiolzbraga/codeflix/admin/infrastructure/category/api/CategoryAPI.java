@@ -63,7 +63,7 @@ public interface CategoryAPI {
     CategoryResponse getById(@Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id);
 
     @PutMapping("/{id}")
-    @Operation(summary = "Atualiza uma categoria", description = "Substitui nome, descrição e situação.")
+    @Operation(summary = "Atualiza uma categoria", description = "Substitui nome e descrição; a ativação tem rotas próprias.")
     @ApiResponse(responseCode = OK, description = "Atualizada",
             content = @Content(schema = @Schema(implementation = UpdateCategoryResponse.class)))
     @ApiResponse(responseCode = NOT_FOUND, description = NOT_FOUND_DESCRIPTION,
@@ -73,6 +73,20 @@ public interface CategoryAPI {
     ResponseEntity<Object> update(
             @Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id,
             @RequestBody UpdateCategoryRequest request);
+
+    @PutMapping("/{id}/activate")
+    @Operation(summary = "Ativa uma categoria", description = "Idempotente: uma categoria já ativa segue ativa.")
+    @ApiResponse(responseCode = OK, description = "Categoria ativa")
+    @ApiResponse(responseCode = NOT_FOUND, description = NOT_FOUND_DESCRIPTION,
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    CategoryResponse activate(@Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id);
+
+    @PutMapping("/{id}/deactivate")
+    @Operation(summary = "Desativa uma categoria", description = "Tira do catálogo sem apagar o registro.")
+    @ApiResponse(responseCode = OK, description = "Categoria inativa")
+    @ApiResponse(responseCode = NOT_FOUND, description = NOT_FOUND_DESCRIPTION,
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    CategoryResponse deactivate(@Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id);
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

@@ -1,4 +1,4 @@
-package com.tarcisiolzbraga.codeflix.admin.application.category.get;
+package com.tarcisiolzbraga.codeflix.admin.application.category;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.category.Category;
 import java.time.Instant;
@@ -9,8 +9,7 @@ public record CategoryOutput(
         String description,
         boolean isActive,
         Instant createdAt,
-        Instant updatedAt,
-        Instant deletedAt) {
+        Instant updatedAt) {
 
     public static CategoryOutput from(final Category category) {
         return new CategoryOutput(
@@ -19,7 +18,6 @@ public record CategoryOutput(
                 category.getDescription(),
                 category.isActive(),
                 category.getCreatedAt(),
-                category.getUpdatedAt(),
-                category.getDeletedAt());
+                category.getUpdatedAt());
     }
 }

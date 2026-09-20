@@ -43,7 +43,7 @@ class CategoryMySQLGatewayIT {
     void givenPersistedCategory_whenCallUpdate_thenSaveTheNewValues() {
         final var category = this.categoryGateway.create(Category.newCategory("Flmes", null, true));
 
-        final var actualCategory = this.categoryGateway.update(category.update("Filmes", "A mais assistida", true));
+        final var actualCategory = this.categoryGateway.update(category.update("Filmes", "A mais assistida"));
 
         assertEquals("Filmes", actualCategory.getName());
         assertEquals("A mais assistida", actualCategory.getDescription());
