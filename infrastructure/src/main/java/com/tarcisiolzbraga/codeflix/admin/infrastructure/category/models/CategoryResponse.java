@@ -1,4 +1,4 @@
-package com.tarcisiolzbraga.codeflix.admin.infrastructure.category.api;
+package com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models;
 
 import com.tarcisiolzbraga.codeflix.admin.application.category.get.CategoryOutput;
 import java.time.Instant;

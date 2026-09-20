@@ -7,10 +7,18 @@ import com.tarcisiolzbraga.codeflix.admin.application.category.delete.DeleteCate
 import com.tarcisiolzbraga.codeflix.admin.application.category.get.GetCategoryByIdUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.category.list.ListCategoriesUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.category.update.UpdateCategoryCommand;
+import com.tarcisiolzbraga.codeflix.admin.application.category.update.UpdateCategoryOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.category.update.UpdateCategoryUseCase;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.Notification;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiError;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.CategoryListResponse;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.CategoryResponse;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.CategorySearchRequest;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.CreateCategoryRequest;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.CreateCategoryResponse;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.UpdateCategoryRequest;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.UpdateCategoryResponse;
 import java.net.URI;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -59,7 +67,7 @@ public class CategoryController implements CategoryAPI {
     public ResponseEntity<Object> update(final String id, final UpdateCategoryRequest request) {
         final var command =
                 UpdateCategoryCommand.with(id, request.name(), request.description(), request.isActive());
-        return this.updateCategoryUseCase.execute(command).fold(this::unprocessableContent, ResponseEntity::ok);
+        return this.updateCategoryUseCase.execute(command).fold(this::unprocessableContent, this::updated);
     }
 
     @Override
@@ -72,6 +80,11 @@ public class CategoryController implements CategoryAPI {
     }
 
     private ResponseEntity<Object> created(final CreateCategoryOutput output) {
-        return ResponseEntity.created(URI.create(RESOURCE_PATH + output.id())).body(output);
+        return ResponseEntity.created(URI.create(RESOURCE_PATH + output.id()))
+                .body(CreateCategoryResponse.from(output));
+    }
+
+    private ResponseEntity<Object> updated(final UpdateCategoryOutput output) {
+        return ResponseEntity.ok(UpdateCategoryResponse.from(output));
     }
 }

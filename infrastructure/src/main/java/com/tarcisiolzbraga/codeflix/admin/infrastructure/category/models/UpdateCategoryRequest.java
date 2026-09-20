@@ -1,4 +1,4 @@
-package com.tarcisiolzbraga.codeflix.admin.infrastructure.category.api;
+package com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models;
 
 public record UpdateCategoryRequest(String name, String description, Boolean active) {
 
