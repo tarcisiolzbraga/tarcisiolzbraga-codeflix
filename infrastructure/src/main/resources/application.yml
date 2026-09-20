@@ -4,6 +4,11 @@ server:
 spring:
   config:
     import: optional:file:.env[.properties]
+  threads:
+    virtual:
+      # Cada requisição roda numa virtual thread: esperar o JDBC não prende thread do SO.
+      # O teto de consultas simultâneas continua sendo o pool de conexões (Hikari).
+      enabled: true
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:adm_videos}
     username: ${DB_USER}
