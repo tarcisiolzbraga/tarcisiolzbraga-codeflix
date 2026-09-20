@@ -12,22 +12,11 @@ import com.tarcisiolzbraga.codeflix.admin.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.Notification;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiError;
 import java.net.URI;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/categories")
-public class CategoryController {
+public class CategoryController implements CategoryAPI {
 
     private static final String RESOURCE_PATH = "/categories/";
 
@@ -50,33 +39,31 @@ public class CategoryController {
         this.listCategoriesUseCase = listCategoriesUseCase;
     }
 
-    @PostMapping
-    public ResponseEntity<Object> create(@RequestBody final CreateCategoryRequest request) {
+    @Override
+    public ResponseEntity<Object> create(final CreateCategoryRequest request) {
         final var command = CreateCategoryCommand.with(request.name(), request.description(), request.isActive());
         return this.createCategoryUseCase.execute(command).fold(this::unprocessableContent, this::created);
     }
 
-    @GetMapping
-    public Pagination<CategoryListResponse> list(@ModelAttribute final CategorySearchRequest request) {
+    @Override
+    public Pagination<CategoryListResponse> list(final CategorySearchRequest request) {
         return this.listCategoriesUseCase.execute(request.toSearchQuery()).map(CategoryListResponse::from);
     }
 
-    @GetMapping("/{id}")
-    public CategoryResponse getById(@PathVariable("id") final String id) {
+    @Override
+    public CategoryResponse getById(final String id) {
         return CategoryResponse.from(this.getCategoryByIdUseCase.execute(id));
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<Object> update(
-            @PathVariable("id") final String id, @RequestBody final UpdateCategoryRequest request) {
+    @Override
+    public ResponseEntity<Object> update(final String id, final UpdateCategoryRequest request) {
         final var command =
                 UpdateCategoryCommand.with(id, request.name(), request.description(), request.isActive());
         return this.updateCategoryUseCase.execute(command).fold(this::unprocessableContent, ResponseEntity::ok);
     }
 
-    @DeleteMapping("/{id}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteById(@PathVariable("id") final String id) {
+    @Override
+    public void deleteById(final String id) {
         this.deleteCategoryUseCase.execute(id);
     }
 
