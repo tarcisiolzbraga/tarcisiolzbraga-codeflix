@@ -12,6 +12,7 @@ import java.util.Set;
 public class Genre extends AggregateRoot<GenreID> {
 
     private static final String CATEGORIES_NOT_NULL_MESSAGE = "'categories' should not be null";
+    private static final String CATEGORY_ID_NOT_NULL_MESSAGE = "'categoryID' should not be null";
 
     private String name;
     // Referência a outro agregado só pelo ID, e em Set porque a mesma categoria não se repete.
@@ -54,6 +55,30 @@ public class Genre extends AggregateRoot<GenreID> {
         this.name = name;
         this.categories.clear();
         this.categories.addAll(categories);
+        refreshUpdatedAt();
+        return this;
+    }
+
+    public Genre addCategory(final CategoryID categoryID) {
+        Objects.requireNonNull(categoryID, CATEGORY_ID_NOT_NULL_MESSAGE);
+        this.categories.add(categoryID);
+        refreshUpdatedAt();
+        return this;
+    }
+
+    public Genre addCategories(final Set<CategoryID> categories) {
+        Objects.requireNonNull(categories, CATEGORIES_NOT_NULL_MESSAGE);
+        if (categories.isEmpty()) {
+            return this;
+        }
+        this.categories.addAll(categories);
+        refreshUpdatedAt();
+        return this;
+    }
+
+    public Genre removeCategory(final CategoryID categoryID) {
+        Objects.requireNonNull(categoryID, CATEGORY_ID_NOT_NULL_MESSAGE);
+        this.categories.remove(categoryID);
         refreshUpdatedAt();
         return this;
     }

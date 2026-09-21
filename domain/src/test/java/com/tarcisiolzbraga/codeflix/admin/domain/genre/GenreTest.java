@@ -19,6 +19,7 @@ class GenreTest {
 
     private static final String EXPECTED_NAME = "Ação";
     private static final int NANOS_PER_MICRO = 1_000;
+    private static final String CATEGORY_ID_NOT_NULL_MESSAGE = "'categoryID' should not be null";
 
     @Test
     void givenValidParams_whenCallNewGenre_thenInstantiateActiveGenre() {
@@ -237,6 +238,100 @@ class GenreTest {
 
         assertTrue(actualEquals);
         assertEquals(genre.hashCode(), sameId.hashCode());
+    }
+
+    @Test
+    void givenGenreWithoutCategories_whenCallAddCategory_thenAddIt() {
+        final var genre = Genre.newGenre(EXPECTED_NAME, true);
+        final var updatedAt = genre.getUpdatedAt();
+        final var expectedCategory = CategoryID.unique();
+
+        final var actualGenre = genre.addCategory(expectedCategory);
+
+        assertEquals(Set.of(expectedCategory), actualGenre.getCategories());
+        assertTrue(actualGenre.getUpdatedAt().isAfter(updatedAt));
+    }
+
+    @Test
+    void givenGenreWithCategory_whenCallAddCategoryAgain_thenKeepASingleEntry() {
+        final var expectedCategory = CategoryID.unique();
+        final var genre = Genre.newGenre(EXPECTED_NAME, true).addCategory(expectedCategory);
+
+        final var actualGenre = genre.addCategory(expectedCategory);
+
+        assertEquals(Set.of(expectedCategory), actualGenre.getCategories());
+    }
+
+    @Test
+    void givenNullCategoryID_whenCallAddCategory_thenThrowNullPointerException() {
+        final var genre = Genre.newGenre(EXPECTED_NAME, true);
+
+        final var actualException = assertThrows(NullPointerException.class, () -> genre.addCategory(null));
+
+        assertEquals(CATEGORY_ID_NOT_NULL_MESSAGE, actualException.getMessage());
+    }
+
+    @Test
+    void givenGenreWithoutCategories_whenCallAddCategories_thenAddAllOfThem() {
+        final var genre = Genre.newGenre(EXPECTED_NAME, true);
+        final var updatedAt = genre.getUpdatedAt();
+        final var expectedCategories = Set.of(CategoryID.unique(), CategoryID.unique());
+
+        final var actualGenre = genre.addCategories(expectedCategories);
+
+        assertEquals(expectedCategories, actualGenre.getCategories());
+        assertTrue(actualGenre.getUpdatedAt().isAfter(updatedAt));
+    }
+
+    @Test
+    void givenEmptyCategories_whenCallAddCategories_thenKeepTheGenreUntouched() {
+        final var genre = Genre.newGenre(EXPECTED_NAME, true);
+        final var updatedAt = genre.getUpdatedAt();
+
+        final var actualGenre = genre.addCategories(Set.of());
+
+        assertTrue(actualGenre.getCategories().isEmpty());
+        assertEquals(updatedAt, actualGenre.getUpdatedAt());
+    }
+
+    @Test
+    void givenNullCategories_whenCallAddCategories_thenThrowNullPointerException() {
+        final var genre = Genre.newGenre(EXPECTED_NAME, true);
+
+        final var actualException = assertThrows(NullPointerException.class, () -> genre.addCategories(null));
+
+        assertEquals("'categories' should not be null", actualException.getMessage());
+    }
+
+    @Test
+    void givenGenreWithCategories_whenCallRemoveCategory_thenRemoveOnlyIt() {
+        final var expectedCategory = CategoryID.unique();
+        final var removedCategory = CategoryID.unique();
+        final var genre = Genre.newGenre(EXPECTED_NAME, true)
+                .addCategories(Set.of(expectedCategory, removedCategory));
+
+        final var actualGenre = genre.removeCategory(removedCategory);
+
+        assertEquals(Set.of(expectedCategory), actualGenre.getCategories());
+    }
+
+    @Test
+    void givenCategoryNotInTheGenre_whenCallRemoveCategory_thenKeepTheCategories() {
+        final var expectedCategory = CategoryID.unique();
+        final var genre = Genre.newGenre(EXPECTED_NAME, true).addCategory(expectedCategory);
+
+        final var actualGenre = genre.removeCategory(CategoryID.unique());
+
+        assertEquals(Set.of(expectedCategory), actualGenre.getCategories());
+    }
+
+    @Test
+    void givenNullCategoryID_whenCallRemoveCategory_thenThrowNullPointerException() {
+        final var genre = Genre.newGenre(EXPECTED_NAME, true);
+
+        final var actualException = assertThrows(NullPointerException.class, () -> genre.removeCategory(null));
+
+        assertEquals(CATEGORY_ID_NOT_NULL_MESSAGE, actualException.getMessage());
     }
 
     private boolean hasMicrosecondPrecision(final Instant instant) {
