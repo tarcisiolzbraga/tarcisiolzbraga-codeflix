@@ -10,6 +10,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.pagination.SearchQuery;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.CategoryRepository;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -127,5 +128,35 @@ class CategoryMySQLGatewayIT {
 
     private List<String> namesOf(final List<Category> categories) {
         return categories.stream().map(Category::getName).toList();
+    }
+
+    @Test
+    void givenPersistedCategories_whenCallFindExistingIds_thenReturnOnlyTheExistingOnes() {
+        final var movies = this.categoryGateway.create(Category.newCategory("Filmes", null, true));
+        final var series = this.categoryGateway.create(Category.newCategory("Series", null, true));
+        final var unknown = CategoryID.from("nao-existe");
+
+        final var actualIds = this.categoryGateway
+                .findExistingIds(Set.of(movies.getId(), series.getId(), unknown));
+
+        assertEquals(Set.of(movies.getId(), series.getId()), actualIds);
+    }
+
+    @Test
+    void givenOnlyUnknownIds_whenCallFindExistingIds_thenReturnEmpty() {
+        this.categoryGateway.create(Category.newCategory("Filmes", null, true));
+
+        final var actualIds = this.categoryGateway.findExistingIds(Set.of(CategoryID.from("nao-existe")));
+
+        assertTrue(actualIds.isEmpty());
+    }
+
+    @Test
+    void givenNoIds_whenCallFindExistingIds_thenReturnEmpty() {
+        this.categoryGateway.create(Category.newCategory("Filmes", null, true));
+
+        final var actualIds = this.categoryGateway.findExistingIds(Set.of());
+
+        assertTrue(actualIds.isEmpty());
     }
 }
