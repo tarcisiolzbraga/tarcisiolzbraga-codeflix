@@ -137,9 +137,9 @@ class CategoryTest {
     void givenActiveCategory_whenCallDeactivate_thenTruncateUpdatedAtToMicroseconds() {
         final var category = Category.newCategory(EXPECTED_NAME, EXPECTED_DESCRIPTION, true);
 
-        final var actualCategory = category.deactivate();
+        category.deactivate();
 
-        assertTrue(hasMicrosecondPrecision(actualCategory.getUpdatedAt()));
+        assertTrue(hasMicrosecondPrecision(category.getUpdatedAt()));
     }
 
     @Test
@@ -176,25 +176,25 @@ class CategoryTest {
     }
 
     @Test
-    void givenActiveCategory_whenCallDeactivate_thenReturnInactiveCategory() {
+    void givenActiveCategory_whenCallDeactivate_thenTurnItInactive() {
         final var category = Category.newCategory(EXPECTED_NAME, EXPECTED_DESCRIPTION, true);
         final var createdAt = category.getCreatedAt();
 
-        final var actualCategory = category.deactivate();
+        category.deactivate();
 
-        assertFalse(actualCategory.isActive());
-        assertEquals(createdAt, actualCategory.getCreatedAt());
-        assertTrue(actualCategory.getUpdatedAt().isAfter(createdAt));
+        assertFalse(category.isActive());
+        assertEquals(createdAt, category.getCreatedAt());
+        assertTrue(category.getUpdatedAt().isAfter(createdAt));
     }
 
     @Test
-    void givenInactiveCategory_whenCallActivate_thenReturnActiveCategory() {
+    void givenInactiveCategory_whenCallActivate_thenTurnItActive() {
         final var category = Category.newCategory(EXPECTED_NAME, EXPECTED_DESCRIPTION, false);
 
-        final var actualCategory = category.activate();
+        category.activate();
 
-        assertTrue(actualCategory.isActive());
-        assertTrue(actualCategory.getUpdatedAt().isAfter(category.getCreatedAt()));
+        assertTrue(category.isActive());
+        assertTrue(category.getUpdatedAt().isAfter(category.getCreatedAt()));
     }
 
     @Test

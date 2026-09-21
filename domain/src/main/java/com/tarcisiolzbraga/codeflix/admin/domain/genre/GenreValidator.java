@@ -1,0 +1,41 @@
+package com.tarcisiolzbraga.codeflix.admin.domain.genre;
+
+import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationError;
+import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationHandler;
+import com.tarcisiolzbraga.codeflix.admin.domain.validation.Validator;
+
+public class GenreValidator extends Validator {
+
+    private static final int NAME_MIN_LENGTH = 1;
+    private static final int NAME_MAX_LENGTH = 255;
+    private static final String NAME_LENGTH_MESSAGE =
+            "'name' must be between %d and %d characters".formatted(NAME_MIN_LENGTH, NAME_MAX_LENGTH);
+
+    private final Genre genre;
+
+    public GenreValidator(final Genre genre, final ValidationHandler handler) {
+        super(handler);
+        this.genre = genre;
+    }
+
+    @Override
+    public void validate() {
+        checkNameConstraints();
+    }
+
+    private void checkNameConstraints() {
+        final var name = this.genre.getName();
+        if (name == null) {
+            validationHandler().append(new ValidationError("'name' should not be null"));
+            return;
+        }
+        if (name.isBlank()) {
+            validationHandler().append(new ValidationError("'name' should not be empty"));
+            return;
+        }
+        // O mínimo é 1 caractere, já garantido pela checagem de nome em branco acima.
+        if (name.trim().length() > NAME_MAX_LENGTH) {
+            validationHandler().append(new ValidationError(NAME_LENGTH_MESSAGE));
+        }
+    }
+}
