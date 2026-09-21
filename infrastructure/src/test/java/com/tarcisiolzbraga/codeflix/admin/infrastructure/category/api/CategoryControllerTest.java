@@ -5,6 +5,7 @@ import static io.vavr.API.Right;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -47,6 +48,8 @@ class CategoryControllerTest {
 
     private static final String CATEGORIES_PATH = "/categories";
     private static final String EXPECTED_ID = "123";
+    private static final String EXPECTED_NAME = "Filmes";
+    private static final String EXPECTED_DESCRIPTION = "A mais assistida";
     private static final String VALID_BODY =
             """
             {"name":"Filmes","description":"A mais assistida","active":true}""";
@@ -89,6 +92,9 @@ class CategoryControllerTest {
         response.andExpect(status().isCreated())
                 .andExpect(header().string("Location", CATEGORIES_PATH + "/" + EXPECTED_ID))
                 .andExpect(jsonPath("$.id").value(EXPECTED_ID));
+        verify(createCategoryUseCase).execute(argThat(command -> EXPECTED_NAME.equals(command.name())
+                && EXPECTED_DESCRIPTION.equals(command.description())
+                && command.isActive()));
     }
 
     @Test
@@ -183,6 +189,9 @@ class CategoryControllerTest {
                 .content(VALID_UPDATE_BODY));
 
         response.andExpect(status().isOk()).andExpect(jsonPath("$.id").value(EXPECTED_ID));
+        verify(updateCategoryUseCase).execute(argThat(command -> EXPECTED_ID.equals(command.id())
+                && EXPECTED_NAME.equals(command.name())
+                && EXPECTED_DESCRIPTION.equals(command.description())));
     }
 
     @Test
