@@ -61,7 +61,8 @@ class CategoryAuditIT {
     @Test
     void givenDeactivatedCategory_whenReadLastRevision_thenAuditTheInheritedFields() {
         final var category = this.categoryGateway.create(Category.newCategory("Filmes", null, true));
-        this.categoryGateway.update(category.deactivate());
+        category.deactivate();
+        this.categoryGateway.update(category);
         final var revisions = revisionsOf(category.getId().getValue());
 
         final var audited = auditedAt(category.getId().getValue(), revisions.getLast());

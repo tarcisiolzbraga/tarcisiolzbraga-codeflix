@@ -21,6 +21,7 @@ public class DefaultActivateCategoryUseCase extends ActivateCategoryUseCase {
         final var category = this.categoryGateway
                 .findById(id)
                 .orElseThrow(() -> NotFoundException.with(Category.class, id));
-        return CategoryOutput.from(this.categoryGateway.update(category.activate()));
+        category.activate();
+        return CategoryOutput.from(this.categoryGateway.update(category));
     }
 }

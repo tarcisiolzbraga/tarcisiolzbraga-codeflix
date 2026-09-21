@@ -21,6 +21,7 @@ public class DefaultDeactivateCategoryUseCase extends DeactivateCategoryUseCase 
         final var category = this.categoryGateway
                 .findById(id)
                 .orElseThrow(() -> NotFoundException.with(Category.class, id));
-        return CategoryOutput.from(this.categoryGateway.update(category.deactivate()));
+        category.deactivate();
+        return CategoryOutput.from(this.categoryGateway.update(category));
     }
 }
