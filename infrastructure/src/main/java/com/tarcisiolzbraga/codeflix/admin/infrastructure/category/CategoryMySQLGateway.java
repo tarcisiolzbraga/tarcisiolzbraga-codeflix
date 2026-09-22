@@ -10,6 +10,8 @@ import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.Ca
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.util.SpecificationUtils;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -56,6 +58,17 @@ public class CategoryMySQLGateway implements CategoryGateway {
                 result.getSize(),
                 result.getTotalElements(),
                 result.map(CategoryJpaEntity::toAggregate).toList());
+    }
+
+    @Override
+    public Set<CategoryID> findExistingIds(final Set<CategoryID> ids) {
+        if (ids.isEmpty()) {
+            return Set.of();
+        }
+        final var values = ids.stream().map(CategoryID::getValue).collect(Collectors.toSet());
+        return this.categoryRepository.findExistingIds(values).stream()
+                .map(CategoryID::from)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     private Category save(final Category category) {
