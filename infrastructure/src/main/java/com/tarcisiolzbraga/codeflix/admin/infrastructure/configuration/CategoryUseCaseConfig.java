@@ -15,6 +15,7 @@ import com.tarcisiolzbraga.codeflix.admin.application.category.list.ListCategori
 import com.tarcisiolzbraga.codeflix.admin.application.category.update.DefaultUpdateCategoryUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.category.update.UpdateCategoryUseCase;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryGateway;
+import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreGateway;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -23,9 +24,11 @@ import org.springframework.context.annotation.Configuration;
 public class CategoryUseCaseConfig {
 
     private final CategoryGateway categoryGateway;
+    private final GenreGateway genreGateway;
 
-    public CategoryUseCaseConfig(final CategoryGateway categoryGateway) {
+    public CategoryUseCaseConfig(final CategoryGateway categoryGateway, final GenreGateway genreGateway) {
         this.categoryGateway = categoryGateway;
+        this.genreGateway = genreGateway;
     }
 
     @Bean
@@ -45,7 +48,7 @@ public class CategoryUseCaseConfig {
 
     @Bean
     DeleteCategoryUseCase deleteCategoryUseCase() {
-        return new DefaultDeleteCategoryUseCase(this.categoryGateway);
+        return new DefaultDeleteCategoryUseCase(this.categoryGateway, this.genreGateway);
     }
 
     @Bean
