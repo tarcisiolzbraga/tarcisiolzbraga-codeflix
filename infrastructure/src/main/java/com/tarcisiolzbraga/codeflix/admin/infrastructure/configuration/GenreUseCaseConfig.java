@@ -4,6 +4,8 @@ import com.tarcisiolzbraga.codeflix.admin.application.genre.activate.ActivateGen
 import com.tarcisiolzbraga.codeflix.admin.application.genre.activate.DefaultActivateGenreUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.DefaultCreateGenreUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.genre.deactivate.DeactivateGenreUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.genre.deactivate.DefaultDeactivateGenreUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.delete.DefaultDeleteGenreUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.delete.DeleteGenreUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.get.DefaultGetGenreByIdUseCase;
@@ -57,5 +59,10 @@ public class GenreUseCaseConfig {
     @Bean
     ActivateGenreUseCase activateGenreUseCase() {
         return new DefaultActivateGenreUseCase(this.genreGateway);
+    }
+
+    @Bean
+    DeactivateGenreUseCase deactivateGenreUseCase() {
+        return new DefaultDeactivateGenreUseCase(this.genreGateway);
     }
 }
