@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -29,7 +30,9 @@ import com.tarcisiolzbraga.codeflix.admin.application.category.update.UpdateCate
 import com.tarcisiolzbraga.codeflix.admin.application.category.update.UpdateCategoryUseCase;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.Category;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
+import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.ConflictException;
 import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.NotFoundException;
+import com.tarcisiolzbraga.codeflix.admin.domain.genre.Genre;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.SearchQuery;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationError;
@@ -234,5 +237,18 @@ class CategoryControllerTest {
 
         response.andExpect(status().isNoContent());
         verify(deleteCategoryUseCase).execute(EXPECTED_ID);
+    }
+
+    @Test
+    void givenCategoryLinkedToGenre_whenCallDelete_thenReturn409() throws Exception {
+        doThrow(ConflictException.linked(Category.class, CategoryID.from(EXPECTED_ID), Genre.class))
+                .when(deleteCategoryUseCase).execute(EXPECTED_ID);
+
+        final var response = this.mockMvc.perform(delete(CATEGORIES_PATH + "/" + EXPECTED_ID));
+
+        response.andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("Category with ID 123 is linked to at least one Genre; deactivate it instead"))
+                .andExpect(jsonPath("$.errors").isEmpty());
     }
 }

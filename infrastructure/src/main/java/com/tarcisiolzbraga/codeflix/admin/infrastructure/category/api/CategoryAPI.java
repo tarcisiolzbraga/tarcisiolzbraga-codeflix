@@ -1,5 +1,7 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.category.api;
 
+import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.CONFLICT;
+import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.CONFLICT_DESCRIPTION;
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.CREATED;
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.ID_DESCRIPTION;
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.NOT_FOUND;
@@ -90,7 +92,14 @@ public interface CategoryAPI {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Remove uma categoria", description = "Idempotente: id inexistente também responde 204.")
+    @Operation(
+            summary = "Remove uma categoria",
+            description = "Idempotente: id inexistente também responde 204. Categoria usada por algum gênero "
+                    + "não é removida; ela deve ser desativada.")
     @ApiResponse(responseCode = NO_CONTENT, description = "Removida, ou já não existia")
+    @ApiResponse(
+            responseCode = CONFLICT,
+            description = CONFLICT_DESCRIPTION,
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     void deleteById(@Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id);
 }
