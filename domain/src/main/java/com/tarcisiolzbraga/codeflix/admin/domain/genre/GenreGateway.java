@@ -1,5 +1,6 @@
 package com.tarcisiolzbraga.codeflix.admin.domain.genre;
 
+import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.SearchQuery;
 import java.util.Optional;
@@ -15,4 +16,6 @@ public interface GenreGateway {
     Optional<Genre> findById(GenreID id);
 
     Pagination<Genre> findAll(SearchQuery query);
+
+    boolean existsByCategory(CategoryID categoryId);
 }

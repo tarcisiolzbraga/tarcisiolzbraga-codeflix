@@ -1,5 +1,6 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.api;
 
+import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.ConflictException;
 import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.DomainException;
 import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.NotFoundException;
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ApiError> handleNotFound(final NotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiError.from(exception));
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiError> handleConflict(final ConflictException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiError.from(exception));
     }
 
     @ExceptionHandler(DomainException.class)

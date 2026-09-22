@@ -9,8 +9,12 @@ import static org.mockito.Mockito.doThrow;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.Category;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
+import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.ConflictException;
+import com.tarcisiolzbraga.codeflix.admin.domain.genre.Genre;
+import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreGateway;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.CategoryRepository;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -24,6 +28,9 @@ class DeleteCategoryUseCaseIT {
     @Autowired
     private CategoryRepository categoryRepository;
 
+    @Autowired
+    private GenreGateway genreGateway;
+
     @MockitoSpyBean
     private CategoryGateway categoryGateway;
 
@@ -34,6 +41,19 @@ class DeleteCategoryUseCaseIT {
         this.useCase.execute(category.getId().getValue());
 
         assertEquals(0, this.categoryRepository.count());
+    }
+
+    @Test
+    void givenCategoryLinkedToGenre_whenCallExecute_thenThrowConflictAndKeepEverything() {
+        final var category = givenPersistedCategory();
+        final var genre = this.genreGateway.create(Genre.newGenre("Ação", true).addCategory(category.getId()));
+
+        assertThrows(ConflictException.class, () -> this.useCase.execute(category.getId().getValue()));
+
+        assertEquals(1, this.categoryRepository.count());
+        assertEquals(
+                Set.of(category.getId()),
+                this.genreGateway.findById(genre.getId()).orElseThrow().getCategories());
     }
 
     @Test
