@@ -1,5 +1,6 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.genre;
 
+import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.Genre;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreID;
@@ -56,6 +57,11 @@ public class GenreMySQLGateway implements GenreGateway {
                 result.getSize(),
                 result.getTotalElements(),
                 result.map(GenreJpaEntity::toAggregate).toList());
+    }
+
+    @Override
+    public boolean existsByCategory(final CategoryID categoryId) {
+        return this.genreRepository.existsByCategoryId(categoryId.getValue());
     }
 
     private Genre save(final Genre genre) {

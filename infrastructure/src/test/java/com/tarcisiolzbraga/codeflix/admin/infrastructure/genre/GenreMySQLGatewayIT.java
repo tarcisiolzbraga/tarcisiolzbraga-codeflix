@@ -137,6 +137,26 @@ class GenreMySQLGatewayIT {
         assertTrue(actualPage.items().isEmpty());
     }
 
+    @Test
+    void givenCategoryLinkedToGenre_whenCallExistsByCategory_thenReturnTrue() {
+        final var movies = existingCategory("Filmes");
+        persist(movies, "Drama");
+
+        final var actualResult = this.genreGateway.existsByCategory(movies);
+
+        assertTrue(actualResult);
+    }
+
+    @Test
+    void givenCategoryWithoutGenres_whenCallExistsByCategory_thenReturnFalse() {
+        persist(existingCategory("Filmes"), "Drama");
+        final var series = existingCategory("Séries");
+
+        final var actualResult = this.genreGateway.existsByCategory(series);
+
+        assertFalse(actualResult);
+    }
+
     private CategoryID existingCategory(final String name) {
         return this.categoryGateway.create(Category.newCategory(name, null, true)).getId();
     }
