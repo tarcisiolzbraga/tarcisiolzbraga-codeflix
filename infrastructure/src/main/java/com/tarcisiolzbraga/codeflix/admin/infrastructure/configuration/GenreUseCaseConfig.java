@@ -2,6 +2,8 @@ package com.tarcisiolzbraga.codeflix.admin.infrastructure.configuration;
 
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.DefaultCreateGenreUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.genre.get.DefaultGetGenreByIdUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.genre.get.GetGenreByIdUseCase;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreGateway;
 import org.springframework.context.annotation.Bean;
@@ -22,5 +24,10 @@ public class GenreUseCaseConfig {
     @Bean
     CreateGenreUseCase createGenreUseCase() {
         return new DefaultCreateGenreUseCase(this.categoryGateway, this.genreGateway);
+    }
+
+    @Bean
+    GetGenreByIdUseCase getGenreByIdUseCase() {
+        return new DefaultGetGenreByIdUseCase(this.genreGateway);
     }
 }
