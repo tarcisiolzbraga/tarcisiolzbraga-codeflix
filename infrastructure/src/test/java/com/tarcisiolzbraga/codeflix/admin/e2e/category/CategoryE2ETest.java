@@ -6,9 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tarcisiolzbraga.codeflix.admin.e2e.CategoryE2EDsl;
+import com.tarcisiolzbraga.codeflix.admin.e2e.GenreE2EDsl;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.E2ETest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiError;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.models.CreateCategoryRequest;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,10 +19,11 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 @E2ETest
-class CategoryE2ETest implements CategoryE2EDsl {
+class CategoryE2ETest implements CategoryE2EDsl, GenreE2EDsl {
 
     private static final String EXPECTED_NAME = "Filmes";
     private static final String EXPECTED_DESCRIPTION = "A mais assistida";
+    private static final String GENRE_NAME = "Ação";
 
     @Value("${local.server.port}")
     private int port;
@@ -142,5 +145,38 @@ class CategoryE2ETest implements CategoryE2EDsl {
         final var actualResponse = createACategory(request);
 
         assertTrue(retrieveACategory(actualResponse.id()).active());
+    }
+
+    @Test
+    void givenACategoryInAGenre_whenDeleteIt_thenReturnConflictAndKeepIt() {
+        final var id = givenACategory(EXPECTED_NAME, EXPECTED_DESCRIPTION);
+        givenAGenre(GENRE_NAME, id);
+
+        final var actualException = assertThrows(HttpClientErrorException.class, () -> deleteACategory(id));
+
+        assertEquals(HttpStatus.CONFLICT, actualException.getStatusCode());
+        assertEquals(id, retrieveACategory(id).id());
+    }
+
+    @Test
+    void givenACategoryInAGenre_whenDeactivateIt_thenItStaysInTheGenreInactive() {
+        final var id = givenACategory(EXPECTED_NAME, EXPECTED_DESCRIPTION);
+        final var genre = givenAGenre(GENRE_NAME, id);
+
+        final var actualResponse = deactivateACategory(id);
+
+        assertFalse(actualResponse.active());
+        assertEquals(List.of(id), retrieveAGenre(genre).categories());
+    }
+
+    @Test
+    void givenACategoryRemovedFromItsGenre_whenDeleteIt_thenItIsGone() {
+        final var id = givenACategory(EXPECTED_NAME, EXPECTED_DESCRIPTION);
+        final var genre = givenAGenre(GENRE_NAME, id);
+        updateAGenre(genre, GENRE_NAME);
+
+        deleteACategory(id);
+
+        assertEquals(0, listCategories(0, 10).total());
     }
 }
