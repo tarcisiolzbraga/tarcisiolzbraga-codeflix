@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -18,6 +19,7 @@ import com.tarcisiolzbraga.codeflix.admin.application.genre.activate.ActivateGen
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.deactivate.DeactivateGenreUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.genre.delete.DeleteGenreUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.get.GetGenreByIdUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.list.GenreListOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.list.ListGenresUseCase;
@@ -73,6 +75,9 @@ class GenreControllerTest {
 
     @MockitoBean
     private DeactivateGenreUseCase deactivateGenreUseCase;
+
+    @MockitoBean
+    private DeleteGenreUseCase deleteGenreUseCase;
 
     @Test
     void givenValidBody_whenCallCreate_thenReturn201WithLocation() throws Exception {
@@ -259,5 +264,13 @@ class GenreControllerTest {
         final var response = this.mockMvc.perform(put(GENRES_PATH + "/" + EXPECTED_ID + "/deactivate"));
 
         response.andExpect(status().isNotFound());
+    }
+
+    @Test
+    void givenValidId_whenCallDelete_thenReturn204() throws Exception {
+        final var response = this.mockMvc.perform(delete(GENRES_PATH + "/" + EXPECTED_ID));
+
+        response.andExpect(status().isNoContent());
+        verify(deleteGenreUseCase).execute(EXPECTED_ID);
     }
 }

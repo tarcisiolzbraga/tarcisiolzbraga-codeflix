@@ -4,6 +4,7 @@ import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseD
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.ID_DESCRIPTION;
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.NOT_FOUND;
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.NOT_FOUND_DESCRIPTION;
+import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.NO_CONTENT;
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.OK;
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.UNPROCESSABLE;
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.UNPROCESSABLE_DESCRIPTION;
@@ -24,7 +25,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,6 +35,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 // Contrato HTTP e documentação OpenAPI dos gêneros; o GenreController só implementa.
 @Tag(name = "Gêneros", description = "Cadastro dos gêneros do catálogo")
@@ -87,4 +91,13 @@ public interface GenreAPI {
     @ApiResponse(responseCode = NOT_FOUND, description = NOT_FOUND_DESCRIPTION,
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     GenreResponse deactivate(@Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id);
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(
+            summary = "Remove um gênero",
+            description = "Idempotente: id inexistente também responde 204. Os vínculos com as categorias saem "
+                    + "junto; as categorias continuam.")
+    @ApiResponse(responseCode = NO_CONTENT, description = "Removido, ou já não existia")
+    void deleteById(@Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id);
 }
