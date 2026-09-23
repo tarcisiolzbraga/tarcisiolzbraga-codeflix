@@ -64,6 +64,18 @@ class UpdateGenreUseCaseIT {
     }
 
     @Test
+    void givenPersistedGenre_whenCallExecute_thenKeepCreatedAtAndAdvanceUpdatedAt() {
+        final var genre = givenPersistedGenre(true, givenPersistedCategory(MOVIES));
+        final var command = UpdateGenreCommand.with(genre.getId().getValue(), EXPECTED_NAME, null);
+
+        this.useCase.execute(command);
+
+        final var persisted = reload(genre);
+        assertEquals(genre.getCreatedAt(), persisted.getCreatedAt());
+        assertTrue(genre.getUpdatedAt().isBefore(persisted.getUpdatedAt()));
+    }
+
+    @Test
     void givenInvalidNameAndUnknownCategory_whenCallExecute_thenReturnBothErrorsAndKeepTheStoredValues() {
         final var movies = givenPersistedCategory(MOVIES);
         final var genre = givenPersistedGenre(true, movies);
