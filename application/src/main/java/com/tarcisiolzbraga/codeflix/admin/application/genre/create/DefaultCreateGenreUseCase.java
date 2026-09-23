@@ -27,7 +27,7 @@ public class DefaultCreateGenreUseCase extends CreateGenreUseCase {
     @Override
     public Either<Notification, CreateGenreOutput> execute(final CreateGenreCommand input) {
         final var categories = toCategoryIds(input.categories());
-        final var genre = Genre.newGenre(input.name(), input.isActive());
+        final var genre = Genre.newGenre(input.name(), input.isActive(), categories);
         final var notification = Notification.create();
         this.categoryExistence.validate(categories, notification);
         genre.validate(notification);
@@ -35,7 +35,6 @@ public class DefaultCreateGenreUseCase extends CreateGenreUseCase {
         if (notification.hasError()) {
             return Left(notification);
         }
-        genre.addCategories(categories);
         return Right(CreateGenreOutput.from(this.genreGateway.create(genre)));
     }
 

@@ -55,6 +55,17 @@ class CreateGenreUseCaseTest {
     }
 
     @Test
+    void givenCommandWithCategories_whenCallExecute_thenCreateGenreWithEqualTimestamps() {
+        final var command = CreateGenreCommand.with(EXPECTED_NAME, true, Set.of(MOVIES_ID));
+        when(categoryGateway.findExistingIds(any())).thenReturn(Set.of(CategoryID.from(MOVIES_ID)));
+        when(genreGateway.create(any())).thenAnswer(returnsFirstArg());
+
+        useCase.execute(command);
+
+        verify(genreGateway).create(argThat(genre -> genre.getCreatedAt().equals(genre.getUpdatedAt())));
+    }
+
+    @Test
     void givenCommandWithoutCategories_whenCallExecute_thenNotQueryTheCategories() {
         final var command = CreateGenreCommand.with(EXPECTED_NAME, true, Set.of());
         when(genreGateway.create(any())).thenAnswer(returnsFirstArg());
