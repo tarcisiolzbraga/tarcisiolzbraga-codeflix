@@ -16,13 +16,18 @@ import com.tarcisiolzbraga.codeflix.admin.application.genre.GenreOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.get.GetGenreByIdUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.genre.list.GenreListOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.genre.list.ListGenresUseCase;
 import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.NotFoundException;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.Genre;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreID;
+import com.tarcisiolzbraga.codeflix.admin.domain.pagination.Pagination;
+import com.tarcisiolzbraga.codeflix.admin.domain.pagination.SearchQuery;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationError;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.Notification;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.ControllerTest;
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,6 +56,9 @@ class GenreControllerTest {
 
     @MockitoBean
     private GetGenreByIdUseCase getGenreByIdUseCase;
+
+    @MockitoBean
+    private ListGenresUseCase listGenresUseCase;
 
     @Test
     void givenValidBody_whenCallCreate_thenReturn201WithLocation() throws Exception {
@@ -124,5 +132,35 @@ class GenreControllerTest {
 
         response.andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Genre with ID 123 was not found"));
+    }
+
+    @Test
+    void givenSearchParams_whenCallList_thenReturn200WithPagination() throws Exception {
+        final var item = new GenreListOutput(EXPECTED_ID, EXPECTED_NAME, true, Set.of("c2", "c1"), CREATED_AT);
+        when(listGenresUseCase.execute(new SearchQuery(1, 5, "aca", "createdAt", "desc")))
+                .thenReturn(new Pagination<>(1, 5, 1L, List.of(item)));
+
+        final var response = this.mockMvc.perform(get(GENRES_PATH)
+                .queryParam("search", "aca")
+                .queryParam("page", "1")
+                .queryParam("perPage", "5")
+                .queryParam("sort", "createdAt")
+                .queryParam("dir", "desc"));
+
+        response.andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentPage").value(1))
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.items[0].name").value(EXPECTED_NAME))
+                .andExpect(jsonPath("$.items[0].categories[0]").value("c1"));
+    }
+
+    @Test
+    void givenNoSearchParam_whenCallList_thenUseTheDefaults() throws Exception {
+        when(listGenresUseCase.execute(new SearchQuery(0, 10, null, "name", "asc")))
+                .thenReturn(new Pagination<>(0, 10, 0L, List.of()));
+
+        final var response = this.mockMvc.perform(get(GENRES_PATH));
+
+        response.andExpect(status().isOk()).andExpect(jsonPath("$.perPage").value(10));
     }
 }
