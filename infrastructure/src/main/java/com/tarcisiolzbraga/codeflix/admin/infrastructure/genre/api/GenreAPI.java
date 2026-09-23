@@ -15,6 +15,8 @@ import com.tarcisiolzbraga.codeflix.admin.infrastructure.genre.models.CreateGenr
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.genre.models.GenreListResponse;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.genre.models.GenreResponse;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.genre.models.GenreSearchRequest;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.genre.models.UpdateGenreRequest;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.genre.models.UpdateGenreResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -27,6 +29,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
@@ -56,4 +59,18 @@ public interface GenreAPI {
     @ApiResponse(responseCode = NOT_FOUND, description = NOT_FOUND_DESCRIPTION,
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     GenreResponse getById(@Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id);
+
+    @PutMapping("/{id}")
+    @Operation(
+            summary = "Atualiza um gênero",
+            description = "Substitui nome e categorias; a ativação tem rotas próprias.")
+    @ApiResponse(responseCode = OK, description = "Atualizado",
+            content = @Content(schema = @Schema(implementation = UpdateGenreResponse.class)))
+    @ApiResponse(responseCode = NOT_FOUND, description = NOT_FOUND_DESCRIPTION,
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = UNPROCESSABLE, description = UNPROCESSABLE_DESCRIPTION,
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    ResponseEntity<Object> update(
+            @Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id,
+            @RequestBody UpdateGenreRequest request);
 }

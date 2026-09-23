@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -18,6 +19,8 @@ import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreUs
 import com.tarcisiolzbraga.codeflix.admin.application.genre.get.GetGenreByIdUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.list.GenreListOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.list.ListGenresUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.genre.update.UpdateGenreOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.genre.update.UpdateGenreUseCase;
 import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.NotFoundException;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.Genre;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreID;
@@ -59,6 +62,9 @@ class GenreControllerTest {
 
     @MockitoBean
     private ListGenresUseCase listGenresUseCase;
+
+    @MockitoBean
+    private UpdateGenreUseCase updateGenreUseCase;
 
     @Test
     void givenValidBody_whenCallCreate_thenReturn201WithLocation() throws Exception {
@@ -162,5 +168,46 @@ class GenreControllerTest {
         final var response = this.mockMvc.perform(get(GENRES_PATH));
 
         response.andExpect(status().isOk()).andExpect(jsonPath("$.perPage").value(10));
+    }
+
+    @Test
+    void givenValidBody_whenCallUpdate_thenReturn200() throws Exception {
+        when(updateGenreUseCase.execute(any())).thenReturn(Right(new UpdateGenreOutput(EXPECTED_ID)));
+
+        final var response = this.mockMvc.perform(put(GENRES_PATH + "/" + EXPECTED_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name":"Ação","categories":["c1","c2"]}"""));
+
+        response.andExpect(status().isOk()).andExpect(jsonPath("$.id").value(EXPECTED_ID));
+        verify(updateGenreUseCase).execute(argThat(command -> EXPECTED_ID.equals(command.id())
+                && EXPECTED_NAME.equals(command.name())
+                && EXPECTED_CATEGORIES.equals(command.categories())));
+    }
+
+    @Test
+    void givenInvalidName_whenCallUpdate_thenReturn422WithErrors() throws Exception {
+        final var notification = Notification.create(new ValidationError("'name' should not be empty"));
+        when(updateGenreUseCase.execute(any())).thenReturn(Left(notification));
+
+        final var response = this.mockMvc.perform(put(GENRES_PATH + "/" + EXPECTED_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name":"   "}"""));
+
+        response.andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.errors[0]").value("'name' should not be empty"));
+    }
+
+    @Test
+    void givenUnknownId_whenCallUpdate_thenReturn404() throws Exception {
+        when(updateGenreUseCase.execute(any()))
+                .thenThrow(NotFoundException.with(Genre.class, GenreID.from(EXPECTED_ID)));
+
+        final var response = this.mockMvc.perform(put(GENRES_PATH + "/" + EXPECTED_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(VALID_BODY));
+
+        response.andExpect(status().isNotFound());
     }
 }
