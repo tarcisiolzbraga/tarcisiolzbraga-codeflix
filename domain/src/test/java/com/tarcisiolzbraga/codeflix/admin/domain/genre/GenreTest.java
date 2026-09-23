@@ -46,6 +46,24 @@ class GenreTest {
     }
 
     @Test
+    void givenCategories_whenCallNewGenre_thenBeBornWithThemAndEqualTimestamps() {
+        final var expectedCategories = Set.of(CategoryID.unique(), CategoryID.unique());
+
+        final var actualGenre = Genre.newGenre(EXPECTED_NAME, true, expectedCategories);
+
+        assertEquals(expectedCategories, actualGenre.getCategories());
+        assertEquals(actualGenre.getCreatedAt(), actualGenre.getUpdatedAt());
+    }
+
+    @Test
+    void givenNullCategories_whenCallNewGenre_thenThrowNullPointerException() {
+        final var actualException =
+                assertThrows(NullPointerException.class, () -> Genre.newGenre(EXPECTED_NAME, true, null));
+
+        assertEquals("'categories' should not be null", actualException.getMessage());
+    }
+
+    @Test
     void givenValidParams_whenCallNewGenre_thenTruncateTimestampsToMicroseconds() {
         final var actualGenre = Genre.newGenre(EXPECTED_NAME, true);
 

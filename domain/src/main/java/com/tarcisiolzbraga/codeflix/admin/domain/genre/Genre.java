@@ -31,8 +31,13 @@ public class Genre extends AggregateRoot<GenreID> {
     }
 
     public static Genre newGenre(final String name, final boolean isActive) {
+        return newGenre(name, isActive, Set.of());
+    }
+
+    // Nasce com as categorias, e não com addCategories depois: assim createdAt e updatedAt ficam iguais.
+    public static Genre newGenre(final String name, final boolean isActive, final Set<CategoryID> categories) {
         final var now = InstantUtils.now();
-        return new Genre(GenreID.unique(), name, isActive, Set.of(), now, now);
+        return new Genre(GenreID.unique(), name, isActive, categories, now, now);
     }
 
     public static Genre with(
