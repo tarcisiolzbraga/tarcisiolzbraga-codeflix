@@ -4,6 +4,7 @@ import com.tarcisiolzbraga.codeflix.admin.application.genre.activate.ActivateGen
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreCommand;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.genre.deactivate.DeactivateGenreUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.get.GetGenreByIdUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.list.ListGenresUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.update.UpdateGenreCommand;
@@ -33,18 +34,21 @@ public class GenreController implements GenreAPI {
     private final ListGenresUseCase listGenresUseCase;
     private final UpdateGenreUseCase updateGenreUseCase;
     private final ActivateGenreUseCase activateGenreUseCase;
+    private final DeactivateGenreUseCase deactivateGenreUseCase;
 
     public GenreController(
             final CreateGenreUseCase createGenreUseCase,
             final GetGenreByIdUseCase getGenreByIdUseCase,
             final ListGenresUseCase listGenresUseCase,
             final UpdateGenreUseCase updateGenreUseCase,
-            final ActivateGenreUseCase activateGenreUseCase) {
+            final ActivateGenreUseCase activateGenreUseCase,
+            final DeactivateGenreUseCase deactivateGenreUseCase) {
         this.createGenreUseCase = createGenreUseCase;
         this.getGenreByIdUseCase = getGenreByIdUseCase;
         this.listGenresUseCase = listGenresUseCase;
         this.updateGenreUseCase = updateGenreUseCase;
         this.activateGenreUseCase = activateGenreUseCase;
+        this.deactivateGenreUseCase = deactivateGenreUseCase;
     }
 
     @Override
@@ -72,6 +76,11 @@ public class GenreController implements GenreAPI {
     @Override
     public GenreResponse activate(final String id) {
         return GenreResponse.from(this.activateGenreUseCase.execute(id));
+    }
+
+    @Override
+    public GenreResponse deactivate(final String id) {
+        return GenreResponse.from(this.deactivateGenreUseCase.execute(id));
     }
 
     private ResponseEntity<Object> unprocessableContent(final Notification notification) {

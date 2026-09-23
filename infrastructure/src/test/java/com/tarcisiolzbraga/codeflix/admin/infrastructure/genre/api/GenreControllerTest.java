@@ -17,6 +17,7 @@ import com.tarcisiolzbraga.codeflix.admin.application.genre.GenreOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.activate.ActivateGenreUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.genre.deactivate.DeactivateGenreUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.get.GetGenreByIdUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.list.GenreListOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.list.ListGenresUseCase;
@@ -69,6 +70,9 @@ class GenreControllerTest {
 
     @MockitoBean
     private ActivateGenreUseCase activateGenreUseCase;
+
+    @MockitoBean
+    private DeactivateGenreUseCase deactivateGenreUseCase;
 
     @Test
     void givenValidBody_whenCallCreate_thenReturn201WithLocation() throws Exception {
@@ -232,6 +236,27 @@ class GenreControllerTest {
                 .thenThrow(NotFoundException.with(Genre.class, GenreID.from(EXPECTED_ID)));
 
         final var response = this.mockMvc.perform(put(GENRES_PATH + "/" + EXPECTED_ID + "/activate"));
+
+        response.andExpect(status().isNotFound());
+    }
+
+    @Test
+    void givenValidId_whenCallDeactivate_thenReturn200WithTheInactiveGenre() throws Exception {
+        final var output =
+                new GenreOutput(EXPECTED_ID, EXPECTED_NAME, false, EXPECTED_CATEGORIES, CREATED_AT, UPDATED_AT);
+        when(deactivateGenreUseCase.execute(EXPECTED_ID)).thenReturn(output);
+
+        final var response = this.mockMvc.perform(put(GENRES_PATH + "/" + EXPECTED_ID + "/deactivate"));
+
+        response.andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false));
+    }
+
+    @Test
+    void givenUnknownId_whenCallDeactivate_thenReturn404() throws Exception {
+        when(deactivateGenreUseCase.execute(EXPECTED_ID))
+                .thenThrow(NotFoundException.with(Genre.class, GenreID.from(EXPECTED_ID)));
+
+        final var response = this.mockMvc.perform(put(GENRES_PATH + "/" + EXPECTED_ID + "/deactivate"));
 
         response.andExpect(status().isNotFound());
     }

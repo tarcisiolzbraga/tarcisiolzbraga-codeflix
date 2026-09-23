@@ -80,4 +80,11 @@ public interface GenreAPI {
     @ApiResponse(responseCode = NOT_FOUND, description = NOT_FOUND_DESCRIPTION,
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     GenreResponse activate(@Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id);
+
+    @PutMapping("/{id}/deactivate")
+    @Operation(summary = "Desativa um gênero", description = "Tira do catálogo sem apagar o registro.")
+    @ApiResponse(responseCode = OK, description = "Gênero inativo")
+    @ApiResponse(responseCode = NOT_FOUND, description = NOT_FOUND_DESCRIPTION,
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    GenreResponse deactivate(@Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id);
 }
