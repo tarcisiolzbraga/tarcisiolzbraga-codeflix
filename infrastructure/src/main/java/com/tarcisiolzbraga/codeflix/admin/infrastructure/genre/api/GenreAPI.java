@@ -73,4 +73,11 @@ public interface GenreAPI {
     ResponseEntity<Object> update(
             @Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id,
             @RequestBody UpdateGenreRequest request);
+
+    @PutMapping("/{id}/activate")
+    @Operation(summary = "Ativa um gênero", description = "Idempotente: um gênero já ativo segue ativo.")
+    @ApiResponse(responseCode = OK, description = "Gênero ativo")
+    @ApiResponse(responseCode = NOT_FOUND, description = NOT_FOUND_DESCRIPTION,
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    GenreResponse activate(@Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id);
 }

@@ -1,5 +1,6 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.genre.api;
 
+import com.tarcisiolzbraga.codeflix.admin.application.genre.activate.ActivateGenreUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreCommand;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreUseCase;
@@ -31,16 +32,19 @@ public class GenreController implements GenreAPI {
     private final GetGenreByIdUseCase getGenreByIdUseCase;
     private final ListGenresUseCase listGenresUseCase;
     private final UpdateGenreUseCase updateGenreUseCase;
+    private final ActivateGenreUseCase activateGenreUseCase;
 
     public GenreController(
             final CreateGenreUseCase createGenreUseCase,
             final GetGenreByIdUseCase getGenreByIdUseCase,
             final ListGenresUseCase listGenresUseCase,
-            final UpdateGenreUseCase updateGenreUseCase) {
+            final UpdateGenreUseCase updateGenreUseCase,
+            final ActivateGenreUseCase activateGenreUseCase) {
         this.createGenreUseCase = createGenreUseCase;
         this.getGenreByIdUseCase = getGenreByIdUseCase;
         this.listGenresUseCase = listGenresUseCase;
         this.updateGenreUseCase = updateGenreUseCase;
+        this.activateGenreUseCase = activateGenreUseCase;
     }
 
     @Override
@@ -63,6 +67,11 @@ public class GenreController implements GenreAPI {
     public ResponseEntity<Object> update(final String id, final UpdateGenreRequest request) {
         final var command = UpdateGenreCommand.with(id, request.name(), request.categories());
         return this.updateGenreUseCase.execute(command).fold(this::unprocessableContent, this::updated);
+    }
+
+    @Override
+    public GenreResponse activate(final String id) {
+        return GenreResponse.from(this.activateGenreUseCase.execute(id));
     }
 
     private ResponseEntity<Object> unprocessableContent(final Notification notification) {

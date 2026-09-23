@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.tarcisiolzbraga.codeflix.admin.application.genre.GenreOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.genre.activate.ActivateGenreUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.create.CreateGenreUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.genre.get.GetGenreByIdUseCase;
@@ -65,6 +66,9 @@ class GenreControllerTest {
 
     @MockitoBean
     private UpdateGenreUseCase updateGenreUseCase;
+
+    @MockitoBean
+    private ActivateGenreUseCase activateGenreUseCase;
 
     @Test
     void givenValidBody_whenCallCreate_thenReturn201WithLocation() throws Exception {
@@ -207,6 +211,27 @@ class GenreControllerTest {
         final var response = this.mockMvc.perform(put(GENRES_PATH + "/" + EXPECTED_ID)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(VALID_BODY));
+
+        response.andExpect(status().isNotFound());
+    }
+
+    @Test
+    void givenValidId_whenCallActivate_thenReturn200WithTheActiveGenre() throws Exception {
+        final var output =
+                new GenreOutput(EXPECTED_ID, EXPECTED_NAME, true, EXPECTED_CATEGORIES, CREATED_AT, UPDATED_AT);
+        when(activateGenreUseCase.execute(EXPECTED_ID)).thenReturn(output);
+
+        final var response = this.mockMvc.perform(put(GENRES_PATH + "/" + EXPECTED_ID + "/activate"));
+
+        response.andExpect(status().isOk()).andExpect(jsonPath("$.active").value(true));
+    }
+
+    @Test
+    void givenUnknownId_whenCallActivate_thenReturn404() throws Exception {
+        when(activateGenreUseCase.execute(EXPECTED_ID))
+                .thenThrow(NotFoundException.with(Genre.class, GenreID.from(EXPECTED_ID)));
+
+        final var response = this.mockMvc.perform(put(GENRES_PATH + "/" + EXPECTED_ID + "/activate"));
 
         response.andExpect(status().isNotFound());
     }
