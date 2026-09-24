@@ -7,6 +7,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.annotation.AliasFor;
@@ -14,6 +15,8 @@ import org.springframework.core.annotation.AliasFor;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Inherited
+// A tag separa quem precisa de Docker: a task unitTests exclui esta e a do e2e.
+@Tag("integrationTest")
 // classes explícito porque os UseCaseIT ficam no pacote da application, de onde a busca por
 // @SpringBootConfiguration subindo pelos pacotes não alcança a Main. Como o classes desliga essa
 // busca, @TestConfiguration aninhada no teste também deixa de ser vista: precisa de @Import.
