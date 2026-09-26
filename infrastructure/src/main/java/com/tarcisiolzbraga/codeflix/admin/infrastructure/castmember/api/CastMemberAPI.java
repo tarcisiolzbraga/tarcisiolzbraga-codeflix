@@ -73,4 +73,18 @@ public interface CastMemberAPI {
     ResponseEntity<Object> update(
             @Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id,
             @RequestBody UpdateCastMemberRequest request);
+
+    @PutMapping("/{id}/activate")
+    @Operation(summary = "Ativa um membro de elenco", description = "Idempotente: um membro já ativo segue ativo.")
+    @ApiResponse(responseCode = OK, description = "Membro ativo")
+    @ApiResponse(responseCode = NOT_FOUND, description = NOT_FOUND_DESCRIPTION,
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    CastMemberResponse activate(@Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id);
+
+    @PutMapping("/{id}/deactivate")
+    @Operation(summary = "Desativa um membro de elenco", description = "Tira do catálogo sem apagar o registro.")
+    @ApiResponse(responseCode = OK, description = "Membro inativo")
+    @ApiResponse(responseCode = NOT_FOUND, description = NOT_FOUND_DESCRIPTION,
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    CastMemberResponse deactivate(@Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id);
 }

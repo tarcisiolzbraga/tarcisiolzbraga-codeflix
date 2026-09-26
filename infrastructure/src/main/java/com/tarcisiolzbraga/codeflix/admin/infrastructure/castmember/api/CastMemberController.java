@@ -1,8 +1,10 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.api;
 
+import com.tarcisiolzbraga.codeflix.admin.application.castmember.activate.ActivateCastMemberUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.create.CreateCastMemberCommand;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.create.CreateCastMemberOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.create.CreateCastMemberUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.castmember.deactivate.DeactivateCastMemberUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.get.GetCastMemberByIdUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.list.ListCastMembersUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.update.UpdateCastMemberCommand;
@@ -31,16 +33,22 @@ public class CastMemberController implements CastMemberAPI {
     private final GetCastMemberByIdUseCase getCastMemberByIdUseCase;
     private final ListCastMembersUseCase listCastMembersUseCase;
     private final UpdateCastMemberUseCase updateCastMemberUseCase;
+    private final ActivateCastMemberUseCase activateCastMemberUseCase;
+    private final DeactivateCastMemberUseCase deactivateCastMemberUseCase;
 
     public CastMemberController(
             final CreateCastMemberUseCase createCastMemberUseCase,
             final GetCastMemberByIdUseCase getCastMemberByIdUseCase,
             final ListCastMembersUseCase listCastMembersUseCase,
-            final UpdateCastMemberUseCase updateCastMemberUseCase) {
+            final UpdateCastMemberUseCase updateCastMemberUseCase,
+            final ActivateCastMemberUseCase activateCastMemberUseCase,
+            final DeactivateCastMemberUseCase deactivateCastMemberUseCase) {
         this.createCastMemberUseCase = createCastMemberUseCase;
         this.getCastMemberByIdUseCase = getCastMemberByIdUseCase;
         this.listCastMembersUseCase = listCastMembersUseCase;
         this.updateCastMemberUseCase = updateCastMemberUseCase;
+        this.activateCastMemberUseCase = activateCastMemberUseCase;
+        this.deactivateCastMemberUseCase = deactivateCastMemberUseCase;
     }
 
     @Override
@@ -63,6 +71,16 @@ public class CastMemberController implements CastMemberAPI {
     public ResponseEntity<Object> update(final String id, final UpdateCastMemberRequest request) {
         final var command = UpdateCastMemberCommand.with(id, request.name(), request.type());
         return this.updateCastMemberUseCase.execute(command).fold(this::unprocessableContent, this::updated);
+    }
+
+    @Override
+    public CastMemberResponse activate(final String id) {
+        return CastMemberResponse.from(this.activateCastMemberUseCase.execute(id));
+    }
+
+    @Override
+    public CastMemberResponse deactivate(final String id) {
+        return CastMemberResponse.from(this.deactivateCastMemberUseCase.execute(id));
     }
 
     private ResponseEntity<Object> unprocessableContent(final Notification notification) {

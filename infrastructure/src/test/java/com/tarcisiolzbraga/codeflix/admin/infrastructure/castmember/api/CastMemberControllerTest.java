@@ -14,6 +14,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.CastMemberOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.castmember.activate.ActivateCastMemberUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.castmember.deactivate.DeactivateCastMemberUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.create.CreateCastMemberOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.create.CreateCastMemberUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.get.GetCastMemberByIdUseCase;
@@ -62,6 +64,12 @@ class CastMemberControllerTest {
 
     @MockitoBean
     private UpdateCastMemberUseCase updateCastMemberUseCase;
+
+    @MockitoBean
+    private ActivateCastMemberUseCase activateCastMemberUseCase;
+
+    @MockitoBean
+    private DeactivateCastMemberUseCase deactivateCastMemberUseCase;
 
     @Test
     void givenValidBody_whenCallCreate_thenReturn201WithLocation() throws Exception {
@@ -187,5 +195,27 @@ class CastMemberControllerTest {
 
         response.andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.errors[0]").value("'name' should not be empty"));
+    }
+
+    @Test
+    void givenExistingId_whenCallActivate_thenReturn200WithTheMemberActive() throws Exception {
+        when(activateCastMemberUseCase.execute(EXPECTED_ID))
+                .thenReturn(new CastMemberOutput(EXPECTED_ID, EXPECTED_NAME, "ACTOR", true, CREATED_AT, UPDATED_AT));
+
+        final var response = this.mockMvc.perform(put(CAST_MEMBERS_PATH + "/" + EXPECTED_ID + "/activate"));
+
+        response.andExpect(status().isOk()).andExpect(jsonPath("$.active").value(true));
+        verify(activateCastMemberUseCase).execute(EXPECTED_ID);
+    }
+
+    @Test
+    void givenExistingId_whenCallDeactivate_thenReturn200WithTheMemberInactive() throws Exception {
+        when(deactivateCastMemberUseCase.execute(EXPECTED_ID))
+                .thenReturn(new CastMemberOutput(EXPECTED_ID, EXPECTED_NAME, "ACTOR", false, CREATED_AT, UPDATED_AT));
+
+        final var response = this.mockMvc.perform(put(CAST_MEMBERS_PATH + "/" + EXPECTED_ID + "/deactivate"));
+
+        response.andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false));
+        verify(deactivateCastMemberUseCase).execute(EXPECTED_ID);
     }
 }
