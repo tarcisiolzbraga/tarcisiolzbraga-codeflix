@@ -4,9 +4,13 @@ import com.tarcisiolzbraga.codeflix.admin.application.castmember.create.CreateCa
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.create.CreateCastMemberOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.create.CreateCastMemberUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.get.GetCastMemberByIdUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.castmember.list.ListCastMembersUseCase;
+import com.tarcisiolzbraga.codeflix.admin.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.Notification;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiError;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.models.CastMemberListResponse;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.models.CastMemberResponse;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.models.CastMemberSearchRequest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.models.CreateCastMemberRequest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.models.CreateCastMemberResponse;
 import java.net.URI;
@@ -20,18 +24,26 @@ public class CastMemberController implements CastMemberAPI {
 
     private final CreateCastMemberUseCase createCastMemberUseCase;
     private final GetCastMemberByIdUseCase getCastMemberByIdUseCase;
+    private final ListCastMembersUseCase listCastMembersUseCase;
 
     public CastMemberController(
             final CreateCastMemberUseCase createCastMemberUseCase,
-            final GetCastMemberByIdUseCase getCastMemberByIdUseCase) {
+            final GetCastMemberByIdUseCase getCastMemberByIdUseCase,
+            final ListCastMembersUseCase listCastMembersUseCase) {
         this.createCastMemberUseCase = createCastMemberUseCase;
         this.getCastMemberByIdUseCase = getCastMemberByIdUseCase;
+        this.listCastMembersUseCase = listCastMembersUseCase;
     }
 
     @Override
     public ResponseEntity<Object> create(final CreateCastMemberRequest request) {
         final var command = CreateCastMemberCommand.with(request.name(), request.type(), request.isActive());
         return this.createCastMemberUseCase.execute(command).fold(this::unprocessableContent, this::created);
+    }
+
+    @Override
+    public Pagination<CastMemberListResponse> list(final CastMemberSearchRequest request) {
+        return this.listCastMembersUseCase.execute(request.toSearchQuery()).map(CastMemberListResponse::from);
     }
 
     @Override

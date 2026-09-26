@@ -16,13 +16,17 @@ import com.tarcisiolzbraga.codeflix.admin.application.castmember.CastMemberOutpu
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.create.CreateCastMemberOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.create.CreateCastMemberUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.get.GetCastMemberByIdUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.castmember.list.CastMemberListOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.castmember.list.ListCastMembersUseCase;
 import com.tarcisiolzbraga.codeflix.admin.domain.castmember.CastMember;
 import com.tarcisiolzbraga.codeflix.admin.domain.castmember.CastMemberID;
 import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.NotFoundException;
+import com.tarcisiolzbraga.codeflix.admin.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationError;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.Notification;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.ControllerTest;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -49,6 +53,9 @@ class CastMemberControllerTest {
 
     @MockitoBean
     private GetCastMemberByIdUseCase getCastMemberByIdUseCase;
+
+    @MockitoBean
+    private ListCastMembersUseCase listCastMembersUseCase;
 
     @Test
     void givenValidBody_whenCallCreate_thenReturn201WithLocation() throws Exception {
@@ -106,5 +113,43 @@ class CastMemberControllerTest {
         response.andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message")
                         .value("CastMember with ID " + EXPECTED_ID + " was not found"));
+    }
+
+    @Test
+    void givenSearchParams_whenCallList_thenPassThemToTheUseCaseAndReturnThePage() throws Exception {
+        final var item = new CastMemberListOutput(EXPECTED_ID, EXPECTED_NAME, "ACTOR", true, CREATED_AT);
+        when(listCastMembersUseCase.execute(any())).thenReturn(new Pagination<>(1, 2, 3, List.of(item)));
+
+        final var response = this.mockMvc.perform(get(CAST_MEMBERS_PATH)
+                .param("search", "vin")
+                .param("page", "1")
+                .param("perPage", "2")
+                .param("sort", "createdAt")
+                .param("dir", "desc"));
+
+        response.andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentPage").value(1))
+                .andExpect(jsonPath("$.perPage").value(2))
+                .andExpect(jsonPath("$.total").value(3))
+                .andExpect(jsonPath("$.items[0].id").value(EXPECTED_ID))
+                .andExpect(jsonPath("$.items[0].type").value("ACTOR"));
+        verify(listCastMembersUseCase).execute(argThat(query -> "vin".equals(query.terms())
+                && query.page() == 1
+                && query.perPage() == 2
+                && "createdAt".equals(query.sort())
+                && "desc".equals(query.direction())));
+    }
+
+    @Test
+    void givenNoParam_whenCallList_thenUseTheDefaults() throws Exception {
+        when(listCastMembersUseCase.execute(any())).thenReturn(new Pagination<>(0, 10, 0, List.of()));
+
+        final var response = this.mockMvc.perform(get(CAST_MEMBERS_PATH));
+
+        response.andExpect(status().isOk());
+        verify(listCastMembersUseCase).execute(argThat(query -> query.page() == 0
+                && query.perPage() == 10
+                && "name".equals(query.sort())
+                && "asc".equals(query.direction())));
     }
 }
