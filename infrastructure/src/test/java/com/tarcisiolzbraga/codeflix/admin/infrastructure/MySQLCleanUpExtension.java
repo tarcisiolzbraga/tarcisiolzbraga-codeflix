@@ -1,5 +1,6 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure;
 
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.persistence.CastMemberRepository;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.CategoryRepository;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.genre.persistence.GenreRepository;
 import java.util.List;
@@ -17,7 +18,8 @@ public class MySQLCleanUpExtension implements BeforeEachCallback {
         final var applicationContext = SpringExtension.getApplicationContext(context);
         cleanUp(List.of(
                 applicationContext.getBean(GenreRepository.class),
-                applicationContext.getBean(CategoryRepository.class)));
+                applicationContext.getBean(CategoryRepository.class),
+                applicationContext.getBean(CastMemberRepository.class)));
     }
 
     // A ordem importa: um repositório que referencia outro vem antes, por causa das foreign keys.
