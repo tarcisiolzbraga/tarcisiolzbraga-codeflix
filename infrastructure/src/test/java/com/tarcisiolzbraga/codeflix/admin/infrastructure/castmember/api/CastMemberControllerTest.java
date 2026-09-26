@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -18,6 +19,7 @@ import com.tarcisiolzbraga.codeflix.admin.application.castmember.activate.Activa
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.deactivate.DeactivateCastMemberUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.create.CreateCastMemberOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.create.CreateCastMemberUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.castmember.delete.DeleteCastMemberUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.get.GetCastMemberByIdUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.list.CastMemberListOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.list.ListCastMembersUseCase;
@@ -70,6 +72,9 @@ class CastMemberControllerTest {
 
     @MockitoBean
     private DeactivateCastMemberUseCase deactivateCastMemberUseCase;
+
+    @MockitoBean
+    private DeleteCastMemberUseCase deleteCastMemberUseCase;
 
     @Test
     void givenValidBody_whenCallCreate_thenReturn201WithLocation() throws Exception {
@@ -217,5 +222,13 @@ class CastMemberControllerTest {
 
         response.andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false));
         verify(deactivateCastMemberUseCase).execute(EXPECTED_ID);
+    }
+
+    @Test
+    void givenAnyId_whenCallDelete_thenReturn204AndCallTheUseCase() throws Exception {
+        final var response = this.mockMvc.perform(delete(CAST_MEMBERS_PATH + "/" + EXPECTED_ID));
+
+        response.andExpect(status().isNoContent());
+        verify(deleteCastMemberUseCase).execute(EXPECTED_ID);
     }
 }
