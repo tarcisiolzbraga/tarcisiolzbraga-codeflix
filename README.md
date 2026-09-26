@@ -37,3 +37,9 @@ Com a aplicação no ar, a documentação da API (Swagger UI) fica em http://loc
 ```
 
 O `./gradlew build` também gera o relatório de cobertura (JaCoCo) dos três módulos em `build/reports/jacoco/html/index.html`.
+
+### Regressão manual no Postman
+
+`.postman/admin-codeflix.postman_collection.json` cobre os endpoints dos três agregados. Importe no Postman e rode a coleção inteira no Collection Runner, de cima para baixo: as requisições guardam os ids que criam em variáveis, conferem status e corpo, e apagam tudo no fim, deixando o banco como estava.
+
+A ordem importa, porque a coleção é uma jornada: as categorias vêm primeiro, o gênero usa a categoria criada, e a última pasta exercita o 409 ao apagar uma categoria vinculada antes de limpar. A variável `baseUrl` aponta para `http://localhost:8080`.

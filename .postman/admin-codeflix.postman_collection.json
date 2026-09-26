@@ -1,0 +1,1307 @@
+{
+  "info": {
+    "name": "admin-codeflix",
+    "description": "Regressão manual da API do catálogo. Roda de cima para baixo no Collection Runner: cada pasta cria o que precisa, confere pela própria API e apaga no fim, deixando o banco como estava. Ajuste baseUrl se a API não estiver em localhost:8080.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "categoriaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "generoId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "atorId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "diretorId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Categorias",
+      "item": [
+        {
+          "name": "Cria a categoria Filmes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Filmes\",\n  \"description\": \"Longas-metragens\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"traz o header Location\", () => pm.response.to.have.header(\"Location\"));",
+                  "const id = pm.response.json().id;",
+                  "pm.test(\"devolve o id\", () => pm.expect(id).to.be.a(\"string\").and.not.empty);",
+                  "pm.collectionVariables.set(\"categoriaId\", id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Busca a categoria criada",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{categoriaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "{{categoriaId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "pm.test(\"conjunto exato de campos\", () => pm.expect(Object.keys(c).sort())",
+                  "    .to.eql([\"active\",\"createdAt\",\"description\",\"id\",\"name\",\"updatedAt\"]));",
+                  "pm.test(\"nasce ativa\", () => pm.expect(c.active).to.be.true);",
+                  "pm.test(\"datas iguais ao criar\", () => pm.expect(c.createdAt).to.eql(c.updatedAt));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lista buscando por termo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories?search=Filmes&page=0&perPage=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "Filmes"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "perPage",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test(\"campos da paginação\", () => pm.expect(Object.keys(p).sort())",
+                  "    .to.eql([\"currentPage\",\"items\",\"perPage\",\"total\"]));",
+                  "pm.test(\"acha a categoria criada\", () => pm.expect(p.items.map(i => i.id)).to.include(",
+                  "    pm.collectionVariables.get(\"categoriaId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Atualiza a categoria",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{categoriaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "{{categoriaId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Filmes e séries\",\n  \"description\": \"Catálogo audiovisual\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"devolve o id\", () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"categoriaId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confere o nome novo e o updatedAt",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{categoriaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "{{categoriaId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "pm.test(\"nome trocado\", () => pm.expect(c.name).to.eql(\"Filmes e séries\"));",
+                  "pm.test(\"updatedAt avançou\", () => pm.expect(new Date(c.updatedAt).getTime())",
+                  "    .to.be.above(new Date(c.createdAt).getTime()));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Desativa a categoria",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{categoriaId}}/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "{{categoriaId}}",
+                "deactivate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"fica inativa\", () => pm.expect(pm.response.json().active).to.be.false);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ativa a categoria de novo",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{categoriaId}}/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "{{categoriaId}}",
+                "activate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"volta a ativa\", () => pm.expect(pm.response.json().active).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recusa categoria sem nome",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"sem nome\"\n}"
+            },
+            "description": "Erro de validação: a API responde 422 com a lista de erros, não 400."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"explica o erro do nome\", () => pm.expect(pm.response.json().errors)",
+                  "    .to.include(\"'name' should not be null\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Busca id inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "00000000-0000-0000-0000-000000000000"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"diz que não achou\", () => pm.expect(pm.response.json().message).to.include(\"was not found\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Gêneros",
+      "item": [
+        {
+          "name": "Cria o gênero Ação com a categoria",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/genres",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "genres"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ação\",\n  \"categories\": [\n    \"{{categoriaId}}\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 201\", () => pm.response.to.have.status(201));",
+                  "const id = pm.response.json().id;",
+                  "pm.collectionVariables.set(\"generoId\", id);",
+                  "pm.test(\"devolve o id\", () => pm.expect(id).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Busca o gênero criado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/genres/{{generoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "genres",
+                "{{generoId}}"
+              ]
+            },
+            "description": "O gênero nasce com as categorias, então createdAt e updatedAt são iguais."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const g = pm.response.json();",
+                  "pm.test(\"conjunto exato de campos\", () => pm.expect(Object.keys(g).sort())",
+                  "    .to.eql([\"active\",\"categories\",\"createdAt\",\"id\",\"name\",\"updatedAt\"]));",
+                  "pm.test(\"traz a categoria vinculada\", () => pm.expect(g.categories)",
+                  "    .to.include(pm.collectionVariables.get(\"categoriaId\")));",
+                  "pm.test(\"datas iguais ao criar\", () => pm.expect(g.createdAt).to.eql(g.updatedAt));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lista os gêneros",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/genres?page=0&perPage=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "genres"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "perPage",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"acha o gênero criado\", () => pm.expect(pm.response.json().items.map(i => i.id))",
+                  "    .to.include(pm.collectionVariables.get(\"generoId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Atualiza o gênero tirando as categorias",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/genres/{{generoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "genres",
+                "{{generoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ação e aventura\",\n  \"categories\": []\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confere que ficou sem categorias",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/genres/{{generoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "genres",
+                "{{generoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const g = pm.response.json();",
+                  "pm.test(\"nome trocado\", () => pm.expect(g.name).to.eql(\"Ação e aventura\"));",
+                  "pm.test(\"sem categorias\", () => pm.expect(g.categories).to.be.an(\"array\").that.is.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Desativa o gênero",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/genres/{{generoId}}/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "genres",
+                "{{generoId}}",
+                "deactivate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"fica inativo\", () => pm.expect(pm.response.json().active).to.be.false);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ativa o gênero de novo",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/genres/{{generoId}}/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "genres",
+                "{{generoId}}",
+                "activate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"volta a ativo\", () => pm.expect(pm.response.json().active).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recusa gênero com categoria inexistente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/genres",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "genres"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Drama\",\n  \"categories\": [\n    \"00000000-0000-0000-0000-000000000000\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"avisa da categoria que não existe\", () => pm.expect(pm.response.json().errors.join(\" \"))",
+                  "    .to.include(\"Some categories could not be found\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Membros de elenco",
+      "item": [
+        {
+          "name": "Cria o ator Vin Diesel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cast-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cast-members"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Vin Diesel\",\n  \"type\": \"ACTOR\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 201\", () => pm.response.to.have.status(201));",
+                  "const id = pm.response.json().id;",
+                  "pm.collectionVariables.set(\"atorId\", id);",
+                  "pm.test(\"devolve o id\", () => pm.expect(id).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Busca o ator criado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cast-members/{{atorId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cast-members",
+                "{{atorId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const m = pm.response.json();",
+                  "pm.test(\"conjunto exato de campos\", () => pm.expect(Object.keys(m).sort())",
+                  "    .to.eql([\"active\",\"createdAt\",\"id\",\"name\",\"type\",\"updatedAt\"]));",
+                  "pm.test(\"guarda o tipo\", () => pm.expect(m.type).to.eql(\"ACTOR\"));",
+                  "pm.test(\"nasce ativo\", () => pm.expect(m.active).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cria um diretor com tipo em minúsculas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cast-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cast-members"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Steven Spielberg\",\n  \"type\": \"director\"\n}"
+            },
+            "description": "O tipo é convertido sem diferenciar maiúsculas de minúsculas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"diretorId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confere que virou DIRECTOR",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cast-members/{{diretorId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cast-members",
+                "{{diretorId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"normaliza o tipo\", () => pm.expect(pm.response.json().type).to.eql(\"DIRECTOR\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lista buscando por termo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cast-members?search=spiel&page=0&perPage=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cast-members"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "spiel"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "perPage",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test(\"acha só o diretor\", () => pm.expect(p.items.map(i => i.name)).to.eql([\"Steven Spielberg\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Atualiza o ator para diretor",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cast-members/{{atorId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cast-members",
+                "{{atorId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Vin Diesel\",\n  \"type\": \"DIRECTOR\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confere o tipo novo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cast-members/{{atorId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cast-members",
+                "{{atorId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const m = pm.response.json();",
+                  "pm.test(\"tipo trocado\", () => pm.expect(m.type).to.eql(\"DIRECTOR\"));",
+                  "pm.test(\"updatedAt avançou\", () => pm.expect(new Date(m.updatedAt).getTime())",
+                  "    .to.be.above(new Date(m.createdAt).getTime()));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Desativa o membro",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cast-members/{{atorId}}/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cast-members",
+                "{{atorId}}",
+                "deactivate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"fica inativo\", () => pm.expect(pm.response.json().active).to.be.false);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ativa o membro de novo",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cast-members/{{atorId}}/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cast-members",
+                "{{atorId}}",
+                "activate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"volta a ativo\", () => pm.expect(pm.response.json().active).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recusa tipo desconhecido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cast-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cast-members"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Fulano\",\n  \"type\": \"SINGER\"\n}"
+            },
+            "description": "Tipo desconhecido é erro de validação, com a mesma mensagem do campo ausente."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 422\", () => pm.response.to.have.status(422));",
+                  "const errors = pm.response.json().errors;",
+                  "pm.test(\"lista os tipos aceitos\", () => pm.expect(errors)",
+                  "    .to.include(\"'type' should be one of ACTOR, DIRECTOR\"));",
+                  "pm.test(\"um erro só para o campo\", () => pm.expect(errors.length).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recusa membro sem nome e sem tipo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cast-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cast-members"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"acumula os dois erros\", () => pm.expect(pm.response.json().errors).to.eql(",
+                  "    [\"'name' should not be null\", \"'type' should be one of ACTOR, DIRECTOR\"]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Vínculos e limpeza",
+      "item": [
+        {
+          "name": "Revincula a categoria ao gênero",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/genres/{{generoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "genres",
+                "{{generoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ação e aventura\",\n  \"categories\": [\n    \"{{categoriaId}}\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recusa apagar categoria vinculada",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{categoriaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "{{categoriaId}}"
+              ]
+            },
+            "description": "Agregado referenciado não é removido, só desativado: a API responde 409."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"explica o vínculo\", () => pm.expect(pm.response.json().message.toLowerCase())",
+                  "    .to.include(\"genre\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Apaga o gênero",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/genres/{{generoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "genres",
+                "{{generoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Gênero apagado devolve 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/genres/{{generoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "genres",
+                "{{generoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Apaga a categoria, agora livre",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{categoriaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "{{categoriaId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Categoria apagada devolve 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{categoriaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "{{categoriaId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Apaga os membros de elenco",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cast-members/{{atorId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cast-members",
+                "{{atorId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Apagar id inexistente também é 204",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cast-members/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cast-members",
+                "00000000-0000-0000-0000-000000000000"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 204\", () => pm.response.to.have.status(204));",
+                  "pm.test(\"remoção é idempotente\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Apaga o diretor",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cast-members/{{diretorId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cast-members",
+                "{{diretorId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
