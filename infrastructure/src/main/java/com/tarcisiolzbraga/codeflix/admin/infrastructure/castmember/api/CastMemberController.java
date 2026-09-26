@@ -5,6 +5,9 @@ import com.tarcisiolzbraga.codeflix.admin.application.castmember.create.CreateCa
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.create.CreateCastMemberUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.get.GetCastMemberByIdUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.list.ListCastMembersUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.castmember.update.UpdateCastMemberCommand;
+import com.tarcisiolzbraga.codeflix.admin.application.castmember.update.UpdateCastMemberOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.castmember.update.UpdateCastMemberUseCase;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.Notification;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiError;
@@ -13,6 +16,8 @@ import com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.models.CastM
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.models.CastMemberSearchRequest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.models.CreateCastMemberRequest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.models.CreateCastMemberResponse;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.models.UpdateCastMemberRequest;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.models.UpdateCastMemberResponse;
 import java.net.URI;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,14 +30,17 @@ public class CastMemberController implements CastMemberAPI {
     private final CreateCastMemberUseCase createCastMemberUseCase;
     private final GetCastMemberByIdUseCase getCastMemberByIdUseCase;
     private final ListCastMembersUseCase listCastMembersUseCase;
+    private final UpdateCastMemberUseCase updateCastMemberUseCase;
 
     public CastMemberController(
             final CreateCastMemberUseCase createCastMemberUseCase,
             final GetCastMemberByIdUseCase getCastMemberByIdUseCase,
-            final ListCastMembersUseCase listCastMembersUseCase) {
+            final ListCastMembersUseCase listCastMembersUseCase,
+            final UpdateCastMemberUseCase updateCastMemberUseCase) {
         this.createCastMemberUseCase = createCastMemberUseCase;
         this.getCastMemberByIdUseCase = getCastMemberByIdUseCase;
         this.listCastMembersUseCase = listCastMembersUseCase;
+        this.updateCastMemberUseCase = updateCastMemberUseCase;
     }
 
     @Override
@@ -51,6 +59,12 @@ public class CastMemberController implements CastMemberAPI {
         return CastMemberResponse.from(this.getCastMemberByIdUseCase.execute(id));
     }
 
+    @Override
+    public ResponseEntity<Object> update(final String id, final UpdateCastMemberRequest request) {
+        final var command = UpdateCastMemberCommand.with(id, request.name(), request.type());
+        return this.updateCastMemberUseCase.execute(command).fold(this::unprocessableContent, this::updated);
+    }
+
     private ResponseEntity<Object> unprocessableContent(final Notification notification) {
         return ResponseEntity.unprocessableContent().body(ApiError.from(notification));
     }
@@ -58,5 +72,9 @@ public class CastMemberController implements CastMemberAPI {
     private ResponseEntity<Object> created(final CreateCastMemberOutput output) {
         return ResponseEntity.created(URI.create(RESOURCE_PATH + output.id()))
                 .body(CreateCastMemberResponse.from(output));
+    }
+
+    private ResponseEntity<Object> updated(final UpdateCastMemberOutput output) {
+        return ResponseEntity.ok(UpdateCastMemberResponse.from(output));
     }
 }

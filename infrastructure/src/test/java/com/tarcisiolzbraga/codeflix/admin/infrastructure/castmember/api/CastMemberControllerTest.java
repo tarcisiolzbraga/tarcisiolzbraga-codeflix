@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -18,6 +19,8 @@ import com.tarcisiolzbraga.codeflix.admin.application.castmember.create.CreateCa
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.get.GetCastMemberByIdUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.list.CastMemberListOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.list.ListCastMembersUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.castmember.update.UpdateCastMemberOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.castmember.update.UpdateCastMemberUseCase;
 import com.tarcisiolzbraga.codeflix.admin.domain.castmember.CastMember;
 import com.tarcisiolzbraga.codeflix.admin.domain.castmember.CastMemberID;
 import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.NotFoundException;
@@ -56,6 +59,9 @@ class CastMemberControllerTest {
 
     @MockitoBean
     private ListCastMembersUseCase listCastMembersUseCase;
+
+    @MockitoBean
+    private UpdateCastMemberUseCase updateCastMemberUseCase;
 
     @Test
     void givenValidBody_whenCallCreate_thenReturn201WithLocation() throws Exception {
@@ -151,5 +157,35 @@ class CastMemberControllerTest {
                 && query.perPage() == 10
                 && "name".equals(query.sort())
                 && "asc".equals(query.direction())));
+    }
+
+    @Test
+    void givenValidBody_whenCallUpdate_thenReturn200WithTheId() throws Exception {
+        when(updateCastMemberUseCase.execute(any())).thenReturn(Right(new UpdateCastMemberOutput(EXPECTED_ID)));
+
+        final var response = this.mockMvc.perform(put(CAST_MEMBERS_PATH + "/" + EXPECTED_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name":"Vin Diesel","type":"DIRECTOR"}"""));
+
+        response.andExpect(status().isOk()).andExpect(jsonPath("$.id").value(EXPECTED_ID));
+        verify(updateCastMemberUseCase).execute(argThat(command -> EXPECTED_ID.equals(command.id())
+                && EXPECTED_NAME.equals(command.name())
+                && "DIRECTOR".equals(command.type())));
+    }
+
+    @Test
+    void givenInvalidBody_whenCallUpdate_thenReturn422WithTheErrors() throws Exception {
+        final var notification = Notification.create();
+        notification.append(new ValidationError("'name' should not be empty"));
+        when(updateCastMemberUseCase.execute(any())).thenReturn(Left(notification));
+
+        final var response = this.mockMvc.perform(put(CAST_MEMBERS_PATH + "/" + EXPECTED_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name":" ","type":"ACTOR"}"""));
+
+        response.andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.errors[0]").value("'name' should not be empty"));
     }
 }
