@@ -170,4 +170,21 @@ class GenreMySQLGatewayIT {
     private List<String> namesOf(final List<Genre> genres) {
         return genres.stream().map(Genre::getName).toList();
     }
+
+    @Test
+    void givenExistingAndUnknownIds_whenCallFindExistingIds_thenReturnOnlyTheExistingOnes() {
+        final var genre = this.genreGateway.create(Genre.newGenre("Ação", true));
+        final var unknown = GenreID.unique();
+
+        final var actualIds = this.genreGateway.findExistingIds(Set.of(genre.getId(), unknown));
+
+        assertEquals(Set.of(genre.getId()), actualIds);
+    }
+
+    @Test
+    void givenNoId_whenCallFindExistingIds_thenReturnEmptyWithoutTouchingTheDatabase() {
+        final var actualIds = this.genreGateway.findExistingIds(Set.of());
+
+        assertTrue(actualIds.isEmpty());
+    }
 }

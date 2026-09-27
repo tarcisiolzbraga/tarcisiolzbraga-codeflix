@@ -11,6 +11,8 @@ import com.tarcisiolzbraga.codeflix.admin.infrastructure.genre.persistence.Genre
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.util.SpecificationUtils;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -57,6 +59,17 @@ public class GenreMySQLGateway implements GenreGateway {
                 result.getSize(),
                 result.getTotalElements(),
                 result.map(GenreJpaEntity::toAggregate).toList());
+    }
+
+    @Override
+    public Set<GenreID> findExistingIds(final Set<GenreID> ids) {
+        if (ids.isEmpty()) {
+            return Set.of();
+        }
+        final var values = ids.stream().map(GenreID::getValue).collect(Collectors.toSet());
+        return this.genreRepository.findExistingIds(values).stream()
+                .map(GenreID::from)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     @Override

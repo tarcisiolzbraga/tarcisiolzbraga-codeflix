@@ -10,6 +10,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.castmember.CastMemberType;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.SearchQuery;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.persistence.CastMemberRepository;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -134,5 +135,22 @@ class CastMemberMySQLGatewayIT {
 
     private CastMember reload(final CastMember castMember) {
         return this.gateway.findById(castMember.getId()).orElseThrow();
+    }
+
+    @Test
+    void givenExistingAndUnknownIds_whenCallFindExistingIds_thenReturnOnlyTheExistingOnes() {
+        final var castMember = this.gateway.create(CastMember.newCastMember(VIN_DIESEL, CastMemberType.ACTOR, true));
+        final var unknown = CastMemberID.unique();
+
+        final var actualIds = this.gateway.findExistingIds(Set.of(castMember.getId(), unknown));
+
+        assertEquals(Set.of(castMember.getId()), actualIds);
+    }
+
+    @Test
+    void givenNoId_whenCallFindExistingIds_thenReturnEmptyWithoutTouchingTheDatabase() {
+        final var actualIds = this.gateway.findExistingIds(Set.of());
+
+        assertTrue(actualIds.isEmpty());
     }
 }
