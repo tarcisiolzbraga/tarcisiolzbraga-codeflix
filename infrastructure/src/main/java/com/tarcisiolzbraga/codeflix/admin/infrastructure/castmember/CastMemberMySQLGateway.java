@@ -10,6 +10,8 @@ import com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.persistence.
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.util.SpecificationUtils;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -57,6 +59,17 @@ public class CastMemberMySQLGateway implements CastMemberGateway {
                 result.getSize(),
                 result.getTotalElements(),
                 result.map(CastMemberJpaEntity::toAggregate).toList());
+    }
+
+    @Override
+    public Set<CastMemberID> findExistingIds(final Set<CastMemberID> ids) {
+        if (ids.isEmpty()) {
+            return Set.of();
+        }
+        final var values = ids.stream().map(CastMemberID::getValue).collect(Collectors.toSet());
+        return this.castMemberRepository.findExistingIds(values).stream()
+                .map(CastMemberID::from)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     private CastMember save(final CastMember castMember) {
