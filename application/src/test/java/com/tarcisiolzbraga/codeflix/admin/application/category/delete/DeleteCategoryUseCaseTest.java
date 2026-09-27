@@ -15,6 +15,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.ConflictException;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreGateway;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoGateway;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,6 +30,9 @@ class DeleteCategoryUseCaseTest {
 
     @Mock
     private GenreGateway genreGateway;
+
+    @Mock
+    private VideoGateway videoGateway;
 
     @InjectMocks
     private DefaultDeleteCategoryUseCase useCase;
@@ -81,5 +85,19 @@ class DeleteCategoryUseCaseTest {
                 assertThrows(IllegalStateException.class, () -> useCase.execute(expectedId.getValue()));
 
         assertSame(expectedException, actualException);
+    }
+    @Test
+    void givenCategoryLinkedToAVideo_whenCallExecute_thenThrowConflictAndKeepIt() {
+        final var expectedId = CategoryID.unique();
+        when(videoGateway.existsByCategory(expectedId)).thenReturn(true);
+
+        final var actualException =
+                assertThrows(ConflictException.class, () -> useCase.execute(expectedId.getValue()));
+
+        assertEquals(
+                "Category with ID %s is linked to at least one Video; deactivate it instead"
+                        .formatted(expectedId.getValue()),
+                actualException.getMessage());
+        verify(categoryGateway, never()).deleteById(any());
     }
 }
