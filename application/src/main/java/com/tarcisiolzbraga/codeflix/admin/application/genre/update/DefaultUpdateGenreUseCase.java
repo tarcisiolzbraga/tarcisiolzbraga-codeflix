@@ -3,7 +3,7 @@ package com.tarcisiolzbraga.codeflix.admin.application.genre.update;
 import static io.vavr.API.Left;
 import static io.vavr.API.Right;
 
-import com.tarcisiolzbraga.codeflix.admin.application.category.CategoryExistenceValidator;
+import com.tarcisiolzbraga.codeflix.admin.application.ReferenceExistenceValidator;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.NotFoundException;
@@ -19,11 +19,11 @@ import java.util.stream.Collectors;
 public class DefaultUpdateGenreUseCase extends UpdateGenreUseCase {
 
     private final GenreGateway genreGateway;
-    private final CategoryExistenceValidator categoryExistence;
+    private final ReferenceExistenceValidator<CategoryID> categoryExistence;
 
     public DefaultUpdateGenreUseCase(final CategoryGateway categoryGateway, final GenreGateway genreGateway) {
         this.genreGateway = Objects.requireNonNull(genreGateway, "'genreGateway' should not be null");
-        this.categoryExistence = new CategoryExistenceValidator(categoryGateway);
+        this.categoryExistence = new ReferenceExistenceValidator<>("categories", categoryGateway::findExistingIds);
     }
 
     @Override
