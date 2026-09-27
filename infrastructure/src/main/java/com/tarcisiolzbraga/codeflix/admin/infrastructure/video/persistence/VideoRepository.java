@@ -27,4 +27,13 @@ public interface VideoRepository extends JpaRepository<VideoJpaEntity, String> {
             @Param("genres") Set<String> genres,
             @Param("castMembers") Set<String> castMembers,
             Pageable page);
+
+    @Query("select count(link) > 0 from VideoCategory link where link.id.categoryId = :categoryId")
+    boolean existsByCategoryId(@Param("categoryId") String categoryId);
+
+    @Query("select count(link) > 0 from VideoGenre link where link.id.genreId = :genreId")
+    boolean existsByGenreId(@Param("genreId") String genreId);
+
+    @Query("select count(link) > 0 from VideoCastMember link where link.id.castMemberId = :castMemberId")
+    boolean existsByCastMemberId(@Param("castMemberId") String castMemberId);
 }

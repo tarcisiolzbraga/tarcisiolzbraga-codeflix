@@ -1,6 +1,9 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.video;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.Identifier;
+import com.tarcisiolzbraga.codeflix.admin.domain.castmember.CastMemberID;
+import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
+import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreID;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.SearchQuery;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Video;
@@ -65,6 +68,21 @@ public class VideoMySQLGateway implements VideoGateway {
                 result.getSize(),
                 result.getTotalElements(),
                 result.map(VideoJpaEntity::toAggregate).toList());
+    }
+
+    @Override
+    public boolean existsByCategory(final CategoryID categoryId) {
+        return this.videoRepository.existsByCategoryId(categoryId.getValue());
+    }
+
+    @Override
+    public boolean existsByGenre(final GenreID genreId) {
+        return this.videoRepository.existsByGenreId(genreId.getValue());
+    }
+
+    @Override
+    public boolean existsByCastMember(final CastMemberID castMemberId) {
+        return this.videoRepository.existsByCastMemberId(castMemberId.getValue());
     }
 
     private Video save(final Video video) {

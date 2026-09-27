@@ -1,6 +1,7 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.video;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.castmember.CastMember;
@@ -157,6 +158,38 @@ class VideoMySQLGatewayIT {
 
         assertEquals(0, actualPage.total());
         assertTrue(actualPage.items().isEmpty());
+    }
+
+    @Test
+    void givenVideoLinkedToACategory_whenCallExistsByCategory_thenReturnTrue() {
+        final var category = existingCategory("Filmes");
+        this.gateway.create(Video.newVideo(details(DUNA), VideoReferences.with(Set.of(category), Set.of(), Set.of())));
+
+        assertTrue(this.gateway.existsByCategory(category));
+    }
+
+    @Test
+    void givenCategoryWithoutVideos_whenCallExistsByCategory_thenReturnFalse() {
+        final var category = existingCategory("Filmes");
+        this.gateway.create(Video.newVideo(details(DUNA), VideoReferences.none()));
+
+        assertFalse(this.gateway.existsByCategory(category));
+    }
+
+    @Test
+    void givenVideoLinkedToAGenre_whenCallExistsByGenre_thenReturnTrue() {
+        final var fiction = this.genreGateway.create(Genre.newGenre("Ficção", true)).getId();
+        this.gateway.create(Video.newVideo(details(DUNA), VideoReferences.with(Set.of(), Set.of(fiction), Set.of())));
+
+        assertTrue(this.gateway.existsByGenre(fiction));
+    }
+
+    @Test
+    void givenVideoLinkedToACastMember_whenCallExistsByCastMember_thenReturnTrue() {
+        final var actor = existingCastMember();
+        this.gateway.create(Video.newVideo(details(DUNA), VideoReferences.with(Set.of(), Set.of(), Set.of(actor))));
+
+        assertTrue(this.gateway.existsByCastMember(actor));
     }
 
     private VideoDetails details(final String title) {
