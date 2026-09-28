@@ -26,6 +26,8 @@ import com.tarcisiolzbraga.codeflix.admin.domain.castmember.CastMemberGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoGateway;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.api.VideoStateUseCases;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.api.VideoUseCases;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -102,5 +104,27 @@ public class VideoUseCaseConfig {
     @Bean
     DeleteVideoUseCase deleteVideoUseCase() {
         return new DefaultDeleteVideoUseCase(this.videoGateway);
+    }
+
+    // O controller recebe os casos de uso agrupados: onze dependências soltas passariam do limite.
+    @Bean
+    VideoUseCases videoUseCases() {
+        return new VideoUseCases(
+                createVideoUseCase(),
+                getVideoByIdUseCase(),
+                listVideosUseCase(),
+                updateVideoUseCase(),
+                deleteVideoUseCase());
+    }
+
+    @Bean
+    VideoStateUseCases videoStateUseCases() {
+        return new VideoStateUseCases(
+                publishVideoUseCase(),
+                unpublishVideoUseCase(),
+                openVideoUseCase(),
+                closeVideoUseCase(),
+                activateVideoUseCase(),
+                deactivateVideoUseCase());
     }
 }
