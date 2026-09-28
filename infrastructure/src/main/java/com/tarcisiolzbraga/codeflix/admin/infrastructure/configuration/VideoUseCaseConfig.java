@@ -14,6 +14,8 @@ import com.tarcisiolzbraga.codeflix.admin.application.video.get.DefaultGetVideoB
 import com.tarcisiolzbraga.codeflix.admin.application.video.get.GetVideoByIdUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.list.DefaultListVideosUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.list.ListVideosUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.video.media.upload.DefaultUploadMediaUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.video.media.upload.UploadMediaUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.open.DefaultOpenVideoUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.open.OpenVideoUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.publish.DefaultPublishVideoUseCase;
@@ -25,6 +27,7 @@ import com.tarcisiolzbraga.codeflix.admin.application.video.update.UpdateVideoUs
 import com.tarcisiolzbraga.codeflix.admin.domain.castmember.CastMemberGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreGateway;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.MediaResourceGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoGateway;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.api.VideoStateUseCases;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.api.VideoUseCases;
@@ -39,16 +42,19 @@ public class VideoUseCaseConfig {
     private final GenreGateway genreGateway;
     private final CastMemberGateway castMemberGateway;
     private final VideoGateway videoGateway;
+    private final MediaResourceGateway mediaResourceGateway;
 
     public VideoUseCaseConfig(
             final CategoryGateway categoryGateway,
             final GenreGateway genreGateway,
             final CastMemberGateway castMemberGateway,
-            final VideoGateway videoGateway) {
+            final VideoGateway videoGateway,
+            final MediaResourceGateway mediaResourceGateway) {
         this.categoryGateway = categoryGateway;
         this.genreGateway = genreGateway;
         this.castMemberGateway = castMemberGateway;
         this.videoGateway = videoGateway;
+        this.mediaResourceGateway = mediaResourceGateway;
     }
 
     @Bean
@@ -115,6 +121,11 @@ public class VideoUseCaseConfig {
                 listVideosUseCase(),
                 updateVideoUseCase(),
                 deleteVideoUseCase());
+    }
+
+    @Bean
+    UploadMediaUseCase uploadMediaUseCase() {
+        return new DefaultUploadMediaUseCase(this.videoGateway, this.mediaResourceGateway);
     }
 
     @Bean
