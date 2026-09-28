@@ -13,6 +13,8 @@ import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.Genre;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreGateway;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.AudioVideoMedia;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.ImageMedia;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Rating;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Video;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoDetails;
@@ -20,6 +22,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoFixture;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoReferences;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import java.time.Year;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -102,6 +105,44 @@ class VideoJpaEntityIT {
         final var entity = VideoJpaEntity.from(video);
 
         assertThrows(DataIntegrityViolationException.class, () -> this.videoRepository.saveAndFlush(entity));
+    }
+
+    @Test
+    void givenVideoWithTheFiveMedias_whenSaveAndReload_thenKeepAllOfThem() {
+        final var video = Video.newVideo(details(), VideoReferences.none());
+        video.updateVideoMedia(AudioVideoMedia.with("abc1", "duna.mp4", "raw/video"));
+        video.updateTrailerMedia(AudioVideoMedia.with("abc2", "trailer.mp4", "raw/trailer"));
+        video.updateBanner(ImageMedia.with("abc3", "banner.png", "raw/banner"));
+        video.updateThumbnail(ImageMedia.with("abc4", "thumb.png", "raw/thumb"));
+        video.updateThumbnailHalf(ImageMedia.with("abc5", "half.png", "raw/half"));
+
+        final var actualVideo = saveAndReload(video);
+
+        assertEquals(video.getVideo(), actualVideo.getVideo());
+        assertEquals(video.getTrailer(), actualVideo.getTrailer());
+        assertEquals(video.getBanner(), actualVideo.getBanner());
+        assertEquals(video.getThumbnail(), actualVideo.getThumbnail());
+        assertEquals(video.getThumbnailHalf(), actualVideo.getThumbnailHalf());
+    }
+
+    @Test
+    void givenNewVideo_whenSaveAndReload_thenBringNoMedia() {
+        final var actualVideo = saveAndReload(Video.newVideo(details(), VideoReferences.none()));
+
+        assertTrue(actualVideo.getVideo().isEmpty());
+        assertTrue(actualVideo.getBanner().isEmpty());
+    }
+
+    @Test
+    void givenVideoWithMedia_whenSendAnotherFile_thenReplaceIt() {
+        final var video = Video.newVideo(details(), VideoReferences.none());
+        video.updateVideoMedia(AudioVideoMedia.with("abc1", "duna.mp4", "raw/video"));
+        final var saved = saveAndReload(video);
+        final var expectedMedia = AudioVideoMedia.with("abc9", "duna-final.mp4", "raw/video-2");
+
+        saved.updateVideoMedia(expectedMedia);
+
+        assertEquals(Optional.of(expectedMedia), saveAndReload(saved).getVideo());
     }
 
     private VideoDetails details() {
