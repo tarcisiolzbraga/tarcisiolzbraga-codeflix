@@ -12,6 +12,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationError;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.Notification;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.ThrowsValidationHandler;
 import java.time.Year;
+import java.util.Optional;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -185,6 +186,7 @@ class VideoTest {
                 expectedVideo.getId(),
                 details(EXPECTED_TITLE),
                 VideoReferences.none(),
+                VideoMedias.none(),
                 new VideoFlags(true, true, false),
                 expectedVideo.getCreatedAt(),
                 expectedVideo.getUpdatedAt());
@@ -193,6 +195,129 @@ class VideoTest {
         assertTrue(actualVideo.isOpened());
         assertTrue(actualVideo.isPublished());
         assertFalse(actualVideo.isActive());
+    }
+
+    @Test
+    void givenValidParams_whenCallNewVideo_thenBeBornWithoutMedias() {
+        final var actualVideo = newVideo();
+
+        assertTrue(actualVideo.getVideo().isEmpty());
+        assertTrue(actualVideo.getTrailer().isEmpty());
+        assertTrue(actualVideo.getBanner().isEmpty());
+        assertTrue(actualVideo.getThumbnail().isEmpty());
+        assertTrue(actualVideo.getThumbnailHalf().isEmpty());
+    }
+
+    @Test
+    void givenAVideo_whenCallUpdateVideoMedia_thenKeepItAndRefreshUpdatedAt() {
+        final var actualVideo = newVideo();
+        final var updatedAt = actualVideo.getUpdatedAt();
+        final var expectedMedia = audioVideoMedia();
+
+        actualVideo.updateVideoMedia(expectedMedia);
+
+        assertEquals(Optional.of(expectedMedia), actualVideo.getVideo());
+        assertTrue(updatedAt.isBefore(actualVideo.getUpdatedAt()));
+    }
+
+    @Test
+    void givenAVideo_whenCallUpdateTrailerMedia_thenKeepItAndRefreshUpdatedAt() {
+        final var actualVideo = newVideo();
+        final var updatedAt = actualVideo.getUpdatedAt();
+        final var expectedMedia = audioVideoMedia();
+
+        actualVideo.updateTrailerMedia(expectedMedia);
+
+        assertEquals(Optional.of(expectedMedia), actualVideo.getTrailer());
+        assertTrue(updatedAt.isBefore(actualVideo.getUpdatedAt()));
+    }
+
+    @Test
+    void givenAVideo_whenCallUpdateBanner_thenKeepItAndRefreshUpdatedAt() {
+        final var actualVideo = newVideo();
+        final var updatedAt = actualVideo.getUpdatedAt();
+        final var expectedMedia = imageMedia();
+
+        actualVideo.updateBanner(expectedMedia);
+
+        assertEquals(Optional.of(expectedMedia), actualVideo.getBanner());
+        assertTrue(updatedAt.isBefore(actualVideo.getUpdatedAt()));
+    }
+
+    @Test
+    void givenAVideo_whenCallUpdateThumbnail_thenKeepItAndRefreshUpdatedAt() {
+        final var actualVideo = newVideo();
+        final var updatedAt = actualVideo.getUpdatedAt();
+        final var expectedMedia = imageMedia();
+
+        actualVideo.updateThumbnail(expectedMedia);
+
+        assertEquals(Optional.of(expectedMedia), actualVideo.getThumbnail());
+        assertTrue(updatedAt.isBefore(actualVideo.getUpdatedAt()));
+    }
+
+    @Test
+    void givenAVideo_whenCallUpdateThumbnailHalf_thenKeepItAndRefreshUpdatedAt() {
+        final var actualVideo = newVideo();
+        final var updatedAt = actualVideo.getUpdatedAt();
+        final var expectedMedia = imageMedia();
+
+        actualVideo.updateThumbnailHalf(expectedMedia);
+
+        assertEquals(Optional.of(expectedMedia), actualVideo.getThumbnailHalf());
+        assertTrue(updatedAt.isBefore(actualVideo.getUpdatedAt()));
+    }
+
+    @Test
+    void givenPersistedMedias_whenCallWith_thenRebuildThem() {
+        final var expectedVideo = audioVideoMedia();
+        final var expectedBanner = imageMedia();
+        final var medias = VideoMedias.with(expectedVideo, null, expectedBanner, null, null);
+
+        final var actualVideo = rebuild(medias);
+
+        assertEquals(Optional.of(expectedVideo), actualVideo.getVideo());
+        assertEquals(Optional.of(expectedBanner), actualVideo.getBanner());
+        assertTrue(actualVideo.getTrailer().isEmpty());
+    }
+
+    @Test
+    void givenNullMedia_whenCallUpdateVideoMedia_thenReceiveAnError() {
+        final var actualVideo = newVideo();
+
+        final var actualException =
+                assertThrows(NullPointerException.class, () -> actualVideo.updateVideoMedia(null));
+
+        assertEquals("'media' should not be null", actualException.getMessage());
+    }
+
+    @Test
+    void givenNullMedia_whenCallUpdateBanner_thenReceiveAnError() {
+        final var actualVideo = newVideo();
+
+        final var actualException = assertThrows(NullPointerException.class, () -> actualVideo.updateBanner(null));
+
+        assertEquals("'media' should not be null", actualException.getMessage());
+    }
+
+    private Video rebuild(final VideoMedias medias) {
+        final var video = newVideo();
+        return Video.with(
+                video.getId(),
+                details(EXPECTED_TITLE),
+                VideoReferences.none(),
+                medias,
+                new VideoFlags(false, false, true),
+                video.getCreatedAt(),
+                video.getUpdatedAt());
+    }
+
+    private AudioVideoMedia audioVideoMedia() {
+        return AudioVideoMedia.with("abc123", "duna.mp4", "videoId-VIDEO");
+    }
+
+    private ImageMedia imageMedia() {
+        return ImageMedia.with("abc123", "duna.png", "videoId-BANNER");
     }
 
     private Video newVideo() {

@@ -9,6 +9,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.video.Video;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoDetails;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoFlags;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoID;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoMedias;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoReferences;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.persistence.BaseJpaEntity;
 import jakarta.persistence.CascadeType;
@@ -93,6 +94,7 @@ public class VideoJpaEntity extends BaseJpaEntity {
                 VideoID.from(getId()),
                 VideoDetails.with(this.title, this.description, Year.of(this.yearLaunched), this.duration, this.rating),
                 VideoReferences.with(getCategoryIds(), getGenreIds(), getCastMemberIds()),
+                VideoMedias.none(),
                 new VideoFlags(this.opened, this.published, isActive()),
                 getCreatedAt(),
                 getUpdatedAt());
