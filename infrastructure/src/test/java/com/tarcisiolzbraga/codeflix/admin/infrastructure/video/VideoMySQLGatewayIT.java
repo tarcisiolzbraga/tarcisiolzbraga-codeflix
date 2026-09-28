@@ -14,15 +14,14 @@ import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.Genre;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.SearchQuery;
-import com.tarcisiolzbraga.codeflix.admin.domain.video.Rating;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Video;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoDetails;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoFixture;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoID;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoReferences;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoSearchQuery;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.persistence.VideoRepository;
-import java.time.Year;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -193,7 +192,7 @@ class VideoMySQLGatewayIT {
     }
 
     private VideoDetails details(final String title) {
-        return VideoDetails.with(title, "Uma descrição", Year.of(2021), 155.0, Rating.AGE_12);
+        return VideoFixture.details(title);
     }
 
     private CategoryID existingCategory(final String name) {

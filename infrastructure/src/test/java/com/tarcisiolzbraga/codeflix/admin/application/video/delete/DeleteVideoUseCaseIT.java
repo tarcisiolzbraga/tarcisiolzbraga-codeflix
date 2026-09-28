@@ -8,16 +8,14 @@ import static org.mockito.Mockito.doThrow;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.category.Category;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryGateway;
-import com.tarcisiolzbraga.codeflix.admin.domain.video.Rating;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Video;
-import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoDetails;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoFixture;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoID;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoReferences;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.CategoryRepository;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.persistence.VideoRepository;
-import java.time.Year;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -76,7 +74,7 @@ class DeleteVideoUseCaseIT {
     private Video givenPersistedVideo() {
         final var category = this.categoryGateway.create(Category.newCategory("Filmes", null, true)).getId();
         return this.videoGateway.create(Video.newVideo(
-                VideoDetails.with("Duna", "Arrakis", Year.of(2021), 155.0, Rating.AGE_12),
+                VideoFixture.details(),
                 VideoReferences.with(Set.of(category), Set.of(), Set.of())));
     }
 }

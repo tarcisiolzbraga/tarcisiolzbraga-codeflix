@@ -13,12 +13,11 @@ import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.NotFoundException;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationError;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Rating;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Video;
-import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoDetails;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoFixture;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoID;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoReferences;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
-import java.time.Year;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -106,7 +105,7 @@ class UpdateVideoUseCaseIT {
 
     private Video givenPersistedVideo() {
         return this.videoGateway.create(Video.newVideo(
-                VideoDetails.with(OLD_TITLE, "Arrakis", Year.of(2021), 155.0, Rating.AGE_12),
+                VideoFixture.details(OLD_TITLE),
                 VideoReferences.none()));
     }
 

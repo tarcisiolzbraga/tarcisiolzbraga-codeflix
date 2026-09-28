@@ -20,11 +20,10 @@ import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationError;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Rating;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Video;
-import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoDetails;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoFixture;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoID;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoReferences;
-import java.time.Year;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -123,7 +122,7 @@ class UpdateVideoUseCaseTest {
 
     private Video givenStoredVideo() {
         final var video = Video.newVideo(
-                VideoDetails.with(OLD_TITLE, "Arrakis", Year.of(2021), 155.0, Rating.AGE_12), VideoReferences.none());
+                VideoFixture.details(OLD_TITLE), VideoReferences.none());
         when(videoGateway.findById(any())).thenReturn(Optional.of(video));
         return video;
     }

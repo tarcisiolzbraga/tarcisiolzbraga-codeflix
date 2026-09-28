@@ -16,6 +16,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Rating;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Video;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoDetails;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoFixture;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoReferences;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import java.time.Year;
@@ -28,7 +29,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 class VideoJpaEntityIT {
 
     private static final String EXPECTED_TITLE = "Duna";
-    private static final String EXPECTED_DESCRIPTION = "Paul Atreides em Arrakis";
 
     @Autowired
     private VideoRepository videoRepository;
@@ -105,7 +105,7 @@ class VideoJpaEntityIT {
     }
 
     private VideoDetails details() {
-        return VideoDetails.with(EXPECTED_TITLE, EXPECTED_DESCRIPTION, Year.of(2021), 155.0, Rating.AGE_12);
+        return VideoFixture.details();
     }
 
     private VideoReferences existingReferences() {

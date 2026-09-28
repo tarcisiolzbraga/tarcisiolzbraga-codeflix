@@ -11,13 +11,11 @@ import static org.mockito.Mockito.when;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.SearchQuery;
-import com.tarcisiolzbraga.codeflix.admin.domain.video.Rating;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Video;
-import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoDetails;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoFixture;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoReferences;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoSearchQuery;
-import java.time.Year;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -40,7 +38,7 @@ class ListVideosUseCaseTest {
     @Test
     void givenPersistedVideos_whenCallExecute_thenReturnThemAsOutput() {
         final var video = Video.newVideo(
-                VideoDetails.with("Duna", "Arrakis", Year.of(2021), 155.0, Rating.AGE_12), VideoReferences.none());
+                VideoFixture.details(), VideoReferences.none());
         when(videoGateway.findAll(any())).thenReturn(new Pagination<>(0, 10, 1, List.of(video)));
 
         final var actualPage = useCase.execute(VideoSearchQuery.with(PAGE));
