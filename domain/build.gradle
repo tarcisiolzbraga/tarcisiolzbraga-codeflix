@@ -1,1 +1,5 @@
 // Módulo de domínio: Java puro, sem dependência de framework.
+
+// Os dados de teste ficam em src/testFixtures e são publicados para os outros módulos: assim
+// application e infrastructure montam os mesmos agregados sem copiar a montagem.
+apply plugin: 'java-test-fixtures'
