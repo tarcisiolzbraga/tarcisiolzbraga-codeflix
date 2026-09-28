@@ -18,7 +18,7 @@ import org.springframework.context.annotation.Import;
 @Inherited
 @Tag("e2eTest")
 @SpringBootTest(classes = Main.class, webEnvironment = WebEnvironment.RANDOM_PORT)
-@Import(MySQLContainerConfiguration.class)
+@Import({MySQLContainerConfiguration.class, GarageContainerConfiguration.class})
 @ExtendWith(MySQLCleanUpExtension.class)
 public @interface E2ETest {
 }
