@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "admin-codeflix",
-    "description": "Regressão manual da API do catálogo. Roda de cima para baixo no Collection Runner: cada pasta cria o que precisa, confere pela própria API e apaga no fim, deixando o banco como estava. Ajuste baseUrl se a API não estiver em localhost:8080.",
+    "description": "Regressão manual da API do catálogo. Roda de cima para baixo no Collection Runner: cada pasta cria o que precisa, confere pela própria API e apaga no fim, deixando o banco como estava. A ordem importa, porque o vídeo referencia categoria, gênero e elenco. Ajuste baseUrl se a API não estiver em localhost:8080.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -27,6 +27,11 @@
     },
     {
       "key": "diretorId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "videoId",
       "value": "",
       "type": "string"
     }
@@ -1034,7 +1039,510 @@
       ]
     },
     {
-      "name": "4. Vínculos e limpeza",
+      "name": "4. Vídeos",
+      "item": [
+        {
+          "name": "Cria o vídeo Duna com a categoria",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/videos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Duna\",\n  \"description\": \"Paul Atreides em Arrakis\",\n  \"launchedAt\": 2021,\n  \"duration\": 155.0,\n  \"rating\": \"12\",\n  \"categories\": [\n    \"{{categoriaId}}\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"traz o header Location\", () => pm.response.to.have.header(\"Location\"));",
+                  "const id = pm.response.json().id;",
+                  "pm.collectionVariables.set(\"videoId\", id);",
+                  "pm.test(\"devolve o id\", () => pm.expect(id).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Busca o vídeo criado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}"
+              ]
+            },
+            "description": "O vídeo nasce fechado e não publicado: abrir e publicar têm rotas próprias."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const v = pm.response.json();",
+                  "pm.test(\"conjunto exato de campos\", () => pm.expect(Object.keys(v).sort())",
+                  "    .to.eql([\"active\",\"castMembers\",\"categories\",\"createdAt\",\"description\",\"duration\",\"genres\",\"id\",\"launchedAt\",\"opened\",\"published\",\"rating\",\"title\",\"updatedAt\"]));",
+                  "pm.test(\"guarda o ano e a classificação\", () => {",
+                  "    pm.expect(v.launchedAt).to.eql(2021);",
+                  "    pm.expect(v.rating).to.eql(\"12\");",
+                  "});",
+                  "pm.test(\"traz a categoria vinculada\", () => pm.expect(v.categories)",
+                  "    .to.include(pm.collectionVariables.get(\"categoriaId\")));",
+                  "pm.test(\"nasce ativo, fechado e não publicado\", () => {",
+                  "    pm.expect(v.active).to.be.true;",
+                  "    pm.expect(v.opened).to.be.false;",
+                  "    pm.expect(v.published).to.be.false;",
+                  "});",
+                  "pm.test(\"datas iguais ao criar\", () => pm.expect(v.createdAt).to.eql(v.updatedAt));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lista buscando por termo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos?search=Duna&page=0&perPage=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos"
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "Duna"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "perPage",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test(\"campos da paginação\", () => pm.expect(Object.keys(p).sort())",
+                  "    .to.eql([\"currentPage\",\"items\",\"perPage\",\"total\"]));",
+                  "pm.test(\"acha o vídeo criado\", () => pm.expect(p.items.map(i => i.id))",
+                  "    .to.include(pm.collectionVariables.get(\"videoId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filtra os vídeos pela categoria",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos?categories={{categoriaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos"
+              ],
+              "query": [
+                {
+                  "key": "categories",
+                  "value": "{{categoriaId}}"
+                }
+              ]
+            },
+            "description": "O filtro por vínculo aceita categories, genres e castMembers."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"acha o vídeo pela categoria\", () => pm.expect(pm.response.json().items.map(i => i.id))",
+                  "    .to.include(pm.collectionVariables.get(\"videoId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Atualiza o vídeo",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Duna: Parte 2\",\n  \"description\": \"Arrakis de novo\",\n  \"launchedAt\": 2024,\n  \"duration\": 166.0,\n  \"rating\": \"14\",\n  \"categories\": [\n    \"{{categoriaId}}\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"devolve o id\", () => pm.expect(pm.response.json().id)",
+                  "    .to.eql(pm.collectionVariables.get(\"videoId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confere os valores novos e o updatedAt",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const v = pm.response.json();",
+                  "pm.test(\"título e classificação trocados\", () => {",
+                  "    pm.expect(v.title).to.eql(\"Duna: Parte 2\");",
+                  "    pm.expect(v.rating).to.eql(\"14\");",
+                  "});",
+                  "pm.test(\"updatedAt avançou\", () => pm.expect(new Date(v.updatedAt).getTime())",
+                  "    .to.be.above(new Date(v.createdAt).getTime()));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Publica o vídeo",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "publish"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"fica publicado\", () => pm.expect(pm.response.json().published).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Despublica o vídeo",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/unpublish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "unpublish"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"volta a não publicado\", () => pm.expect(pm.response.json().published).to.be.false);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Abre o vídeo",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/open",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "open"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"fica aberto\", () => pm.expect(pm.response.json().opened).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fecha o vídeo",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/close",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "close"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"volta a fechado\", () => pm.expect(pm.response.json().opened).to.be.false);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Desativa o vídeo",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "deactivate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"fica inativo\", () => pm.expect(pm.response.json().active).to.be.false);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ativa o vídeo de novo",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "activate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"volta a ativo\", () => pm.expect(pm.response.json().active).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recusa vídeo sem título e com classificação inválida",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/videos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"sem título\",\n  \"launchedAt\": 2021,\n  \"duration\": 155.0,\n  \"rating\": \"99\"\n}"
+            },
+            "description": "Classificação desconhecida é erro de validação, não falha de desserialização."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 422\", () => pm.response.to.have.status(422));",
+                  "const errors = pm.response.json().errors;",
+                  "pm.test(\"acumula os dois erros\", () => pm.expect(errors).to.eql(",
+                  "    [\"'title' should not be null\", \"'rating' should not be null\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recusa vídeo com categoria inexistente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/videos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Fantasma\",\n  \"description\": \"d\",\n  \"launchedAt\": 2021,\n  \"duration\": 155.0,\n  \"rating\": \"12\",\n  \"categories\": [\n    \"00000000-0000-0000-0000-000000000000\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"avisa da categoria que não existe\", () => pm.expect(pm.response.json().errors.join(\" \"))",
+                  "    .to.include(\"Some categories could not be found\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Vínculos e limpeza",
       "item": [
         {
           "name": "Revincula a categoria ao gênero",
@@ -1145,6 +1653,93 @@
               "path": [
                 "genres",
                 "{{generoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recusa apagar categoria vinculada a vídeo",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/{{categoriaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories",
+                "{{categoriaId}}"
+              ]
+            },
+            "description": "Agregado referenciado por vídeo também não é removido: a API responde 409."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"explica o vínculo\", () => pm.expect(pm.response.json().message.toLowerCase())",
+                  "    .to.include(\"video\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Apaga o vídeo",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vídeo apagado devolve 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}"
               ]
             }
           },

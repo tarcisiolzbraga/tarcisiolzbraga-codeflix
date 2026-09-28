@@ -1,10 +1,8 @@
 package com.tarcisiolzbraga.codeflix.admin.application.video;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.Identifier;
-import com.tarcisiolzbraga.codeflix.admin.domain.video.Rating;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Video;
 import java.time.Instant;
-import java.time.Year;
 import java.util.Set;
 import java.util.stream.Collectors;
 

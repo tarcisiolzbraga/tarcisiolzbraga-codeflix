@@ -15,6 +15,7 @@ import com.tarcisiolzbraga.codeflix.admin.application.castmember.list.ListCastMe
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.update.DefaultUpdateCastMemberUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.castmember.update.UpdateCastMemberUseCase;
 import com.tarcisiolzbraga.codeflix.admin.domain.castmember.CastMemberGateway;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoGateway;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -23,9 +24,12 @@ import org.springframework.context.annotation.Configuration;
 public class CastMemberUseCaseConfig {
 
     private final CastMemberGateway castMemberGateway;
+    private final VideoGateway videoGateway;
 
-    public CastMemberUseCaseConfig(final CastMemberGateway castMemberGateway) {
+    public CastMemberUseCaseConfig(
+            final CastMemberGateway castMemberGateway, final VideoGateway videoGateway) {
         this.castMemberGateway = castMemberGateway;
+        this.videoGateway = videoGateway;
     }
 
     @Bean
@@ -60,6 +64,6 @@ public class CastMemberUseCaseConfig {
 
     @Bean
     DeleteCastMemberUseCase deleteCastMemberUseCase() {
-        return new DefaultDeleteCastMemberUseCase(this.castMemberGateway);
+        return new DefaultDeleteCastMemberUseCase(this.castMemberGateway, this.videoGateway);
     }
 }

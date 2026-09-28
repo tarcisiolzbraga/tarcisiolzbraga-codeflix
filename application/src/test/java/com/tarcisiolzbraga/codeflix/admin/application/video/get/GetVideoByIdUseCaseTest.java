@@ -9,13 +9,11 @@ import static org.mockito.Mockito.when;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.NotFoundException;
-import com.tarcisiolzbraga.codeflix.admin.domain.video.Rating;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Video;
-import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoDetails;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoFixture;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoID;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoReferences;
-import java.time.Year;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -39,7 +37,7 @@ class GetVideoByIdUseCaseTest {
     void givenExistingId_whenCallExecute_thenReturnTheVideoInEdgeTypes() {
         final var category = CategoryID.unique();
         final var video = Video.newVideo(
-                VideoDetails.with(EXPECTED_TITLE, "Arrakis", Year.of(2021), 155.0, Rating.AGE_12),
+                VideoFixture.details(),
                 VideoReferences.with(Set.of(category), Set.of(), Set.of()));
         when(videoGateway.findById(any())).thenReturn(Optional.of(video));
 
