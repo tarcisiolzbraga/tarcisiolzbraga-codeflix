@@ -11,6 +11,7 @@ import java.time.Year;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 
 public class Video extends AggregateRoot<VideoID> {
 
@@ -133,6 +134,35 @@ public class Video extends AggregateRoot<VideoID> {
     public void updateThumbnailHalf(final ImageMedia media) {
         this.thumbnailHalf = Objects.requireNonNull(media, MEDIA_NOT_NULL_MESSAGE);
         refreshUpdatedAt();
+    }
+
+    // O retorno do codificador chega pela fila e pode falar de um arquivo que já foi trocado ou
+    // removido, ou de uma imagem, que não é codificada: nesses casos não há o que mover, e falhar
+    // só faria a mensagem voltar para sempre.
+    public void processing(final VideoMediaType type) {
+        applyToAudioVideo(type, AudioVideoMedia::processing);
+    }
+
+    public void completed(final VideoMediaType type, final String encodedLocation) {
+        applyToAudioVideo(type, media -> media.completed(encodedLocation));
+    }
+
+    private void applyToAudioVideo(final VideoMediaType type, final UnaryOperator<AudioVideoMedia> change) {
+        switch (type) {
+            case VIDEO -> this.video = moved(this.video, change);
+            case TRAILER -> this.trailer = moved(this.trailer, change);
+            default -> {
+                // imagem não tem status
+            }
+        }
+    }
+
+    private AudioVideoMedia moved(final AudioVideoMedia media, final UnaryOperator<AudioVideoMedia> change) {
+        if (media == null) {
+            return null;
+        }
+        refreshUpdatedAt();
+        return change.apply(media);
     }
 
     public Optional<AudioVideoMedia> getVideo() {
