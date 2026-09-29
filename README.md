@@ -8,7 +8,7 @@ Administração do catálogo de vídeos do Codeflix. Java 25 + Spring Boot 4.1.1
 - `infrastructure`: Spring Boot (API REST, JPA, Flyway, MySQL e o armazenamento das mídias).
 
 ## Execução
-Copie o `.env.example` para `.env` e preencha usuário e senha do banco, mais as credenciais do armazenamento (`STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` e `STORAGE_RPC_SECRET`, este último gerado com `openssl rand -hex 32`). O `docker compose` e a aplicação leem as variáveis desse arquivo.
+Copie o `.env.example` para `.env` e preencha usuário e senha do banco, mais as credenciais do armazenamento (`STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` e `STORAGE_RPC_SECRET`, este último gerado com `openssl rand -hex 32`) e as da fila (`AMQP_USER` e `AMQP_PASSWORD`). O `docker compose` e a aplicação leem as variáveis desse arquivo.
 
 ```bash
 cp .env.example .env
@@ -16,7 +16,7 @@ docker compose up -d
 ./gradlew bootRun
 ```
 
-O `docker compose` sobe dois serviços: o MySQL e o [Garage](https://garagehq.deuxfleurs.fr), armazenamento
+O `docker compose` sobe três serviços: o MySQL, o RabbitMQ e o [Garage](https://garagehq.deuxfleurs.fr), armazenamento
 compatível com S3 onde ficam os arquivos das mídias. O Garage sobe com `--single-node --default-bucket`, então
 ele mesmo monta o layout e cria o bucket e a chave com as credenciais do `.env`, sem nenhum comando depois da
 subida. A permissão é por chave e por bucket: a chave da aplicação só enxerga o bucket dela.
@@ -28,8 +28,36 @@ Cada vídeo aceita cinco arquivos — `VIDEO`, `TRAILER`, `BANNER`, `THUMBNAIL` 
 mesmo tipo troca o arquivo anterior, e apagar o vídeo leva os arquivos junto.
 
 O arquivo enviado é lido inteiro em memória antes de ir para o armazenamento, então o teto é
-`MEDIA_MAX_FILE_SIZE` (padrão 100MB). Subir daqui pede envio em fluxo, que ainda não existe. O arquivo de áudio
-e vídeo nasce com status `PENDING`: quem mudaria esse status é o codificador, que também ainda não existe.
+`MEDIA_MAX_FILE_SIZE` (padrão 100MB). Subir daqui pede envio em fluxo, que ainda não existe.
+
+### Codificação dos vídeos
+
+O arquivo de áudio e vídeo nasce com status `PENDING` e é o codificador que o move. A conversa acontece por uma
+fila do RabbitMQ, também no `docker compose`, com um exchange direto (`video.events`) e uma fila para cada
+sentido. A aplicação declara essa topologia na subida, então um broker novo sobe vazio e se monta sozinho.
+
+Quando um arquivo `VIDEO` ou `TRAILER` é enviado, sai uma mensagem em `video.created.queue` (imagem não é
+codificada, e não gera aviso):
+
+```json
+{ "videoId": "...", "type": "VIDEO", "filePath": "<videoId>/VIDEO", "occurredOn": "2026-09-29T12:00:00Z" }
+```
+
+O codificador responde em `video.encoded.queue`, em uma de três formas, escolhidas pelo campo `status`:
+
+```json
+{ "status": "PROCESSING", "videoId": "...", "type": "VIDEO" }
+{ "status": "COMPLETED",  "videoId": "...", "type": "VIDEO", "encodedPath": "encoded/duna.mp4" }
+{ "status": "ERROR",      "videoId": "...", "type": "VIDEO", "message": "codec não suportado" }
+```
+
+`PROCESSING` e `COMPLETED` movem o status da mídia, e `COMPLETED` guarda onde o arquivo codificado ficou.
+`ERROR` é apenas registrado no log: o domínio ainda não tem um estado de falha para a mídia. Mensagem ilegível,
+ou com tipo de mídia desconhecido, é registrada e descartada em vez de voltar para a fila.
+
+**Não há codificador neste repositório.** Para ver o ciclo completo, envie um arquivo pela API e publique a
+resposta à mão no painel do RabbitMQ (http://localhost:15672, com as credenciais do `.env`): na aba *Exchanges*,
+escolha `video.events`, use a routing key `video.encoded` e cole um dos JSON acima.
 
 ### Perfis
 | Perfil | Quando | Configuração do banco | Swagger UI |

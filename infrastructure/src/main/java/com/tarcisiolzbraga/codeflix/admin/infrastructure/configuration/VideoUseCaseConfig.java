@@ -16,6 +16,8 @@ import com.tarcisiolzbraga.codeflix.admin.application.video.list.DefaultListVide
 import com.tarcisiolzbraga.codeflix.admin.application.video.list.ListVideosUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.media.get.DefaultGetMediaUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.media.get.GetMediaUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.video.media.update.DefaultUpdateMediaStatusUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.video.media.update.UpdateMediaStatusUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.media.upload.DefaultUploadMediaUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.media.upload.UploadMediaUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.open.DefaultOpenVideoUseCase;
@@ -145,6 +147,11 @@ public class VideoUseCaseConfig {
                 closeVideoUseCase(),
                 activateVideoUseCase(),
                 deactivateVideoUseCase());
+    }
+
+    @Bean
+    UpdateMediaStatusUseCase updateMediaStatusUseCase() {
+        return new DefaultUpdateMediaStatusUseCase(this.videoGateway);
     }
 
     @Bean

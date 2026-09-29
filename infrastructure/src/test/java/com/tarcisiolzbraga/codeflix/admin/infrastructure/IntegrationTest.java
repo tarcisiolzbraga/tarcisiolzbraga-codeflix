@@ -21,8 +21,9 @@ import org.springframework.core.annotation.AliasFor;
 // @SpringBootConfiguration subindo pelos pacotes não alcança a Main. Como o classes desliga essa
 // busca, @TestConfiguration aninhada no teste também deixa de ser vista: precisa de @Import.
 @SpringBootTest(classes = Main.class)
-@Import({MySQLContainerConfiguration.class, GarageContainerConfiguration.class})
-@ExtendWith(MySQLCleanUpExtension.class)
+@Import({MySQLContainerConfiguration.class, GarageContainerConfiguration.class,
+        RabbitMQContainerConfiguration.class})
+@ExtendWith({MySQLCleanUpExtension.class, RabbitCleanUpExtension.class})
 public @interface IntegrationTest {
 
     // MOCK por padrão; RANDOM_PORT sobe o Tomcat de verdade, para testar o que passa por ele.

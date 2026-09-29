@@ -1,6 +1,7 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.video;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.Identifier;
+import com.tarcisiolzbraga.codeflix.admin.domain.events.DomainEventPublisher;
 import com.tarcisiolzbraga.codeflix.admin.domain.castmember.CastMemberID;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreID;
@@ -26,9 +27,12 @@ public class VideoMySQLGateway implements VideoGateway {
     private static final String LIKE_WILDCARD = "%";
 
     private final VideoRepository videoRepository;
+    private final DomainEventPublisher eventPublisher;
 
-    public VideoMySQLGateway(final VideoRepository videoRepository) {
+    public VideoMySQLGateway(
+            final VideoRepository videoRepository, final DomainEventPublisher eventPublisher) {
         this.videoRepository = Objects.requireNonNull(videoRepository, "'videoRepository' should not be null");
+        this.eventPublisher = Objects.requireNonNull(eventPublisher, "'eventPublisher' should not be null");
     }
 
     @Override
@@ -85,8 +89,12 @@ public class VideoMySQLGateway implements VideoGateway {
         return this.videoRepository.existsByCastMemberId(castMemberId.getValue());
     }
 
+    // O evento só sai depois da linha gravada, e sai uma vez: quem publica esvazia a lista do
+    // agregado, então salvar de novo não repete o aviso.
     private Video save(final Video video) {
-        return this.videoRepository.save(VideoJpaEntity.from(video)).toAggregate();
+        final var saved = this.videoRepository.save(VideoJpaEntity.from(video)).toAggregate();
+        video.publishDomainEvents(this.eventPublisher);
+        return saved;
     }
 
     private Sort sortOf(final SearchQuery page) {

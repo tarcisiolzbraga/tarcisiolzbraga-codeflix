@@ -300,6 +300,84 @@ class VideoTest {
         assertEquals("'media' should not be null", actualException.getMessage());
     }
 
+    @Test
+    void givenAVideo_whenCallUpdateVideoMedia_thenRegisterTheMediaCreatedEvent() {
+        final var actualVideo = newVideo();
+
+        actualVideo.updateVideoMedia(audioVideoMedia());
+
+        final var actualEvent = (VideoMediaCreated) actualVideo.getDomainEvents().getFirst();
+        assertEquals(actualVideo.getId().getValue(), actualEvent.videoId());
+        assertEquals(VideoMediaType.VIDEO, actualEvent.type());
+        assertEquals("videoId-VIDEO", actualEvent.filePath());
+        assertNotNull(actualEvent.occurredOn());
+    }
+
+    @Test
+    void givenAVideo_whenCallUpdateTrailerMedia_thenRegisterTheEventForTheTrailer() {
+        final var actualVideo = newVideo();
+
+        actualVideo.updateTrailerMedia(audioVideoMedia());
+
+        final var actualEvent = (VideoMediaCreated) actualVideo.getDomainEvents().getFirst();
+        assertEquals(VideoMediaType.TRAILER, actualEvent.type());
+    }
+
+    @Test
+    void givenAVideo_whenCallUpdateBanner_thenRegisterNoEvent() {
+        final var actualVideo = newVideo();
+
+        actualVideo.updateBanner(imageMedia());
+
+        assertTrue(actualVideo.getDomainEvents().isEmpty());
+    }
+
+    @Test
+    void givenAVideoWithAMedia_whenCallProcessing_thenMoveOnlyThatMediaAndRegisterNoEvent() {
+        final var actualVideo = newVideo();
+        actualVideo.updateVideoMedia(audioVideoMedia());
+        actualVideo.publishDomainEvents(event -> { });
+
+        actualVideo.processing(VideoMediaType.VIDEO);
+
+        assertEquals(MediaStatus.PROCESSING, actualVideo.getVideo().orElseThrow().status());
+        assertTrue(actualVideo.getDomainEvents().isEmpty());
+    }
+
+    @Test
+    void givenAVideoWithATrailer_whenCallCompleted_thenKeepWhereTheEncodedFileIs() {
+        final var actualVideo = newVideo();
+        actualVideo.updateTrailerMedia(audioVideoMedia());
+
+        actualVideo.completed(VideoMediaType.TRAILER, "encoded/trailer");
+
+        final var actualMedia = actualVideo.getTrailer().orElseThrow();
+        assertEquals(MediaStatus.COMPLETED, actualMedia.status());
+        assertEquals("encoded/trailer", actualMedia.encodedLocation());
+    }
+
+    @Test
+    void givenAVideoWithoutThatMedia_whenCallProcessing_thenDoNothing() {
+        final var actualVideo = newVideo();
+        final var updatedAt = actualVideo.getUpdatedAt();
+
+        actualVideo.processing(VideoMediaType.VIDEO);
+
+        assertTrue(actualVideo.getVideo().isEmpty());
+        assertEquals(updatedAt, actualVideo.getUpdatedAt());
+    }
+
+    @Test
+    void givenAnImageType_whenCallCompleted_thenDoNothing() {
+        final var actualVideo = newVideo();
+        actualVideo.updateBanner(imageMedia());
+        final var updatedAt = actualVideo.getUpdatedAt();
+
+        actualVideo.completed(VideoMediaType.BANNER, "encoded/banner");
+
+        assertEquals(updatedAt, actualVideo.getUpdatedAt());
+    }
+
     private Video rebuild(final VideoMedias medias) {
         final var video = newVideo();
         return Video.with(

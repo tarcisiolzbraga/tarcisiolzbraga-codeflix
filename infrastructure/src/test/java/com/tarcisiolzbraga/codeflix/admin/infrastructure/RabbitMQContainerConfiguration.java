@@ -1,0 +1,33 @@
+package com.tarcisiolzbraga.codeflix.admin.infrastructure;
+
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.test.context.DynamicPropertyRegistrar;
+import org.testcontainers.containers.RabbitMQContainer;
+import org.testcontainers.utility.DockerImageName;
+
+// A mesma imagem do docker compose, como o MySQL e o Garage: o teste fala com um broker de verdade.
+// As propriedades são registradas à mão, e não por @ServiceConnection, porque o YAML comum declara
+// spring.rabbitmq.* sem valor padrão de propósito: sem sobrescrever, a ligação do RabbitProperties
+// falharia nos perfis homolog e production, onde a variável de ambiente não existe.
+@TestConfiguration(proxyBeanMethods = false)
+public class RabbitMQContainerConfiguration {
+
+    private static final DockerImageName RABBITMQ_IMAGE = DockerImageName.parse("rabbitmq:4.2-management")
+            .asCompatibleSubstituteFor("rabbitmq");
+
+    @Bean
+    RabbitMQContainer rabbitMQContainer() {
+        return new RabbitMQContainer(RABBITMQ_IMAGE);
+    }
+
+    @Bean
+    DynamicPropertyRegistrar rabbitMQProperties(final RabbitMQContainer container) {
+        return registry -> {
+            registry.add("spring.rabbitmq.host", container::getHost);
+            registry.add("spring.rabbitmq.port", container::getAmqpPort);
+            registry.add("spring.rabbitmq.username", container::getAdminUsername);
+            registry.add("spring.rabbitmq.password", container::getAdminPassword);
+        };
+    }
+}

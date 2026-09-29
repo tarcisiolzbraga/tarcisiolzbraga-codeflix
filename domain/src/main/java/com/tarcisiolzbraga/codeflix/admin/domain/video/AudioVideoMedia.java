@@ -28,4 +28,15 @@ public record AudioVideoMedia(
             final MediaStatus status) {
         return new AudioVideoMedia(checksum, name, rawLocation, encodedLocation, status);
     }
+
+    // Value object: mudar de status é devolver outro, não alterar este.
+    public AudioVideoMedia processing() {
+        return new AudioVideoMedia(
+                this.checksum, this.name, this.rawLocation, this.encodedLocation, MediaStatus.PROCESSING);
+    }
+
+    public AudioVideoMedia completed(final String encodedLocation) {
+        return new AudioVideoMedia(
+                this.checksum, this.name, this.rawLocation, encodedLocation, MediaStatus.COMPLETED);
+    }
 }

@@ -45,6 +45,33 @@ class AudioVideoMediaTest {
     }
 
     @Test
+    void givenAPendingMedia_whenCallProcessing_thenOnlyMoveTheStatus() {
+        final var actualMedia = AudioVideoMedia.with(CHECKSUM, NAME, RAW_LOCATION).processing();
+
+        assertEquals(MediaStatus.PROCESSING, actualMedia.status());
+        assertEquals("", actualMedia.encodedLocation());
+        assertEquals(RAW_LOCATION, actualMedia.rawLocation());
+    }
+
+    @Test
+    void givenAProcessingMedia_whenCallCompleted_thenKeepWhereTheEncodedFileIs() {
+        final var actualMedia =
+                AudioVideoMedia.with(CHECKSUM, NAME, RAW_LOCATION).processing().completed(ENCODED_LOCATION);
+
+        assertEquals(MediaStatus.COMPLETED, actualMedia.status());
+        assertEquals(ENCODED_LOCATION, actualMedia.encodedLocation());
+    }
+
+    @Test
+    void givenAMedia_whenCallProcessing_thenLeaveTheOriginalUntouched() {
+        final var original = AudioVideoMedia.with(CHECKSUM, NAME, RAW_LOCATION);
+
+        original.processing();
+
+        assertEquals(MediaStatus.PENDING, original.status());
+    }
+
+    @Test
     void givenNullChecksum_whenCallWith_thenReceiveAnError() {
         final var actualException =
                 assertThrows(NullPointerException.class, () -> AudioVideoMedia.with(null, NAME, RAW_LOCATION));
