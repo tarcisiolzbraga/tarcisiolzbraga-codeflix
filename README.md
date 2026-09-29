@@ -5,16 +5,31 @@ Administração do catálogo de vídeos do Codeflix. Java 25 + Spring Boot 4.1.1
 ## Módulos
 - `domain`: entidades, value objects e regras de negócio (Java puro).
 - `application`: casos de uso, depende apenas do `domain`.
-- `infrastructure`: Spring Boot (API REST, JPA, Flyway, MySQL).
+- `infrastructure`: Spring Boot (API REST, JPA, Flyway, MySQL e o armazenamento das mídias).
 
 ## Execução
-Copie o `.env.example` para `.env` e preencha usuário e senha do banco. O `docker compose` e a aplicação leem as variáveis desse arquivo.
+Copie o `.env.example` para `.env` e preencha usuário e senha do banco, mais as credenciais do armazenamento (`STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` e `STORAGE_RPC_SECRET`, este último gerado com `openssl rand -hex 32`). O `docker compose` e a aplicação leem as variáveis desse arquivo.
 
 ```bash
 cp .env.example .env
 docker compose up -d
 ./gradlew bootRun
 ```
+
+O `docker compose` sobe dois serviços: o MySQL e o [Garage](https://garagehq.deuxfleurs.fr), armazenamento
+compatível com S3 onde ficam os arquivos das mídias. O Garage sobe com `--single-node --default-bucket`, então
+ele mesmo monta o layout e cria o bucket e a chave com as credenciais do `.env`, sem nenhum comando depois da
+subida. A permissão é por chave e por bucket: a chave da aplicação só enxerga o bucket dela.
+
+### Mídias dos vídeos
+
+Cada vídeo aceita cinco arquivos — `VIDEO`, `TRAILER`, `BANNER`, `THUMBNAIL` e `THUMBNAIL_HALF` — em
+`POST /videos/{id}/medias/{type}` (multipart, campo `file`) e `GET /videos/{id}/medias/{type}`. Enviar de novo o
+mesmo tipo troca o arquivo anterior, e apagar o vídeo leva os arquivos junto.
+
+O arquivo enviado é lido inteiro em memória antes de ir para o armazenamento, então o teto é
+`MEDIA_MAX_FILE_SIZE` (padrão 100MB). Subir daqui pede envio em fluxo, que ainda não existe. O arquivo de áudio
+e vídeo nasce com status `PENDING`: quem mudaria esse status é o codificador, que também ainda não existe.
 
 ### Perfis
 | Perfil | Quando | Configuração do banco | Swagger UI |
@@ -40,6 +55,8 @@ O `./gradlew build` também gera o relatório de cobertura (JaCoCo) dos três m�
 
 ### Regressão manual no Postman
 
-`.postman/admin-codeflix.postman_collection.json` cobre os endpoints dos três agregados. Importe no Postman e rode a coleção inteira no Collection Runner, de cima para baixo: as requisições guardam os ids que criam em variáveis, conferem status e corpo, e apagam tudo no fim, deixando o banco como estava.
+`.postman/admin-codeflix.postman_collection.json` cobre os endpoints dos quatro agregados. Importe no Postman e rode a coleção inteira no Collection Runner, de cima para baixo: as requisições guardam os ids que criam em variáveis, conferem status e corpo, e apagam tudo no fim, deixando o banco como estava.
+
+O envio de mídia usa `.postman/files/duna.mp4`, versionado junto: no Collection Runner do Postman, selecione esse arquivo no campo `file` da requisição; pelo Newman, aponte a pasta com `newman run .postman/admin-codeflix.postman_collection.json --working-dir .postman`.
 
 A ordem importa, porque a coleção é uma jornada: as categorias vêm primeiro, o gênero usa a categoria criada, e a última pasta exercita o 409 ao apagar uma categoria vinculada antes de limpar. A variável `baseUrl` aponta para `http://localhost:8080`.
