@@ -1462,6 +1462,195 @@
           ]
         },
         {
+          "name": "Envia o arquivo de vídeo",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/medias/VIDEO",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "medias",
+                "VIDEO"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "files/duna.mp4"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"traz o header Location\", () => pm.response.to.have.header(\"Location\"));",
+                  "const corpo = pm.response.json();",
+                  "pm.test(\"devolve exatamente videoId e type\", () => pm.expect(Object.keys(corpo).sort()).to.eql([\"type\", \"videoId\"]));",
+                  "pm.test(\"aponta o vídeo e o tipo\", () => {",
+                  "    pm.expect(corpo.videoId).to.eql(pm.collectionVariables.get(\"videoId\"));",
+                  "    pm.expect(corpo.type).to.eql(\"VIDEO\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Baixa o arquivo de vídeo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/medias/VIDEO",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "medias",
+                "VIDEO"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"devolve o conteúdo enviado\", () => pm.expect(pm.response.text()).to.eql(\"conteudo do arquivo de teste\"));",
+                  "pm.test(\"diz o nome do arquivo\", () => pm.expect(pm.response.headers.get(\"Content-Disposition\")).to.include(\"duna.mp4\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "O vídeo passa a mostrar a mídia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const corpo = pm.response.json();",
+                  "pm.test(\"traz a mídia de vídeo pendente\", () => {",
+                  "    pm.expect(corpo.video.name).to.eql(\"duna.mp4\");",
+                  "    pm.expect(corpo.video.status).to.eql(\"PENDING\");",
+                  "    pm.expect(corpo.video.encodedLocation).to.eql(\"\");",
+                  "});",
+                  "pm.test(\"as mídias não enviadas vêm nulas\", () => {",
+                  "    pm.expect(corpo.trailer).to.eql(null);",
+                  "    pm.expect(corpo.banner).to.eql(null);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Baixar uma mídia que não foi enviada responde 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/medias/TRAILER",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "medias",
+                "TRAILER"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"diz qual mídia de qual vídeo\", () => pm.expect(pm.response.json().message)",
+                  "    .to.eql(\"Media TRAILER of Video with ID \" + pm.collectionVariables.get(\"videoId\") + \" was not found\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tipo de mídia desconhecido responde 400",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/videos/{{videoId}}/medias/poster",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos",
+                "{{videoId}}",
+                "medias",
+                "poster"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "files/duna.mp4"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Recusa vídeo sem título e com classificação inválida",
           "request": {
             "method": "POST",
