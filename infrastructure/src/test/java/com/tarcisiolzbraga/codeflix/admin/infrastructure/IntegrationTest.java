@@ -23,7 +23,7 @@ import org.springframework.core.annotation.AliasFor;
 @SpringBootTest(classes = Main.class)
 @Import({MySQLContainerConfiguration.class, GarageContainerConfiguration.class,
         RabbitMQContainerConfiguration.class})
-@ExtendWith(MySQLCleanUpExtension.class)
+@ExtendWith({MySQLCleanUpExtension.class, RabbitCleanUpExtension.class})
 public @interface IntegrationTest {
 
     // MOCK por padrão; RANDOM_PORT sobe o Tomcat de verdade, para testar o que passa por ele.

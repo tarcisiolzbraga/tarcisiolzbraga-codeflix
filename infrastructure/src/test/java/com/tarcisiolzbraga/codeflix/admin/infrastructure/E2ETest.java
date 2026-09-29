@@ -20,6 +20,6 @@ import org.springframework.context.annotation.Import;
 @SpringBootTest(classes = Main.class, webEnvironment = WebEnvironment.RANDOM_PORT)
 @Import({MySQLContainerConfiguration.class, GarageContainerConfiguration.class,
         RabbitMQContainerConfiguration.class})
-@ExtendWith(MySQLCleanUpExtension.class)
+@ExtendWith({MySQLCleanUpExtension.class, RabbitCleanUpExtension.class})
 public @interface E2ETest {
 }
