@@ -10,11 +10,13 @@ import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseD
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.UNPROCESSABLE_DESCRIPTION;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.Pagination;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoMediaType;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiError;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.CreateVideoRequest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.CreateVideoResponse;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.UpdateVideoRequest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.UpdateVideoResponse;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.UploadMediaResponse;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.VideoListResponse;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.VideoResponse;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.VideoSearchRequest;
@@ -26,6 +28,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,12 +38,16 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.multipart.MultipartFile;
 
 // Contrato HTTP e documentação OpenAPI dos vídeos; o VideoController só implementa.
 @Tag(name = "Vídeos", description = "Cadastro dos vídeos do catálogo")
 @RequestMapping("/videos")
 public interface VideoAPI {
+
+    String MEDIA_TYPE_DESCRIPTION = "Tipo do arquivo: VIDEO, TRAILER, BANNER, THUMBNAIL ou THUMBNAIL_HALF";
 
     @PostMapping
     @Operation(
@@ -121,6 +128,31 @@ public interface VideoAPI {
     @ApiResponse(responseCode = NOT_FOUND, description = NOT_FOUND_DESCRIPTION,
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     VideoResponse deactivate(@Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id);
+
+    @PostMapping(value = "/{id}/medias/{type}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(
+            summary = "Envia um arquivo de mídia do vídeo",
+            description = "Enviar de novo o mesmo tipo troca o arquivo anterior. O arquivo de áudio e "
+                    + "vídeo nasce pendente de codificação.")
+    @ApiResponse(responseCode = CREATED, description = "Arquivo guardado; a URL dele vem no header Location",
+            content = @Content(schema = @Schema(implementation = UploadMediaResponse.class)))
+    @ApiResponse(responseCode = NOT_FOUND, description = NOT_FOUND_DESCRIPTION,
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    ResponseEntity<UploadMediaResponse> uploadMedia(
+            @Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id,
+            @Parameter(description = MEDIA_TYPE_DESCRIPTION) @PathVariable("type") VideoMediaType type,
+            @RequestParam("file") MultipartFile file);
+
+    @GetMapping("/{id}/medias/{type}")
+    @Operation(
+            summary = "Baixa um arquivo de mídia do vídeo",
+            description = "Responde com o arquivo, o tipo de conteúdo original e o nome com que foi enviado.")
+    @ApiResponse(responseCode = OK, description = "Arquivo encontrado")
+    @ApiResponse(responseCode = NOT_FOUND, description = "Nenhum arquivo desse tipo para o vídeo informado",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    ResponseEntity<byte[]> getMedia(
+            @Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id,
+            @Parameter(description = MEDIA_TYPE_DESCRIPTION) @PathVariable("type") VideoMediaType type);
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

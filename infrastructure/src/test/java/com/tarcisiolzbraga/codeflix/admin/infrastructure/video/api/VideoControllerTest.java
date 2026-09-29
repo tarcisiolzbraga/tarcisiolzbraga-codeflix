@@ -8,14 +8,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.tarcisiolzbraga.codeflix.admin.application.video.VideoFields;
 import com.tarcisiolzbraga.codeflix.admin.application.video.VideoOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.video.VideoMediaOutputs;
 import com.tarcisiolzbraga.codeflix.admin.application.video.VideoReferenceIds;
 import com.tarcisiolzbraga.codeflix.admin.application.video.activate.ActivateVideoUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.close.CloseVideoUseCase;
@@ -26,6 +29,10 @@ import com.tarcisiolzbraga.codeflix.admin.application.video.delete.DeleteVideoUs
 import com.tarcisiolzbraga.codeflix.admin.application.video.get.GetVideoByIdUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.list.ListVideosUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.list.VideoListOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.video.media.get.GetMediaUseCase;
+import com.tarcisiolzbraga.codeflix.admin.application.video.media.get.MediaOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.video.media.upload.UploadMediaOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.video.media.upload.UploadMediaUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.open.OpenVideoUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.publish.PublishVideoUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.unpublish.UnpublishVideoUseCase;
@@ -37,6 +44,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationError;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.Notification;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Video;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoID;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoMediaType;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.ControllerTest;
 import java.time.Instant;
 import java.util.List;
@@ -47,6 +55,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 // Os casos de uso são mockados um por um, e os records de agrupamento são os de verdade: assim o
@@ -100,6 +109,12 @@ class VideoControllerTest {
 
     @MockitoBean
     private DeactivateVideoUseCase deactivateVideoUseCase;
+
+    @MockitoBean
+    private UploadMediaUseCase uploadMediaUseCase;
+
+    @MockitoBean
+    private GetMediaUseCase getMediaUseCase;
 
     @Test
     void givenValidBody_whenCallCreate_thenReturn201WithLocation() throws Exception {
@@ -233,11 +248,68 @@ class VideoControllerTest {
                 EXPECTED_ID,
                 new VideoFields(EXPECTED_TITLE, "Arrakis", 2021, 155.0, "12"),
                 new VideoReferenceIds(Set.of(CATEGORY_ID), Set.of(), Set.of()),
+                noMedias(),
                 false,
                 published,
                 true,
                 CREATED_AT,
                 UPDATED_AT);
+    }
+
+    @Test
+    void givenAFile_whenCallUploadMedia_thenReturn201WithLocationAndTheCommandValues() throws Exception {
+        final var file = new MockMultipartFile("file", "duna.mp4", "video/mp4", "conteudo".getBytes());
+        when(uploadMediaUseCase.execute(any()))
+                .thenReturn(new UploadMediaOutput(EXPECTED_ID, VideoMediaType.TRAILER));
+
+        final var response =
+                this.mockMvc.perform(multipart(VIDEOS_PATH + "/" + EXPECTED_ID + "/medias/trailer").file(file));
+
+        response.andExpect(status().isCreated())
+                .andExpect(header().string("Location", VIDEOS_PATH + "/" + EXPECTED_ID + "/medias/TRAILER"))
+                .andExpect(jsonPath("$.videoId").value(EXPECTED_ID))
+                .andExpect(jsonPath("$.type").value("TRAILER"));
+        verify(uploadMediaUseCase).execute(argThat(command -> EXPECTED_ID.equals(command.videoId())
+                && command.resource().type() == VideoMediaType.TRAILER
+                && "duna.mp4".equals(command.resource().resource().name())
+                && "video/mp4".equals(command.resource().resource().contentType())));
+    }
+
+    @Test
+    void givenUnknownMediaType_whenCallUploadMedia_thenReturn400() throws Exception {
+        final var file = new MockMultipartFile("file", "duna.mp4", "video/mp4", "conteudo".getBytes());
+
+        final var response =
+                this.mockMvc.perform(multipart(VIDEOS_PATH + "/" + EXPECTED_ID + "/medias/poster").file(file));
+
+        response.andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void givenAStoredMedia_whenCallGetMedia_thenReturnTheFileWithItsTypeAndName() throws Exception {
+        when(getMediaUseCase.execute(any()))
+                .thenReturn(new MediaOutput("conteudo".getBytes(), "video/mp4", "duna.mp4"));
+
+        final var response = this.mockMvc.perform(get(VIDEOS_PATH + "/" + EXPECTED_ID + "/medias/VIDEO"));
+
+        response.andExpect(status().isOk())
+                .andExpect(content().contentType("video/mp4"))
+                .andExpect(header().string("Content-Disposition", "attachment; filename=\"duna.mp4\""))
+                .andExpect(content().bytes("conteudo".getBytes()));
+        verify(getMediaUseCase).execute(argThat(command -> EXPECTED_ID.equals(command.videoId())
+                && command.type() == VideoMediaType.VIDEO));
+    }
+
+    @Test
+    void givenNoStoredMedia_whenCallGetMedia_thenReturn404() throws Exception {
+        when(getMediaUseCase.execute(any()))
+                .thenThrow(NotFoundException.withMedia("VIDEO", VideoID.from(EXPECTED_ID)));
+
+        final var response = this.mockMvc.perform(get(VIDEOS_PATH + "/" + EXPECTED_ID + "/medias/VIDEO"));
+
+        response.andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message")
+                        .value("Media VIDEO of Video with ID %s was not found".formatted(EXPECTED_ID)));
     }
 
     @TestConfiguration
@@ -263,5 +335,15 @@ class VideoControllerTest {
                 final DeactivateVideoUseCase deactivate) {
             return new VideoStateUseCases(publish, unpublish, open, close, activate, deactivate);
         }
+
+        @Bean
+        VideoMediaUseCases videoMediaUseCases(final UploadMediaUseCase upload, final GetMediaUseCase getMedia) {
+            return new VideoMediaUseCases(upload, getMedia);
+        }
     }
+
+    private VideoMediaOutputs noMedias() {
+        return new VideoMediaOutputs(null, null, null, null, null);
+    }
+
 }

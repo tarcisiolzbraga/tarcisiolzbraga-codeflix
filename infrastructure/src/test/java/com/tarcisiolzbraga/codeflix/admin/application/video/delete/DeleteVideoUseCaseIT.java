@@ -3,16 +3,21 @@ package com.tarcisiolzbraga.codeflix.admin.application.video.delete;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.category.Category;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryGateway;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.MediaResourceGateway;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.Resource;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Video;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoFixture;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoID;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoMediaType;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoReferences;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoResource;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.CategoryRepository;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.persistence.VideoRepository;
@@ -28,6 +33,9 @@ class DeleteVideoUseCaseIT {
     private DeleteVideoUseCase useCase;
 
     @Autowired
+    private MediaResourceGateway mediaResourceGateway;
+
+    @Autowired
     private CategoryGateway categoryGateway;
 
     @Autowired
@@ -38,6 +46,17 @@ class DeleteVideoUseCaseIT {
 
     @MockitoSpyBean
     private VideoGateway videoGateway;
+
+    @Test
+    void givenVideoWithMedias_whenCallExecute_thenRemoveTheFilesToo() {
+        final var video = this.videoGateway.create(VideoFixture.video());
+        final var resource = Resource.with("conteudo".getBytes(), "abc1", "video/mp4", "duna.mp4");
+        this.mediaResourceGateway.storeAudioVideo(video.getId(), VideoResource.with(VideoMediaType.VIDEO, resource));
+
+        useCase.execute(video.getId().getValue());
+
+        assertTrue(this.mediaResourceGateway.getResource(video.getId(), VideoMediaType.VIDEO).isEmpty());
+    }
 
     @Test
     void givenVideoWithReferences_whenCallExecute_thenRemoveItAndKeepTheReferences() {

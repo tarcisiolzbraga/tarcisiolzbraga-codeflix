@@ -64,3 +64,18 @@ spring:
       hibernate.query.fail_on_pagination_over_collection_fetch: true
   flyway:
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      # O arquivo enviado é lido inteiro em memória antes de ir para o armazenamento, então o teto
+      # aqui é o que impede uma requisição derrubar a aplicação. Subir daqui pede envio em fluxo.
+      max-file-size: ${MEDIA_MAX_FILE_SIZE:100MB}
+      max-request-size: ${MEDIA_MAX_FILE_SIZE:100MB}
+
+# Armazenamento das mídias. Como no banco, sem valor padrão: variável faltando derruba a
+# subida em vez de gravar arquivo em lugar errado.
+storage:
+  bucket: ${STORAGE_BUCKET}
+  endpoint: ${STORAGE_ENDPOINT}
+  region: ${STORAGE_REGION:garage}
+  access-key: ${STORAGE_ACCESS_KEY}
+  secret-key: ${STORAGE_SECRET_KEY}

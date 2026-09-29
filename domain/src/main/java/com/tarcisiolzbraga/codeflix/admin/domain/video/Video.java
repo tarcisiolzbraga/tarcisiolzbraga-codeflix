@@ -9,23 +9,31 @@ import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationHandler;
 import java.time.Instant;
 import java.time.Year;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 public class Video extends AggregateRoot<VideoID> {
 
     private static final String DETAILS_NOT_NULL_MESSAGE = "'details' should not be null";
     private static final String REFERENCES_NOT_NULL_MESSAGE = "'references' should not be null";
+    private static final String MEDIA_NOT_NULL_MESSAGE = "'media' should not be null";
 
     private VideoDetails details;
     // Referência a outro agregado só pelo ID, como no Genre.
     private VideoReferences references;
     private boolean opened;
     private boolean published;
+    private AudioVideoMedia video;
+    private AudioVideoMedia trailer;
+    private ImageMedia banner;
+    private ImageMedia thumbnail;
+    private ImageMedia thumbnailHalf;
 
     private Video(
             final VideoID id,
             final VideoDetails details,
             final VideoReferences references,
+            final VideoMedias medias,
             final VideoFlags flags,
             final Instant createdAt,
             final Instant updatedAt) {
@@ -34,22 +42,35 @@ public class Video extends AggregateRoot<VideoID> {
         this.references = Objects.requireNonNull(references, REFERENCES_NOT_NULL_MESSAGE);
         this.opened = flags.opened();
         this.published = flags.published();
+        this.video = medias.video();
+        this.trailer = medias.trailer();
+        this.banner = medias.banner();
+        this.thumbnail = medias.thumbnail();
+        this.thumbnailHalf = medias.thumbnailHalf();
     }
 
     // Nasce fechado e não publicado: abrir e publicar são decisões próprias, com método para cada uma.
     public static Video newVideo(final VideoDetails details, final VideoReferences references) {
         final var now = InstantUtils.now();
-        return new Video(VideoID.unique(), details, references, VideoFlags.closedAndUnpublished(), now, now);
+        return new Video(
+                VideoID.unique(),
+                details,
+                references,
+                VideoMedias.none(),
+                VideoFlags.closedAndUnpublished(),
+                now,
+                now);
     }
 
     public static Video with(
             final VideoID id,
             final VideoDetails details,
             final VideoReferences references,
+            final VideoMedias medias,
             final VideoFlags flags,
             final Instant createdAt,
             final Instant updatedAt) {
-        return new Video(id, details, references, flags, createdAt, updatedAt);
+        return new Video(id, details, references, medias, flags, createdAt, updatedAt);
     }
 
     @Override
@@ -82,6 +103,53 @@ public class Video extends AggregateRoot<VideoID> {
     public void close() {
         this.opened = false;
         refreshUpdatedAt();
+    }
+
+    // Um método por arquivo, como manda a regra de um método de intenção por regra: o caso de uso
+    // escolhe qual chamar a partir do tipo recebido na rota.
+    public void updateVideoMedia(final AudioVideoMedia media) {
+        this.video = Objects.requireNonNull(media, MEDIA_NOT_NULL_MESSAGE);
+        refreshUpdatedAt();
+    }
+
+    public void updateTrailerMedia(final AudioVideoMedia media) {
+        this.trailer = Objects.requireNonNull(media, MEDIA_NOT_NULL_MESSAGE);
+        refreshUpdatedAt();
+    }
+
+    public void updateBanner(final ImageMedia media) {
+        this.banner = Objects.requireNonNull(media, MEDIA_NOT_NULL_MESSAGE);
+        refreshUpdatedAt();
+    }
+
+    public void updateThumbnail(final ImageMedia media) {
+        this.thumbnail = Objects.requireNonNull(media, MEDIA_NOT_NULL_MESSAGE);
+        refreshUpdatedAt();
+    }
+
+    public void updateThumbnailHalf(final ImageMedia media) {
+        this.thumbnailHalf = Objects.requireNonNull(media, MEDIA_NOT_NULL_MESSAGE);
+        refreshUpdatedAt();
+    }
+
+    public Optional<AudioVideoMedia> getVideo() {
+        return Optional.ofNullable(this.video);
+    }
+
+    public Optional<AudioVideoMedia> getTrailer() {
+        return Optional.ofNullable(this.trailer);
+    }
+
+    public Optional<ImageMedia> getBanner() {
+        return Optional.ofNullable(this.banner);
+    }
+
+    public Optional<ImageMedia> getThumbnail() {
+        return Optional.ofNullable(this.thumbnail);
+    }
+
+    public Optional<ImageMedia> getThumbnailHalf() {
+        return Optional.ofNullable(this.thumbnailHalf);
     }
 
     public String getTitle() {
