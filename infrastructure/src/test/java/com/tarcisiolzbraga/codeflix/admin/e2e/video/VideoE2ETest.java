@@ -1,11 +1,13 @@
 package com.tarcisiolzbraga.codeflix.admin.e2e.video;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tarcisiolzbraga.codeflix.admin.e2e.CategoryE2EDsl;
+import com.tarcisiolzbraga.codeflix.admin.e2e.E2EMediaFile;
 import com.tarcisiolzbraga.codeflix.admin.e2e.VideoE2EDsl;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.E2ETest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiError;
@@ -184,5 +186,53 @@ class VideoE2ETest implements VideoE2EDsl, CategoryE2EDsl {
         final var actualException = assertThrows(HttpClientErrorException.class, () -> deleteACategory(movies));
 
         assertEquals(HttpStatus.CONFLICT, actualException.getStatusCode());
+    }
+
+    @Test
+    void givenAVideo_whenUploadAFile_thenItCanBeDownloadedBackWholeAndAppearsOnTheVideo() {
+        final var id = givenAVideo(DUNA, givenACategory("Filmes", null));
+        final var file = E2EMediaFile.of("duna.mp4", "video/mp4", "o filme inteiro");
+
+        final var actualUpload = uploadMedia(id, "VIDEO", file);
+
+        assertEquals(id, actualUpload.videoId());
+        assertEquals("VIDEO", actualUpload.type());
+        assertArrayEquals(file.content(), downloadMedia(id, "VIDEO"));
+        final var video = retrieveAVideo(id);
+        assertEquals("duna.mp4", video.video().name());
+        assertEquals("PENDING", video.video().status());
+    }
+
+    @Test
+    void givenAVideoWithAFile_whenUploadAnotherOfTheSameType_thenTheNewOneReplacesIt() {
+        final var id = givenAVideo(DUNA, givenACategory("Filmes", null));
+        uploadMedia(id, "BANNER", E2EMediaFile.of("antigo.png", "image/png", "imagem antiga"));
+
+        uploadMedia(id, "BANNER", E2EMediaFile.of("novo.png", "image/png", "imagem nova"));
+
+        assertArrayEquals("imagem nova".getBytes(), downloadMedia(id, "BANNER"));
+        assertEquals("novo.png", retrieveAVideo(id).banner().name());
+    }
+
+    @Test
+    void givenAVideoWithAFile_whenDeleteTheVideo_thenTheFileIsGoneToo() {
+        final var id = givenAVideo(DUNA, givenACategory("Filmes", null));
+        uploadMedia(id, "VIDEO", E2EMediaFile.of("duna.mp4", "video/mp4", "o filme inteiro"));
+
+        deleteAVideo(id);
+
+        final var actualException =
+                assertThrows(HttpClientErrorException.class, () -> downloadMedia(id, "VIDEO"));
+        assertEquals(HttpStatus.NOT_FOUND, actualException.getStatusCode());
+    }
+
+    @Test
+    void givenAVideoWithoutFiles_whenDownloadAMedia_thenReturnNotFound() {
+        final var id = givenAVideo(DUNA, givenACategory("Filmes", null));
+
+        final var actualException =
+                assertThrows(HttpClientErrorException.class, () -> downloadMedia(id, "TRAILER"));
+
+        assertEquals(HttpStatus.NOT_FOUND, actualException.getStatusCode());
     }
 }

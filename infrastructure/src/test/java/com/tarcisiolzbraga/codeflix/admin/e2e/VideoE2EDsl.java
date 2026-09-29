@@ -4,11 +4,15 @@ import com.tarcisiolzbraga.codeflix.admin.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.CreateVideoRequest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.CreateVideoResponse;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.UpdateVideoRequest;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.UploadMediaResponse;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.VideoListResponse;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.VideoResponse;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.web.client.RestClient;
 
 // Fala com a API como um cliente qualquer falaria: só HTTP, sem atalho pelo gateway ou pelo banco.
@@ -82,6 +86,26 @@ public interface VideoE2EDsl {
 
     default VideoResponse deactivateAVideo(final String id) {
         return changeState(id, "deactivate");
+    }
+
+    default UploadMediaResponse uploadMedia(final String id, final String type, final E2EMediaFile file) {
+        final var body = new MultipartBodyBuilder();
+        body.part("file", new ByteArrayResource(file.content()))
+                .filename(file.filename())
+                .contentType(MediaType.parseMediaType(file.contentType()));
+        return client().post()
+                .uri(VIDEOS_PATH + "/{id}/medias/{type}", id, type)
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(body.build())
+                .retrieve()
+                .body(UploadMediaResponse.class);
+    }
+
+    default byte[] downloadMedia(final String id, final String type) {
+        return client().get()
+                .uri(VIDEOS_PATH + "/{id}/medias/{type}", id, type)
+                .retrieve()
+                .body(byte[].class);
     }
 
     default void deleteAVideo(final String id) {
