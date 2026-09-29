@@ -31,6 +31,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.MediaResourceGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoGateway;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.api.VideoMediaUseCases;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.api.VideoStateUseCases;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.api.VideoUseCases;
 import org.springframework.context.annotation.Bean;
@@ -144,5 +145,10 @@ public class VideoUseCaseConfig {
                 closeVideoUseCase(),
                 activateVideoUseCase(),
                 deactivateVideoUseCase());
+    }
+
+    @Bean
+    VideoMediaUseCases videoMediaUseCases() {
+        return new VideoMediaUseCases(uploadMediaUseCase(), getMediaUseCase());
     }
 }
