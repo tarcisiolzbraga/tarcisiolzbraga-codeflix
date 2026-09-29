@@ -300,6 +300,38 @@ class VideoTest {
         assertEquals("'media' should not be null", actualException.getMessage());
     }
 
+    @Test
+    void givenAVideo_whenCallUpdateVideoMedia_thenRegisterTheMediaCreatedEvent() {
+        final var actualVideo = newVideo();
+
+        actualVideo.updateVideoMedia(audioVideoMedia());
+
+        final var actualEvent = (VideoMediaCreated) actualVideo.getDomainEvents().getFirst();
+        assertEquals(actualVideo.getId().getValue(), actualEvent.videoId());
+        assertEquals(VideoMediaType.VIDEO, actualEvent.type());
+        assertEquals("videoId-VIDEO", actualEvent.filePath());
+        assertNotNull(actualEvent.occurredOn());
+    }
+
+    @Test
+    void givenAVideo_whenCallUpdateTrailerMedia_thenRegisterTheEventForTheTrailer() {
+        final var actualVideo = newVideo();
+
+        actualVideo.updateTrailerMedia(audioVideoMedia());
+
+        final var actualEvent = (VideoMediaCreated) actualVideo.getDomainEvents().getFirst();
+        assertEquals(VideoMediaType.TRAILER, actualEvent.type());
+    }
+
+    @Test
+    void givenAVideo_whenCallUpdateBanner_thenRegisterNoEvent() {
+        final var actualVideo = newVideo();
+
+        actualVideo.updateBanner(imageMedia());
+
+        assertTrue(actualVideo.getDomainEvents().isEmpty());
+    }
+
     private Video rebuild(final VideoMedias medias) {
         final var video = newVideo();
         return Video.with(

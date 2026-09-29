@@ -106,14 +106,17 @@ public class Video extends AggregateRoot<VideoID> {
     }
 
     // Um método por arquivo, como manda a regra de um método de intenção por regra: o caso de uso
-    // escolhe qual chamar a partir do tipo recebido na rota.
+    // escolhe qual chamar a partir do tipo recebido na rota. Só áudio e vídeo avisam o mundo de
+    // fora: imagem não passa por codificação, então não há o que o codificador faça com ela.
     public void updateVideoMedia(final AudioVideoMedia media) {
         this.video = Objects.requireNonNull(media, MEDIA_NOT_NULL_MESSAGE);
+        registerEvent(new VideoMediaCreated(getId().getValue(), VideoMediaType.VIDEO, media.rawLocation()));
         refreshUpdatedAt();
     }
 
     public void updateTrailerMedia(final AudioVideoMedia media) {
         this.trailer = Objects.requireNonNull(media, MEDIA_NOT_NULL_MESSAGE);
+        registerEvent(new VideoMediaCreated(getId().getValue(), VideoMediaType.TRAILER, media.rawLocation()));
         refreshUpdatedAt();
     }
 
