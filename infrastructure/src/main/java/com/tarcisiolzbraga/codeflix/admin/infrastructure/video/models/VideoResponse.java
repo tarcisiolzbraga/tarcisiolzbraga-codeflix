@@ -19,6 +19,11 @@ public record VideoResponse(
         List<String> categories,
         List<String> genres,
         List<String> castMembers,
+        AudioVideoMediaResponse video,
+        AudioVideoMediaResponse trailer,
+        ImageMediaResponse banner,
+        ImageMediaResponse thumbnail,
+        ImageMediaResponse thumbnailHalf,
         Instant createdAt,
         Instant updatedAt) {
 
@@ -37,6 +42,11 @@ public record VideoResponse(
                 sorted(output.references().categories()),
                 sorted(output.references().genres()),
                 sorted(output.references().castMembers()),
+                AudioVideoMediaResponse.from(output.medias().video()),
+                AudioVideoMediaResponse.from(output.medias().trailer()),
+                ImageMediaResponse.from(output.medias().banner()),
+                ImageMediaResponse.from(output.medias().thumbnail()),
+                ImageMediaResponse.from(output.medias().thumbnailHalf()),
                 output.createdAt(),
                 output.updatedAt());
     }

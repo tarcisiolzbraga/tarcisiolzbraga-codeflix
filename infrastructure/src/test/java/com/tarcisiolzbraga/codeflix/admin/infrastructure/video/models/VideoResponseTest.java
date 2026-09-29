@@ -1,8 +1,11 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.tarcisiolzbraga.codeflix.admin.application.video.VideoFields;
+import com.tarcisiolzbraga.codeflix.admin.application.video.VideoImageOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.video.VideoMediaOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.video.VideoOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.video.VideoMediaOutputs;
 import com.tarcisiolzbraga.codeflix.admin.application.video.VideoReferenceIds;
@@ -24,7 +27,8 @@ class VideoResponseTest {
 
     private static final Set<String> EXPECTED_FIELDS = Set.of(
             "id", "title", "description", "launchedAt", "duration", "rating", "opened", "published", "active",
-            "categories", "genres", "castMembers", "createdAt", "updatedAt");
+            "categories", "genres", "castMembers", "video", "trailer", "banner", "thumbnail",
+            "thumbnailHalf", "createdAt", "updatedAt");
     private static final Instant CREATED_AT = Instant.parse("2026-01-31T10:15:30.123456Z");
     private static final Instant UPDATED_AT = Instant.parse("2026-02-01T08:00:00Z");
 
@@ -54,6 +58,8 @@ class VideoResponseTest {
         assertEquals(false, fields.get("opened"));
         assertEquals(true, fields.get("published"));
         assertEquals(List.of("c1", "c2"), fields.get("categories"));
+        assertEquals(Map.of("checksum", "abc2", "name", "duna.png", "location", "raw/banner"), fields.get("banner"));
+        assertNull(fields.get("trailer"));
         assertEquals(CREATED_AT.toString(), fields.get("createdAt"));
         assertEquals(UPDATED_AT.toString(), fields.get("updatedAt"));
     }
@@ -80,7 +86,13 @@ class VideoResponseTest {
     private VideoResponse responseFixture() {
         return new VideoResponse(
                 "123", "Duna", "Arrakis", 2021, 155.0, "12", false, true, true,
-                List.of("c1", "c2"), List.of("g1"), List.of("m1"), CREATED_AT, UPDATED_AT);
+                List.of("c1", "c2"), List.of("g1"), List.of("m1"),
+                AudioVideoMediaResponse.from(new VideoMediaOutput("abc1", "duna.mp4", "raw/video", "", "PENDING")),
+                null,
+                ImageMediaResponse.from(new VideoImageOutput("abc2", "duna.png", "raw/banner")),
+                null,
+                null,
+                CREATED_AT, UPDATED_AT);
     }
 
     private Map<String, Object> fieldsOf(final JsonContent<VideoResponse> content) throws IOException {
