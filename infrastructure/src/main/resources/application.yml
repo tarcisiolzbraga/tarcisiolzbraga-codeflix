@@ -64,6 +64,11 @@ spring:
       hibernate.query.fail_on_pagination_over_collection_fetch: true
   flyway:
     locations: classpath:db/migration
+  rabbitmq:
+    host: ${AMQP_HOST}
+    port: ${AMQP_PORT}
+    username: ${AMQP_USER}
+    password: ${AMQP_PASSWORD}
   servlet:
     multipart:
       # O arquivo enviado é lido inteiro em memória antes de ir para o armazenamento, então o teto
@@ -79,3 +84,15 @@ storage:
   region: ${STORAGE_REGION:garage}
   access-key: ${STORAGE_ACCESS_KEY}
   secret-key: ${STORAGE_SECRET_KEY}
+
+# Fila entre a aplicação e o codificador. Um exchange direto, uma fila para cada sentido:
+# video.created sai daqui quando um arquivo é enviado, video.encoded volta com o resultado.
+amqp:
+  exchange: video.events
+  queues:
+    video-created:
+      queue: video.created.queue
+      routing-key: video.created
+    video-encoded:
+      queue: video.encoded.queue
+      routing-key: video.encoded

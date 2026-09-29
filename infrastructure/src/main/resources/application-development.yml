@@ -2,6 +2,9 @@
 spring:
   config:
     import: optional:file:.env[.properties]
+  rabbitmq:
+    host: ${AMQP_HOST:localhost}
+    port: ${AMQP_PORT:5672}
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:adm_videos}
     hikari:

@@ -21,7 +21,8 @@ import org.springframework.core.annotation.AliasFor;
 // @SpringBootConfiguration subindo pelos pacotes não alcança a Main. Como o classes desliga essa
 // busca, @TestConfiguration aninhada no teste também deixa de ser vista: precisa de @Import.
 @SpringBootTest(classes = Main.class)
-@Import({MySQLContainerConfiguration.class, GarageContainerConfiguration.class})
+@Import({MySQLContainerConfiguration.class, GarageContainerConfiguration.class,
+        RabbitMQContainerConfiguration.class})
 @ExtendWith(MySQLCleanUpExtension.class)
 public @interface IntegrationTest {
 

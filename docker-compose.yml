@@ -32,7 +32,22 @@ services:
       - garage_meta:/var/lib/garage/meta
       - garage_data:/var/lib/garage/data
 
+  # Fila entre a aplicação e o codificador de vídeo. A imagem -management traz o painel em
+  # http://localhost:15672, útil para ver mensagem parada durante o desenvolvimento.
+  rabbitmq:
+    image: rabbitmq:4.2-management
+    container_name: adm_videos_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${AMQP_USER}
+      RABBITMQ_DEFAULT_PASS: ${AMQP_PASSWORD}
+    ports:
+      - "${AMQP_PORT}:5672"
+      - "${AMQP_MANAGEMENT_PORT}:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
 volumes:
   mysql_data:
   garage_meta:
   garage_data:
+  rabbitmq_data:
