@@ -112,7 +112,7 @@ public class VideoUseCaseConfig {
 
     @Bean
     DeleteVideoUseCase deleteVideoUseCase() {
-        return new DefaultDeleteVideoUseCase(this.videoGateway);
+        return new DefaultDeleteVideoUseCase(this.videoGateway, this.mediaResourceGateway);
     }
 
     // O controller recebe os casos de uso agrupados: onze dependências soltas passariam do limite.
