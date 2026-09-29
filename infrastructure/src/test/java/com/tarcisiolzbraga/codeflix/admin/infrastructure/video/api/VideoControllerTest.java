@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.tarcisiolzbraga.codeflix.admin.application.video.VideoFields;
 import com.tarcisiolzbraga.codeflix.admin.application.video.VideoOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.video.VideoMediaOutputs;
 import com.tarcisiolzbraga.codeflix.admin.application.video.VideoReferenceIds;
 import com.tarcisiolzbraga.codeflix.admin.application.video.activate.ActivateVideoUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.close.CloseVideoUseCase;
@@ -233,6 +234,7 @@ class VideoControllerTest {
                 EXPECTED_ID,
                 new VideoFields(EXPECTED_TITLE, "Arrakis", 2021, 155.0, "12"),
                 new VideoReferenceIds(Set.of(CATEGORY_ID), Set.of(), Set.of()),
+                noMedias(),
                 false,
                 published,
                 true,
@@ -264,4 +266,9 @@ class VideoControllerTest {
             return new VideoStateUseCases(publish, unpublish, open, close, activate, deactivate);
         }
     }
+
+    private VideoMediaOutputs noMedias() {
+        return new VideoMediaOutputs(null, null, null, null, null);
+    }
+
 }

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.tarcisiolzbraga.codeflix.admin.application.video.VideoFields;
 import com.tarcisiolzbraga.codeflix.admin.application.video.VideoOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.video.VideoMediaOutputs;
 import com.tarcisiolzbraga.codeflix.admin.application.video.VideoReferenceIds;
 import java.io.IOException;
 import java.time.Instant;
@@ -63,6 +64,7 @@ class VideoResponseTest {
                 "123",
                 new VideoFields("Duna", "Arrakis", 2021, 155.0, "12"),
                 new VideoReferenceIds(Set.of("c3", "c1", "c2"), Set.of("g2", "g1"), Set.of("m1")),
+                noMedias(),
                 false,
                 true,
                 true,
@@ -84,4 +86,9 @@ class VideoResponseTest {
     private Map<String, Object> fieldsOf(final JsonContent<VideoResponse> content) throws IOException {
         return this.objectMapper.readValue(content.getJson(), new TypeReference<>() {});
     }
+
+    private VideoMediaOutputs noMedias() {
+        return new VideoMediaOutputs(null, null, null, null, null);
+    }
+
 }
