@@ -111,14 +111,23 @@ public class Video extends AggregateRoot<VideoID> {
     // fora: imagem não passa por codificação, então não há o que o codificador faça com ela.
     public void updateVideoMedia(final AudioVideoMedia media) {
         this.video = Objects.requireNonNull(media, MEDIA_NOT_NULL_MESSAGE);
-        registerEvent(new VideoMediaCreated(getId().getValue(), VideoMediaType.VIDEO, media.rawLocation()));
+        announce(VideoMediaType.VIDEO, media);
         refreshUpdatedAt();
     }
 
     public void updateTrailerMedia(final AudioVideoMedia media) {
         this.trailer = Objects.requireNonNull(media, MEDIA_NOT_NULL_MESSAGE);
-        registerEvent(new VideoMediaCreated(getId().getValue(), VideoMediaType.TRAILER, media.rawLocation()));
+        announce(VideoMediaType.TRAILER, media);
         refreshUpdatedAt();
+    }
+
+    // Só se anuncia o que ainda precisa ser codificado: uma mídia que já saiu de PENDING chegou
+    // aqui por outro caminho que não um envio novo, e repetir o aviso mandaria o codificador
+    // refazer trabalho pronto.
+    private void announce(final VideoMediaType type, final AudioVideoMedia media) {
+        if (media.status() == MediaStatus.PENDING) {
+            registerEvent(new VideoMediaCreated(getId().getValue(), type, media.rawLocation()));
+        }
     }
 
     public void updateBanner(final ImageMedia media) {

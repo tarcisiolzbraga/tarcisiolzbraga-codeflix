@@ -314,6 +314,17 @@ class VideoTest {
     }
 
     @Test
+    void givenAnAlreadyEncodedMedia_whenCallUpdateVideoMedia_thenRegisterNoEvent() {
+        final var actualVideo = newVideo();
+        final var encoded = audioVideoMedia().completed("encoded/video");
+
+        actualVideo.updateVideoMedia(encoded);
+
+        assertEquals(Optional.of(encoded), actualVideo.getVideo());
+        assertTrue(actualVideo.getDomainEvents().isEmpty());
+    }
+
+    @Test
     void givenAVideo_whenCallUpdateTrailerMedia_thenRegisterTheEventForTheTrailer() {
         final var actualVideo = newVideo();
 
