@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class VideoMySQLGateway implements VideoGateway {
@@ -35,12 +36,16 @@ public class VideoMySQLGateway implements VideoGateway {
         this.eventPublisher = Objects.requireNonNull(eventPublisher, "'eventPublisher' should not be null");
     }
 
+    // Transacional porque salvar o vídeo e gravar o aviso na tabela de saída precisam acontecer
+    // juntos: é isso que impede a linha existir sem o aviso, ou o contrário.
     @Override
+    @Transactional
     public Video create(final Video video) {
         return save(video);
     }
 
     @Override
+    @Transactional
     public Video update(final Video video) {
         return save(video);
     }
@@ -89,7 +94,7 @@ public class VideoMySQLGateway implements VideoGateway {
         return this.videoRepository.existsByCastMemberId(castMemberId.getValue());
     }
 
-    // O evento só sai depois da linha gravada, e sai uma vez: quem publica esvazia a lista do
+    // O aviso é gravado junto, na mesma transação, e sai uma vez: quem publica esvazia a lista do
     // agregado, então salvar de novo não repete o aviso.
     private Video save(final Video video) {
         final var saved = this.videoRepository.save(VideoJpaEntity.from(video)).toAggregate();

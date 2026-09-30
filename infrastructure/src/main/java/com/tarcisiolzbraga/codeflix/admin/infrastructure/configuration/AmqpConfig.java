@@ -2,8 +2,9 @@ package com.tarcisiolzbraga.codeflix.admin.infrastructure.configuration;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.events.DomainEventPublisher;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.messaging.EventRouting;
-import com.tarcisiolzbraga.codeflix.admin.infrastructure.messaging.RabbitDomainEventPublisher;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.messaging.OutboxDomainEventPublisher;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.messaging.RabbitEventSender;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.messaging.persistence.OutboxEventRepository;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
@@ -59,11 +60,13 @@ public class AmqpConfig {
         return new RabbitEventSender(properties.exchange(), operations);
     }
 
+    // O agregado avisa a tabela de saída, não o broker: é o que permite gravar e avisar na mesma
+    // transação.
     @Bean
     DomainEventPublisher domainEventPublisher(
             final EventRouting eventRouting,
-            final RabbitEventSender rabbitEventSender,
+            final OutboxEventRepository outboxRepository,
             final ObjectMapper objectMapper) {
-        return new RabbitDomainEventPublisher(eventRouting, rabbitEventSender, objectMapper);
+        return new OutboxDomainEventPublisher(eventRouting, outboxRepository, objectMapper);
     }
 }
