@@ -32,9 +32,9 @@ public class DefaultUpdateMediaStatusUseCase extends UpdateMediaStatusUseCase {
 
     private void move(final Video video, final UpdateMediaStatusCommand input) {
         if (input.status() == MediaStatus.COMPLETED) {
-            video.completed(input.type(), input.encodedPath());
+            video.completed(input.type(), input.checksum(), input.encodedPath());
         } else {
-            video.processing(input.type());
+            video.processing(input.type(), input.checksum());
         }
     }
 }

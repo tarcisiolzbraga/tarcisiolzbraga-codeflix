@@ -21,4 +21,7 @@ public sealed interface VideoEncoderResult
     // Texto, e não VideoMediaType: tipo desconhecido é para o consumidor registrar e descartar,
     // não para derrubar a desserialização e a mensagem voltar para sempre.
     String type();
+
+    // O mesmo checksum que saiu no aviso de envio: é ele que diz de qual envio esta resposta fala.
+    String checksum();
 }

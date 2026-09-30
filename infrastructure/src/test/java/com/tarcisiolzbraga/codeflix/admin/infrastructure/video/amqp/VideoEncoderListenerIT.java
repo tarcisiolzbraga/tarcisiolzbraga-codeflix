@@ -38,7 +38,7 @@ class VideoEncoderListenerIT {
         final var video = givenStoredVideoWithMedia();
 
         send("""
-                {"status":"COMPLETED","videoId":"%s","type":"VIDEO","encodedPath":"encoded/duna.mp4"}"""
+                {"status":"COMPLETED","videoId":"%s","type":"VIDEO","checksum":"abc1","encodedPath":"encoded/duna.mp4"}"""
                 .formatted(video.getId().getValue()));
 
         final var actualMedia = awaitMedia(video.getId(), media -> media.status() == MediaStatus.COMPLETED);
@@ -50,7 +50,7 @@ class VideoEncoderListenerIT {
         final var video = givenStoredVideoWithMedia();
 
         send("""
-                {"status":"PROCESSING","videoId":"%s","type":"VIDEO"}""".formatted(video.getId().getValue()));
+                {"status":"PROCESSING","videoId":"%s","type":"VIDEO","checksum":"abc1"}""".formatted(video.getId().getValue()));
 
         final var actualMedia = awaitMedia(video.getId(), media -> media.status() == MediaStatus.PROCESSING);
         assertEquals("", actualMedia.encodedLocation());
@@ -62,11 +62,27 @@ class VideoEncoderListenerIT {
 
         send("isto não é json");
         send("""
-                {"status":"COMPLETED","videoId":"%s","type":"VIDEO","encodedPath":"encoded/duna.mp4"}"""
+                {"status":"COMPLETED","videoId":"%s","type":"VIDEO","checksum":"abc1","encodedPath":"encoded/duna.mp4"}"""
                 .formatted(video.getId().getValue()));
 
         final var actualMedia = awaitMedia(video.getId(), media -> media.status() == MediaStatus.COMPLETED);
         assertEquals("encoded/duna.mp4", actualMedia.encodedLocation());
+    }
+
+    @Test
+    void givenAnAnswerForAReplacedFile_whenTheEncoderSendsIt_thenIgnoreIt() {
+        final var video = givenStoredVideoWithMedia();
+
+        send("""
+                {"status":"COMPLETED","videoId":"%s","type":"VIDEO","checksum":"envio-antigo",\
+"encodedPath":"encoded/antigo.mp4"}"""
+                .formatted(video.getId().getValue()));
+        send("""
+                {"status":"PROCESSING","videoId":"%s","type":"VIDEO","checksum":"abc1"}"""
+                .formatted(video.getId().getValue()));
+
+        final var actualMedia = awaitMedia(video.getId(), media -> media.status() == MediaStatus.PROCESSING);
+        assertEquals("", actualMedia.encodedLocation());
     }
 
     private void send(final String payload) {

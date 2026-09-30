@@ -350,7 +350,7 @@ class VideoTest {
         actualVideo.updateVideoMedia(audioVideoMedia());
         actualVideo.publishDomainEvents(event -> { });
 
-        actualVideo.processing(VideoMediaType.VIDEO);
+        actualVideo.processing(VideoMediaType.VIDEO, "abc123");
 
         assertEquals(MediaStatus.PROCESSING, actualVideo.getVideo().orElseThrow().status());
         assertTrue(actualVideo.getDomainEvents().isEmpty());
@@ -361,7 +361,7 @@ class VideoTest {
         final var actualVideo = newVideo();
         actualVideo.updateTrailerMedia(audioVideoMedia());
 
-        actualVideo.completed(VideoMediaType.TRAILER, "encoded/trailer");
+        actualVideo.completed(VideoMediaType.TRAILER, "abc123", "encoded/trailer");
 
         final var actualMedia = actualVideo.getTrailer().orElseThrow();
         assertEquals(MediaStatus.COMPLETED, actualMedia.status());
@@ -373,7 +373,7 @@ class VideoTest {
         final var actualVideo = newVideo();
         final var updatedAt = actualVideo.getUpdatedAt();
 
-        actualVideo.processing(VideoMediaType.VIDEO);
+        actualVideo.processing(VideoMediaType.VIDEO, "abc123");
 
         assertTrue(actualVideo.getVideo().isEmpty());
         assertEquals(updatedAt, actualVideo.getUpdatedAt());
@@ -385,9 +385,33 @@ class VideoTest {
         actualVideo.updateBanner(imageMedia());
         final var updatedAt = actualVideo.getUpdatedAt();
 
-        actualVideo.completed(VideoMediaType.BANNER, "encoded/banner");
+        actualVideo.completed(VideoMediaType.BANNER, "abc123", "encoded/banner");
 
         assertEquals(updatedAt, actualVideo.getUpdatedAt());
+    }
+
+    @Test
+    void givenAnotherChecksum_whenCallCompleted_thenIgnoreTheLateAnswer() {
+        final var actualVideo = newVideo();
+        actualVideo.updateVideoMedia(audioVideoMedia());
+        final var updatedAt = actualVideo.getUpdatedAt();
+
+        actualVideo.completed(VideoMediaType.VIDEO, "outro-checksum", "encoded/antigo");
+
+        final var actualMedia = actualVideo.getVideo().orElseThrow();
+        assertEquals(MediaStatus.PENDING, actualMedia.status());
+        assertEquals("", actualMedia.encodedLocation());
+        assertEquals(updatedAt, actualVideo.getUpdatedAt());
+    }
+
+    @Test
+    void givenAnotherChecksum_whenCallProcessing_thenIgnoreTheLateAnswer() {
+        final var actualVideo = newVideo();
+        actualVideo.updateVideoMedia(audioVideoMedia());
+
+        actualVideo.processing(VideoMediaType.VIDEO, "outro-checksum");
+
+        assertEquals(MediaStatus.PENDING, actualVideo.getVideo().orElseThrow().status());
     }
 
     private Video rebuild(final VideoMedias medias) {

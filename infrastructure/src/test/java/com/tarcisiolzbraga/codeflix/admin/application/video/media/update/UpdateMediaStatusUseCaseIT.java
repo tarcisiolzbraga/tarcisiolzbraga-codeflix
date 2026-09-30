@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 class UpdateMediaStatusUseCaseIT {
 
     private static final String ENCODED_PATH = "encoded/video.mp4";
+    private static final String CHECKSUM = "abc1";
 
     @Autowired
     private UpdateMediaStatusUseCase useCase;
@@ -55,7 +56,7 @@ class UpdateMediaStatusUseCaseIT {
         final var video = givenStoredVideoWithMedia();
 
         useCase.execute(new UpdateMediaStatusCommand(
-                video.getId().getValue(), VideoMediaType.TRAILER, MediaStatus.COMPLETED, ENCODED_PATH));
+                video.getId().getValue(), VideoMediaType.TRAILER, MediaStatus.COMPLETED, CHECKSUM, ENCODED_PATH));
 
         final var reloaded = this.videoGateway.findById(video.getId()).orElseThrow();
         assertEquals(MediaStatus.PENDING, reloaded.getVideo().orElseThrow().status());
@@ -78,6 +79,7 @@ class UpdateMediaStatusUseCaseIT {
     }
 
     private UpdateMediaStatusCommand commandWith(final VideoID id, final MediaStatus status) {
-        return new UpdateMediaStatusCommand(id.getValue(), VideoMediaType.VIDEO, status, ENCODED_PATH);
+        return new UpdateMediaStatusCommand(
+                id.getValue(), VideoMediaType.VIDEO, status, CHECKSUM, ENCODED_PATH);
     }
 }

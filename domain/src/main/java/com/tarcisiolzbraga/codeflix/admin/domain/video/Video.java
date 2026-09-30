@@ -146,30 +146,34 @@ public class Video extends AggregateRoot<VideoID> {
         refreshUpdatedAt();
     }
 
-    // O retorno do codificador chega pela fila e pode falar de um arquivo que já foi trocado ou
-    // removido, ou de uma imagem, que não é codificada: nesses casos não há o que mover, e falhar
-    // só faria a mensagem voltar para sempre.
-    public void processing(final VideoMediaType type) {
-        applyToAudioVideo(type, AudioVideoMedia::processing);
+    // O retorno do codificador chega pela fila e pode falar de um arquivo já trocado ou removido,
+    // de uma imagem, que não é codificada, ou de um envio anterior: nesses casos não há o que
+    // mover, e falhar só faria a mensagem voltar para sempre.
+    public void processing(final VideoMediaType type, final String checksum) {
+        applyToAudioVideo(type, checksum, AudioVideoMedia::processing);
     }
 
-    public void completed(final VideoMediaType type, final String encodedLocation) {
-        applyToAudioVideo(type, media -> media.completed(encodedLocation));
+    public void completed(final VideoMediaType type, final String checksum, final String encodedLocation) {
+        applyToAudioVideo(type, checksum, media -> media.completed(encodedLocation));
     }
 
-    private void applyToAudioVideo(final VideoMediaType type, final UnaryOperator<AudioVideoMedia> change) {
+    private void applyToAudioVideo(
+            final VideoMediaType type, final String checksum, final UnaryOperator<AudioVideoMedia> change) {
         switch (type) {
-            case VIDEO -> this.video = moved(this.video, change);
-            case TRAILER -> this.trailer = moved(this.trailer, change);
+            case VIDEO -> this.video = moved(this.video, checksum, change);
+            case TRAILER -> this.trailer = moved(this.trailer, checksum, change);
             default -> {
                 // imagem não tem status
             }
         }
     }
 
-    private AudioVideoMedia moved(final AudioVideoMedia media, final UnaryOperator<AudioVideoMedia> change) {
-        if (media == null) {
-            return null;
+    // Só se move a mídia que o codificador de fato trabalhou. Checksum diferente é resposta de um
+    // envio anterior, já sobrescrito: aplicá-la apontaria o arquivo novo para a saída do antigo.
+    private AudioVideoMedia moved(
+            final AudioVideoMedia media, final String checksum, final UnaryOperator<AudioVideoMedia> change) {
+        if (media == null || !media.checksum().equals(checksum)) {
+            return media;
         }
         refreshUpdatedAt();
         return change.apply(media);

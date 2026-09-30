@@ -23,32 +23,34 @@ class VideoEncoderResultTest {
     void givenACompletedPayload_whenRead_thenBuildTheCompletedResult() {
         final var json =
                 """
-                {"status":"COMPLETED","videoId":"123","type":"VIDEO","encodedPath":"encoded/duna.mp4"}""";
+                {"status":"COMPLETED","videoId":"123","type":"VIDEO","checksum":"abc1","encodedPath":"encoded/duna.mp4"}""";
 
         final var actualResult = this.objectMapper.readValue(json, VideoEncoderResult.class);
 
         final var completed = assertInstanceOf(VideoEncoderCompleted.class, actualResult);
         assertEquals(VIDEO_ID, completed.videoId());
         assertEquals("VIDEO", completed.type());
+        assertEquals("abc1", completed.checksum());
         assertEquals("encoded/duna.mp4", completed.encodedPath());
     }
 
     @Test
     void givenAProcessingPayload_whenRead_thenBuildTheProcessingResult() {
         final var json = """
-                {"status":"PROCESSING","videoId":"123","type":"TRAILER"}""";
+                {"status":"PROCESSING","videoId":"123","type":"TRAILER","checksum":"abc2"}""";
 
         final var actualResult = this.objectMapper.readValue(json, VideoEncoderResult.class);
 
         final var processing = assertInstanceOf(VideoEncoderProcessing.class, actualResult);
         assertEquals("TRAILER", processing.type());
+        assertEquals("abc2", processing.checksum());
     }
 
     @Test
     void givenAnErrorPayload_whenRead_thenBuildTheErrorResult() {
         final var json =
                 """
-                {"status":"ERROR","videoId":"123","type":"VIDEO","message":"codec não suportado"}""";
+                {"status":"ERROR","videoId":"123","type":"VIDEO","checksum":"abc3","message":"codec não suportado"}""";
 
         final var actualResult = this.objectMapper.readValue(json, VideoEncoderResult.class);
 
