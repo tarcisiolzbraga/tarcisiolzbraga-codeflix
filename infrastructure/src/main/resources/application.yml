@@ -96,3 +96,7 @@ amqp:
     video-encoded:
       queue: video.encoded.queue
       routing-key: video.encoded
+  outbox:
+    # De quanto em quanto tempo o relay procura o que entregar (ms) e quantas linhas leva por vez.
+    poll-interval: ${OUTBOX_POLL_INTERVAL:5000}
+    batch-size: ${OUTBOX_BATCH_SIZE:50}

@@ -13,11 +13,14 @@ import org.springframework.amqp.rabbit.core.RabbitOperations;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import tools.jackson.databind.ObjectMapper;
 
 // A topologia é declarada aqui e criada pelo broker na subida, então o docker compose e o container
 // de teste sobem vazios e a aplicação monta o que precisa.
+// O agendamento existe por causa do relay da tabela de saída.
 @Configuration
+@EnableScheduling
 @EnableConfigurationProperties(AmqpProperties.class)
 public class AmqpConfig {
 

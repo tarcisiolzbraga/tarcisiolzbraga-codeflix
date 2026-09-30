@@ -28,6 +28,9 @@ public class RabbitMQContainerConfiguration {
             registry.add("spring.rabbitmq.port", container::getAmqpPort);
             registry.add("spring.rabbitmq.username", container::getAdminUsername);
             registry.add("spring.rabbitmq.password", container::getAdminPassword);
+            // Uma hora: o relay não dispara sozinho no meio dos testes. Quem quiser exercitá-lo
+            // chama deliverPending() à mão, e assim cada teste controla o próprio tempo.
+            registry.add("amqp.outbox.poll-interval", () -> 3600000);
         };
     }
 }
