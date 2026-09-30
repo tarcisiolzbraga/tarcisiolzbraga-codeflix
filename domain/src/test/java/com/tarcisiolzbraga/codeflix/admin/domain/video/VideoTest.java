@@ -414,6 +414,19 @@ class VideoTest {
         assertEquals(MediaStatus.PENDING, actualVideo.getVideo().orElseThrow().status());
     }
 
+    @Test
+    void givenTheSameAnswerTwice_whenCallCompleted_thenLeaveUpdatedAtAlone() {
+        final var actualVideo = newVideo();
+        actualVideo.updateVideoMedia(audioVideoMedia());
+        actualVideo.completed(VideoMediaType.VIDEO, "abc123", "encoded/video");
+        final var updatedAt = actualVideo.getUpdatedAt();
+
+        actualVideo.completed(VideoMediaType.VIDEO, "abc123", "encoded/video");
+
+        assertEquals(MediaStatus.COMPLETED, actualVideo.getVideo().orElseThrow().status());
+        assertEquals(updatedAt, actualVideo.getUpdatedAt());
+    }
+
     private Video rebuild(final VideoMedias medias) {
         final var video = newVideo();
         return Video.with(

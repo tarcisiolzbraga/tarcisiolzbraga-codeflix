@@ -10,6 +10,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoFixture;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoGateway;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.configuration.AmqpProperties;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.messaging.persistence.OutboxEventRepository;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -18,12 +19,13 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 @IntegrationTest
-class RabbitDomainEventPublisherIT {
-
-    private static final long RECEIVE_TIMEOUT = 5000L;
+class OutboxDomainEventPublisherIT {
 
     @Autowired
     private VideoGateway videoGateway;
+
+    @Autowired
+    private OutboxEventRepository outboxRepository;
 
     @Autowired
     private RabbitTemplate rabbitTemplate;
@@ -35,53 +37,59 @@ class RabbitDomainEventPublisherIT {
     private ObjectMapper objectMapper;
 
     @Test
-    void givenAVideoWithANewMedia_whenSave_thenPutTheEventOnTheQueue() {
+    void givenAVideoWithANewMedia_whenSave_thenLeaveOnePendingRow() {
         final var video = videoWithMedia();
 
         this.videoGateway.create(video);
 
-        final var message = receive();
-        assertNotNull(message);
-        assertEquals(video.getId().getValue(), message.get("videoId"));
-        assertEquals("VIDEO", message.get("type"));
-        assertEquals("raw/video", message.get("filePath"));
-        assertEquals("abc1", message.get("checksum"));
-        assertNotNull(message.get("occurredOn"));
+        final var rows = this.outboxRepository.findAll();
+        assertEquals(1, rows.size());
+        final var row = rows.getFirst();
+        assertEquals("video.created", row.getRoutingKey());
+        assertNotNull(row.getCreatedAt());
+        assertNull(row.getSentAt());
     }
 
     @Test
-    void givenAnAlreadyPublishedVideo_whenSaveAgain_thenSendNoNewMessage() {
+    void givenAPendingRow_whenReadItsPayload_thenCarryTheEventAsItWas() {
         final var video = this.videoGateway.create(videoWithMedia());
-        drain();
+
+        final Map<String, Object> payload = this.objectMapper.readValue(
+                this.outboxRepository.findAll().getFirst().getPayload(), new TypeReference<>() {});
+
+        assertEquals(video.getId().getValue(), payload.get("videoId"));
+        assertEquals("VIDEO", payload.get("type"));
+        assertEquals("raw/video", payload.get("filePath"));
+        assertEquals("abc1", payload.get("checksum"));
+    }
+
+    @Test
+    void givenAVideoWithANewMedia_whenSave_thenSendNothingToTheBrokerYet() {
+        this.videoGateway.create(videoWithMedia());
+
+        assertNull(this.rabbitTemplate.receiveAndConvert(
+                this.amqpProperties.queues().videoCreated().queue(), 500L));
+    }
+
+    @Test
+    void givenAnAlreadyAnnouncedVideo_whenSaveAgain_thenLeaveNoNewRow() {
+        final var video = this.videoGateway.create(videoWithMedia());
 
         this.videoGateway.update(video);
 
-        assertNull(this.rabbitTemplate.receiveAndConvert(queue(), 500L));
+        assertEquals(1, this.outboxRepository.count());
     }
 
     @Test
-    void givenAVideoWithoutMedia_whenSave_thenSendNothing() {
+    void givenAVideoWithoutMedia_whenSave_thenLeaveNoRow() {
         this.videoGateway.create(VideoFixture.video());
 
-        assertNull(this.rabbitTemplate.receiveAndConvert(queue(), 500L));
+        assertEquals(0, this.outboxRepository.count());
     }
 
     private Video videoWithMedia() {
         final var video = VideoFixture.video();
         video.updateVideoMedia(AudioVideoMedia.with("abc1", "duna.mp4", "raw/video"));
         return video;
-    }
-
-    private String queue() {
-        return this.amqpProperties.queues().videoCreated().queue();
-    }
-
-    private Map<String, Object> receive() {
-        final var payload = this.rabbitTemplate.receiveAndConvert(queue(), RECEIVE_TIMEOUT);
-        return payload == null ? null : this.objectMapper.readValue(payload.toString(), new TypeReference<>() {});
-    }
-
-    private void drain() {
-        this.rabbitTemplate.receiveAndConvert(queue(), RECEIVE_TIMEOUT);
     }
 }

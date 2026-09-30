@@ -63,6 +63,21 @@ corre, a resposta atrasada chega com o checksum antigo e é descartada — sem i
 apontar para a saída codificada do arquivo que ele substituiu. Ele serve também ao codificador, como chave
 para reconhecer trabalho que já fez.
 
+#### Entrega garantida
+
+A aplicação não publica direto no broker. Quando um arquivo é enviado, o aviso é gravado na tabela `outbox_event`
+**dentro da mesma transação** que salva o vídeo: ou os dois existem, ou nenhum. Um relay agendado
+(`OUTBOX_POLL_INTERVAL`, padrão 5s) lê o que ainda não foi entregue, manda ao broker e marca a linha como
+enviada; se o broker estiver fora, a linha continua pendente e a passagem seguinte tenta de novo.
+
+O preço é a entrega **ao menos uma vez**: uma queda entre o envio e a marcação faz a mensagem sair repetida. Por
+isso o consumidor é idempotente — resposta com checksum de outro envio é descartada, e resposta repetida com o
+mesmo conteúdo não regrava a mídia nem mexe no `updated_at`.
+
+A linha entregue fica guardada por `OUTBOX_RETENTION` (padrão 7 dias) e depois é apagada, porque a tabela é fila
+e não histórico. Linha pendente nunca é apagada. O relay pressupõe **uma instância** da aplicação: com várias, o
+passo seguinte seria travar a leitura com `SKIP LOCKED`.
+
 **Não há codificador neste repositório.** Para ver o ciclo completo, envie um arquivo pela API e publique a
 resposta à mão no painel do RabbitMQ (http://localhost:15672, com as credenciais do `.env`): na aba *Exchanges*,
 escolha `video.events`, use a routing key `video.encoded` e cole um dos JSON acima.

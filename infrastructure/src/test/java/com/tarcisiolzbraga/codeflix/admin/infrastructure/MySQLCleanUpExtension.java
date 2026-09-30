@@ -3,6 +3,7 @@ package com.tarcisiolzbraga.codeflix.admin.infrastructure;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.persistence.CastMemberRepository;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.CategoryRepository;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.genre.persistence.GenreRepository;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.messaging.persistence.OutboxEventRepository;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.persistence.VideoRepository;
 import java.util.List;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
@@ -18,6 +19,7 @@ public class MySQLCleanUpExtension implements BeforeEachCallback {
     public void beforeEach(final ExtensionContext context) {
         final var applicationContext = SpringExtension.getApplicationContext(context);
         cleanUp(List.of(
+                applicationContext.getBean(OutboxEventRepository.class),
                 applicationContext.getBean(VideoRepository.class),
                 applicationContext.getBean(GenreRepository.class),
                 applicationContext.getBean(CategoryRepository.class),
