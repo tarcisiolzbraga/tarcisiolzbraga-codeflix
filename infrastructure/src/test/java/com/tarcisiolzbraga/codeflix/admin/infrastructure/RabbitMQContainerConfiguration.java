@@ -31,6 +31,7 @@ public class RabbitMQContainerConfiguration {
             // Uma hora: o relay não dispara sozinho no meio dos testes. Quem quiser exercitá-lo
             // chama deliverPending() à mão, e assim cada teste controla o próprio tempo.
             registry.add("amqp.outbox.poll-interval", () -> 3600000);
+            registry.add("amqp.outbox.cleanup-interval", () -> 3600000);
         };
     }
 }

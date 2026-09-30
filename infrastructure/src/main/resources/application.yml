@@ -100,3 +100,7 @@ amqp:
     # De quanto em quanto tempo o relay procura o que entregar (ms) e quantas linhas leva por vez.
     poll-interval: ${OUTBOX_POLL_INTERVAL:5000}
     batch-size: ${OUTBOX_BATCH_SIZE:50}
+    # A linha entregue fica guardada um tempo para consulta, e depois sai: a tabela é fila, não
+    # histórico — o histórico do vídeo está na auditoria dele.
+    cleanup-interval: ${OUTBOX_CLEANUP_INTERVAL:3600000}
+    retention: ${OUTBOX_RETENTION:7d}
