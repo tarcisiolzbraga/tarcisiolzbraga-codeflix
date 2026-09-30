@@ -1,7 +1,9 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.configuration;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.events.DomainEventPublisher;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.messaging.EventRouting;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.messaging.RabbitDomainEventPublisher;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.messaging.RabbitEventSender;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
@@ -48,9 +50,20 @@ public class AmqpConfig {
     }
 
     @Bean
+    EventRouting eventRouting(final AmqpProperties properties) {
+        return new EventRouting(properties.queues().videoCreated().routingKey());
+    }
+
+    @Bean
+    RabbitEventSender rabbitEventSender(final AmqpProperties properties, final RabbitOperations operations) {
+        return new RabbitEventSender(properties.exchange(), operations);
+    }
+
+    @Bean
     DomainEventPublisher domainEventPublisher(
-            final AmqpProperties properties, final RabbitOperations operations, final ObjectMapper objectMapper) {
-        return new RabbitDomainEventPublisher(
-                properties.exchange(), properties.queues().videoCreated().routingKey(), operations, objectMapper);
+            final EventRouting eventRouting,
+            final RabbitEventSender rabbitEventSender,
+            final ObjectMapper objectMapper) {
+        return new RabbitDomainEventPublisher(eventRouting, rabbitEventSender, objectMapper);
     }
 }
