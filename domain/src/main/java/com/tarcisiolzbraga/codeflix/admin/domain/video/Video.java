@@ -126,7 +126,8 @@ public class Video extends AggregateRoot<VideoID> {
     // refazer trabalho pronto.
     private void announce(final VideoMediaType type, final AudioVideoMedia media) {
         if (media.status() == MediaStatus.PENDING) {
-            registerEvent(new VideoMediaCreated(getId().getValue(), type, media.rawLocation()));
+            registerEvent(new VideoMediaCreated(
+                    getId().getValue(), type, media.rawLocation(), media.checksum()));
         }
     }
 

@@ -310,6 +310,7 @@ class VideoTest {
         assertEquals(actualVideo.getId().getValue(), actualEvent.videoId());
         assertEquals(VideoMediaType.VIDEO, actualEvent.type());
         assertEquals("videoId-VIDEO", actualEvent.filePath());
+        assertEquals("abc123", actualEvent.checksum());
         assertNotNull(actualEvent.occurredOn());
     }
 
