@@ -170,13 +170,19 @@ public class Video extends AggregateRoot<VideoID> {
 
     // Só se move a mídia que o codificador de fato trabalhou. Checksum diferente é resposta de um
     // envio anterior, já sobrescrito: aplicá-la apontaria o arquivo novo para a saída do antigo.
+    // E resposta repetida, que a entrega garantida torna rotina, não é mudança: sem esta conferência
+    // ela regravaria a linha, mexeria no updated_at e criaria revisão de auditoria à toa.
     private AudioVideoMedia moved(
             final AudioVideoMedia media, final String checksum, final UnaryOperator<AudioVideoMedia> change) {
         if (media == null || !media.checksum().equals(checksum)) {
             return media;
         }
+        final var moved = change.apply(media);
+        if (moved.equals(media)) {
+            return media;
+        }
         refreshUpdatedAt();
-        return change.apply(media);
+        return moved;
     }
 
     public Optional<AudioVideoMedia> getVideo() {
