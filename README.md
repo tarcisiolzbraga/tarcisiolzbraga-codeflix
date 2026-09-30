@@ -40,20 +40,28 @@ Quando um arquivo `VIDEO` ou `TRAILER` é enviado, sai uma mensagem em `video.cr
 codificada, e não gera aviso):
 
 ```json
-{ "videoId": "...", "type": "VIDEO", "filePath": "<videoId>/VIDEO", "occurredOn": "2026-09-29T12:00:00Z" }
+{ "videoId": "...", "type": "VIDEO", "filePath": "<videoId>/VIDEO", "checksum": "...",
+  "occurredOn": "2026-09-29T12:00:00Z" }
 ```
 
-O codificador responde em `video.encoded.queue`, em uma de três formas, escolhidas pelo campo `status`:
+O codificador responde em `video.encoded.queue`, em uma de três formas, escolhidas pelo campo `status`, e
+devolve o mesmo `checksum` que recebeu:
 
 ```json
-{ "status": "PROCESSING", "videoId": "...", "type": "VIDEO" }
-{ "status": "COMPLETED",  "videoId": "...", "type": "VIDEO", "encodedPath": "encoded/duna.mp4" }
-{ "status": "ERROR",      "videoId": "...", "type": "VIDEO", "message": "codec não suportado" }
+{ "status": "PROCESSING", "videoId": "...", "type": "VIDEO", "checksum": "..." }
+{ "status": "COMPLETED",  "videoId": "...", "type": "VIDEO", "checksum": "...", "encodedPath": "encoded/duna.mp4" }
+{ "status": "ERROR",      "videoId": "...", "type": "VIDEO", "checksum": "...", "message": "codec não suportado" }
 ```
 
 `PROCESSING` e `COMPLETED` movem o status da mídia, e `COMPLETED` guarda onde o arquivo codificado ficou.
 `ERROR` é apenas registrado no log: o domínio ainda não tem um estado de falha para a mídia. Mensagem ilegível,
 ou com tipo de mídia desconhecido, é registrada e descartada em vez de voltar para a fila.
+
+O `checksum` existe porque o endereço do arquivo não distingue um envio do outro: reenviar o mesmo tipo
+sobrescreve o arquivo no mesmo lugar. Se o usuário trocar o arquivo enquanto a codificação do anterior ainda
+corre, a resposta atrasada chega com o checksum antigo e é descartada — sem isso, o arquivo novo passaria a
+apontar para a saída codificada do arquivo que ele substituiu. Ele serve também ao codificador, como chave
+para reconhecer trabalho que já fez.
 
 **Não há codificador neste repositório.** Para ver o ciclo completo, envie um arquivo pela API e publique a
 resposta à mão no painel do RabbitMQ (http://localhost:15672, com as credenciais do `.env`): na aba *Exchanges*,

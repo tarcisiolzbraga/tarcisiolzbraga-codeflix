@@ -28,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class UpdateMediaStatusUseCaseTest {
 
     private static final String ENCODED_PATH = "encoded/video.mp4";
+    private static final String CHECKSUM = "abc1";
 
     @Mock
     private VideoGateway videoGateway;
@@ -69,6 +70,18 @@ class UpdateMediaStatusUseCaseTest {
     }
 
     @Test
+    void givenAnotherChecksum_whenCallExecute_thenIgnoreTheLateAnswer() {
+        final var video = givenVideoWithMedia();
+        final var command = new UpdateMediaStatusCommand(
+                video.getId().getValue(), VideoMediaType.VIDEO, MediaStatus.COMPLETED, "outro", ENCODED_PATH);
+        when(videoGateway.update(any())).thenAnswer(returnsFirstArg());
+
+        useCase.execute(command);
+
+        assertEquals(MediaStatus.PENDING, video.getVideo().orElseThrow().status());
+    }
+
+    @Test
     void givenUnknownVideo_whenCallExecute_thenThrowNotFoundAndSaveNothing() {
         final var expectedId = VideoID.unique();
         when(videoGateway.findById(expectedId)).thenReturn(Optional.empty());
@@ -100,6 +113,6 @@ class UpdateMediaStatusUseCaseTest {
     }
 
     private UpdateMediaStatusCommand commandWith(final VideoID id, final MediaStatus status) {
-        return new UpdateMediaStatusCommand(id.getValue(), VideoMediaType.VIDEO, status, ENCODED_PATH);
+        return new UpdateMediaStatusCommand(id.getValue(), VideoMediaType.VIDEO, status, CHECKSUM, ENCODED_PATH);
     }
 }

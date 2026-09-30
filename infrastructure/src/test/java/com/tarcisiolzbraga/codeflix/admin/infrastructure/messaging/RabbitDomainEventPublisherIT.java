@@ -45,6 +45,7 @@ class RabbitDomainEventPublisherIT {
         assertEquals(video.getId().getValue(), message.get("videoId"));
         assertEquals("VIDEO", message.get("type"));
         assertEquals("raw/video", message.get("filePath"));
+        assertEquals("abc1", message.get("checksum"));
         assertNotNull(message.get("occurredOn"));
     }
 

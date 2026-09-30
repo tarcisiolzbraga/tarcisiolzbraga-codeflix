@@ -70,6 +70,6 @@ public class VideoEncoderListener {
     private void execute(final VideoEncoderResult result, final VideoMediaType type, final MediaStatus status) {
         final var encodedPath = result instanceof VideoEncoderCompleted completed ? completed.encodedPath() : "";
         this.updateMediaStatusUseCase.execute(
-                new UpdateMediaStatusCommand(result.videoId(), type, status, encodedPath));
+                new UpdateMediaStatusCommand(result.videoId(), type, status, result.checksum(), encodedPath));
     }
 }
