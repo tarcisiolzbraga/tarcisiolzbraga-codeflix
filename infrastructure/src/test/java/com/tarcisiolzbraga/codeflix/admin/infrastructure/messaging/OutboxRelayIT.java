@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.video.AudioVideoMedia;
@@ -18,6 +19,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -88,6 +90,22 @@ class OutboxRelayIT {
         assertThrows(IllegalStateException.class, () -> this.relay.deliverPending());
 
         assertNull(this.outboxRepository.findAll().getFirst().getSentAt());
+    }
+
+    @Test
+    void givenTheSecondSendFailing_whenDeliver_thenKeepTheFirstOneDelivered() {
+        this.videoGateway.create(videoWithMedia());
+        this.videoGateway.create(videoWithMedia());
+        doNothing()
+                .doThrow(new IllegalStateException("broker indisponível"))
+                .when(this.sender)
+                .send(any(), any());
+
+        assertThrows(IllegalStateException.class, () -> this.relay.deliverPending());
+
+        final var rows = this.outboxRepository.findBySentAtIsNullOrderByCreatedAtAsc(PageRequest.of(0, 10));
+        assertEquals(1, rows.getTotalElements());
+        assertEquals(2, this.outboxRepository.count());
     }
 
     private Video videoWithMedia() {
