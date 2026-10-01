@@ -58,7 +58,13 @@ O arquivo enviado é lido inteiro em memória antes de ir para o armazenamento, 
 
 O arquivo de áudio e vídeo nasce com status `PENDING` e é o codificador que o move. A conversa acontece por uma
 fila do RabbitMQ, também no `docker compose`, com um exchange direto (`video.events`) e uma fila para cada
-sentido. A aplicação declara essa topologia na subida, então um broker novo sobe vazio e se monta sozinho.
+sentido. O broker sobe com essa topologia já criada, vinda de `.rabbitmq/definitions.json`: o exchange, as duas filas, os
+dois bindings e o usuário. A aplicação também as declara na subida, de forma idempotente, então ela continua
+funcionando contra um broker vazio — por exemplo o de Testcontainers, nos testes.
+
+O usuário vem do arquivo porque, havendo definitions, o RabbitMQ **não** cria o de `RABBITMQ_DEFAULT_USER`. Como
+o nome e a senha moram no `.env`, eles entram no arquivo por substituição no container, antes da subida do nó,
+com a mesma mecânica usada no Keycloak — o arquivo versionado traz só marcadores.
 
 Quando um arquivo `VIDEO` ou `TRAILER` é enviado, sai uma mensagem em `video.created.queue` (imagem não é
 codificada, e não gera aviso):
