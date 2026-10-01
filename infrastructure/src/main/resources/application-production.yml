@@ -6,6 +6,15 @@ springdoc:
   swagger-ui:
     enabled: false
 
+# Aqui a aplicação roda em container, então o log estruturado sai no stdout, que é de onde o coletor
+# o recolhe — sem arquivo, que num container seria uma camada a mais para ninguém ler. É o inverso do
+# development, onde o console fica legível e o arquivo é que sai em ECS.
 logging:
+  structured:
+    format:
+      console: ecs
+    ecs:
+      service:
+        environment: production
   level:
     com.tarcisiolzbraga.codeflix.admin: info

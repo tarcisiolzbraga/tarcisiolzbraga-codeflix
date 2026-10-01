@@ -109,3 +109,10 @@ amqp:
 # subida em vez de validar token contra o emissor errado.
 keycloak:
   issuer-uri: ${KEYCLOAK_ISSUER_URI}
+
+# Identifica a aplicação no log estruturado, que é como o Kibana a separa das outras.
+logging:
+  structured:
+    ecs:
+      service:
+        name: admin-codeflix

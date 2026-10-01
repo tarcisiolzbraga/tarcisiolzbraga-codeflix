@@ -21,7 +21,21 @@ keycloak:
 storage:
   endpoint: http://${STORAGE_HOST:localhost}:${STORAGE_PORT:3900}
 
+# O console segue legível para quem está desenvolvendo, e o arquivo sai em ECS, o esquema da própria
+# Elastic — é dele que o Filebeat se alimenta. O Boot 4 formata sozinho: nada de logback-spring.xml
+# nem de encoder a mais no classpath.
+#
+# Só no development: em homolog e produção quem recolhe o log é a plataforma, a partir do stdout, e
+# essa decisão é outra.
 logging:
+  file:
+    name: ${LOG_FILE:build/logs/admin-codeflix.json}
+  structured:
+    format:
+      file: ecs
+    ecs:
+      service:
+        environment: development
   level:
     com.tarcisiolzbraga.codeflix.admin: debug
     org.hibernate.SQL: debug

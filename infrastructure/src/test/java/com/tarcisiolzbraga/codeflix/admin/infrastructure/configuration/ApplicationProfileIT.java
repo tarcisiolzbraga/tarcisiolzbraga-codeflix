@@ -1,6 +1,7 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.configuration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -41,6 +42,13 @@ class ApplicationProfileIT {
         }
 
         @Test
+        void givenDevelopmentProfile_whenReadLogging_thenWriteTheFileInEcs() {
+            final var actualFormat = this.environment.getProperty("logging.structured.format.file");
+
+            assertEquals("ecs", actualFormat);
+        }
+
+        @Test
         void givenDevelopmentProfile_whenReadPool_thenDetectConnectionLeaks() throws SQLException {
             final var pool = this.dataSource.unwrap(HikariDataSource.class);
 
@@ -56,6 +64,15 @@ class ApplicationProfileIT {
 
         @Autowired
         private MockMvc mockMvc;
+
+        @Autowired
+        private Environment environment;
+
+        @Test
+        void givenHomologProfile_whenReadLogging_thenWriteTheConsoleInEcs() {
+            assertEquals("ecs", this.environment.getProperty("logging.structured.format.console"));
+            assertNull(this.environment.getProperty("logging.file.name"));
+        }
 
         @Test
         void givenHomologProfile_whenCallApiDocs_thenServeTheDocs() throws Exception {
