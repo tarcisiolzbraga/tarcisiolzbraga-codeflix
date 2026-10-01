@@ -16,8 +16,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import tools.jackson.databind.ObjectMapper;
 
-// A topologia é declarada aqui e criada pelo broker na subida, então o docker compose e o container
-// de teste sobem vazios e a aplicação monta o que precisa.
+// A topologia é declarada aqui, de forma idempotente, e criada na subida da aplicação. Isso é o que
+// a mantém funcionando contra um broker vazio, como o de Testcontainers nos testes.
+//
+// A MESMA topologia está em .rabbitmq/definitions.json, que o broker do docker compose carrega no
+// boot. Mudança de exchange, fila, binding ou routing key tem de ser feita nos dois lugares: se
+// divergirem, a aplicação falha com PRECONDITION_FAILED ao declarar algo diferente do que existe.
+//
 // O agendamento existe por causa do relay da tabela de saída.
 @Configuration
 @EnableScheduling
