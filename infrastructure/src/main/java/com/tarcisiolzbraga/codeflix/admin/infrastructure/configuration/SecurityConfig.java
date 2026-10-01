@@ -52,10 +52,20 @@ public class SecurityConfig {
                 .anyRequest().hasRole(ROLE_ADMIN);
     }
 
+    // O Boot sabe montar este decoder sozinho: basta configurar spring.security.oauth2.resourceserver
+    // .jwt.jwk-set-uri junto de .issuer-uri, e ele constrói a partir das chaves e instala o validador
+    // de emissor, sem buscar metadados na subida. Tentamos, e não serve aqui: as condições daquela
+    // autoconfiguração são avaliadas antes de os registradores de propriedade dos testes rodarem,
+    // então o container do Keycloak teria de deixar de ser bean para virar singleton estático,
+    // diferente do MySQL, do Garage e do RabbitMQ.
+    //
+    // O preço de montar aqui está declarado: o caminho das chaves fica no código, e os
+    // OAuth2TokenValidator e JwkSetUriJwtDecoderBuilderCustomizer registrados como bean são
+    // ignorados — quem precisar de um validador novo acrescenta nesta linha.
+    //
     // Construído do jwk-set-uri, e não do issuer-uri: o segundo faria o Spring buscar os metadados
     // do emissor na subida, e a aplicação deixaria de subir sem o Keycloak no ar — inclusive nos
-    // testes. Assim as chaves são buscadas na primeira validação, e o emissor é conferido por
-    // validador, sem ida à rede na subida.
+    // testes.
     @Bean
     JwtDecoder jwtDecoder(final KeycloakProperties properties) {
         final var decoder = NimbusJwtDecoder.withJwkSetUri(properties.jwkSetUri()).build();
