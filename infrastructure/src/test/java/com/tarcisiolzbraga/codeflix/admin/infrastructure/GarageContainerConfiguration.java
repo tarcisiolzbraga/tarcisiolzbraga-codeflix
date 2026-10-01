@@ -37,10 +37,11 @@ public class GarageContainerConfiguration {
             root_domain = ".s3.garage"
             """;
 
-    // Em variável e devolvido no fim, como o do MySQL: encadear faria o compilador do Eclipse
-    // acusar vazamento de recurso.
-    @Bean
-    GenericContainer<?> garageContainer() {
+    private static final GenericContainer<?> CONTAINER = startedContainer();
+
+    // Estático e fora do ciclo de vida do Spring, como o do MySQL e pelo mesmo motivo: como bean,
+    // subiria um Garage por contexto.
+    private static GenericContainer<?> startedContainer() {
         final GenericContainer<?> container = new GenericContainer<>(GARAGE_IMAGE);
         container.withCopyToContainer(Transferable.of(CONFIGURATION), "/etc/garage.toml");
         container.withEnv("GARAGE_RPC_SECRET", SECRET_KEY);
@@ -50,15 +51,16 @@ public class GarageContainerConfiguration {
         container.withCommand("/garage", "server", "--single-node", "--default-bucket");
         container.withExposedPorts(S3_PORT);
         container.waitingFor(Wait.forLogMessage(".*Creating default bucket.*", 1));
+        container.start();
         return container;
     }
 
     @Bean
-    DynamicPropertyRegistrar garageProperties(final GenericContainer<?> garageContainer) {
+    DynamicPropertyRegistrar garageProperties() {
         return registry -> {
             registry.add(
                     "storage.endpoint",
-                    () -> "http://%s:%d".formatted(garageContainer.getHost(), garageContainer.getMappedPort(S3_PORT)));
+                    () -> "http://%s:%d".formatted(CONTAINER.getHost(), CONTAINER.getMappedPort(S3_PORT)));
             registry.add("storage.bucket", () -> BUCKET);
             registry.add("storage.access-key", () -> ACCESS_KEY);
             registry.add("storage.secret-key", () -> SECRET_KEY);

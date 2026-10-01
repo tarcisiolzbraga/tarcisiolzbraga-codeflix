@@ -16,18 +16,22 @@ public class RabbitMQContainerConfiguration {
     private static final DockerImageName RABBITMQ_IMAGE = DockerImageName.parse("rabbitmq:4.2-management")
             .asCompatibleSubstituteFor("rabbitmq");
 
-    @Bean
-    RabbitMQContainer rabbitMQContainer() {
-        return new RabbitMQContainer(RABBITMQ_IMAGE);
+    // Estático e fora do ciclo de vida do Spring: como bean, subiria um broker por contexto.
+    private static final RabbitMQContainer CONTAINER = startedContainer();
+
+    private static RabbitMQContainer startedContainer() {
+        final var container = new RabbitMQContainer(RABBITMQ_IMAGE);
+        container.start();
+        return container;
     }
 
     @Bean
-    DynamicPropertyRegistrar rabbitMQProperties(final RabbitMQContainer container) {
+    DynamicPropertyRegistrar rabbitMQProperties() {
         return registry -> {
-            registry.add("spring.rabbitmq.host", container::getHost);
-            registry.add("spring.rabbitmq.port", container::getAmqpPort);
-            registry.add("spring.rabbitmq.username", container::getAdminUsername);
-            registry.add("spring.rabbitmq.password", container::getAdminPassword);
+            registry.add("spring.rabbitmq.host", CONTAINER::getHost);
+            registry.add("spring.rabbitmq.port", CONTAINER::getAmqpPort);
+            registry.add("spring.rabbitmq.username", CONTAINER::getAdminUsername);
+            registry.add("spring.rabbitmq.password", CONTAINER::getAdminPassword);
             // Uma hora: o relay não dispara sozinho no meio dos testes. Quem quiser exercitá-lo
             // chama deliverPending() à mão, e assim cada teste controla o próprio tempo.
             registry.add("amqp.outbox.poll-interval", () -> 3600000);

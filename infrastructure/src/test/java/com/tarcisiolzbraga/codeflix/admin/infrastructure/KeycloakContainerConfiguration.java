@@ -28,8 +28,10 @@ public class KeycloakContainerConfiguration {
     private static final String CLIENT_SECRET = "segredo-de-teste";
     private static final String SECRET_PLACEHOLDER = "__KEYCLOAK_CLIENT_SECRET__";
 
-    @Bean
-    GenericContainer<?> keycloakContainer() {
+    // Estático e fora do ciclo de vida do Spring: como bean, subiria um Keycloak por contexto.
+    private static final GenericContainer<?> CONTAINER = startedContainer();
+
+    private static GenericContainer<?> startedContainer() {
         final GenericContainer<?> container = new GenericContainer<>(KEYCLOAK_IMAGE);
         container.withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", "admin");
         container.withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", "admin");
@@ -38,21 +40,22 @@ public class KeycloakContainerConfiguration {
         container.withCommand("start-dev", "--import-realm");
         container.withExposedPorts(HTTP_PORT);
         container.waitingFor(Wait.forLogMessage(".*Listening on.*", 1));
+        container.start();
         return container;
     }
 
     @Bean
-    DynamicPropertyRegistrar keycloakIssuerProperty(final GenericContainer<?> keycloakContainer) {
-        return registry -> registry.add("keycloak.issuer-uri", () -> issuerUri(keycloakContainer));
+    DynamicPropertyRegistrar keycloakIssuerProperty() {
+        return registry -> registry.add("keycloak.issuer-uri", KeycloakContainerConfiguration::issuerUri);
     }
 
     @Bean
-    KeycloakTestToken keycloakTestToken(final GenericContainer<?> keycloakContainer) {
-        return new KeycloakTestToken(issuerUri(keycloakContainer), CLIENT_ID, CLIENT_SECRET);
+    KeycloakTestToken keycloakTestToken() {
+        return new KeycloakTestToken(issuerUri(), CLIENT_ID, CLIENT_SECRET);
     }
 
-    private static String issuerUri(final GenericContainer<?> container) {
-        return "http://%s:%d/realms/%s".formatted(container.getHost(), container.getMappedPort(HTTP_PORT), REALM);
+    private static String issuerUri() {
+        return "http://%s:%d/realms/%s".formatted(CONTAINER.getHost(), CONTAINER.getMappedPort(HTTP_PORT), REALM);
     }
 
     // O arquivo versionado traz um marcador no lugar do segredo, do mesmo jeito que o docker compose
