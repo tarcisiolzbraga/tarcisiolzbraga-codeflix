@@ -164,6 +164,24 @@ SPRING_PROFILES_ACTIVE=homolog java -jar build/libs/application.jar
 
 Com a aplicação no ar, a documentação da API (Swagger UI) fica em http://localhost:8080/swagger-ui.html, e o JSON do OpenAPI em http://localhost:8080/v3/api-docs.
 
+## Integração contínua
+
+`.github/workflows/ci.yml` roda em qualquer branch e em pull request, em três etapas encadeadas, da mais rápida
+para a mais cara:
+
+1. **Testes sem container** — `./gradlew unitTests`, que dispensa Docker e responde em segundos. Erro bobo não
+   espera container subir.
+2. **Build completo** — `./gradlew build`, com os testes de integração e E2E subindo MySQL, Garage, RabbitMQ e
+   Keycloak em Testcontainers. O runner tem Docker, e os testes não precisam do `.env`: quem fornece credencial
+   são os próprios containers. O relatório dos testes fica guardado como artefato.
+3. **Imagem Docker** — gera o jar e constrói a imagem **sem publicar**. Não exige credencial, e passa a verificar
+   o `Dockerfile`, que fora disso não é exercitado por nada.
+
+O jar do wrapper é validado contra os oficiais do Gradle na primeira etapa, e um push novo na mesma referência
+cancela a execução anterior.
+
+A publicação da imagem entra quando houver registro e segredo definidos.
+
 ## Observabilidade
 
 Elasticsearch, Kibana, Logstash e Filebeat ficam atrás do profile `observability`, então o `docker compose up -d`
