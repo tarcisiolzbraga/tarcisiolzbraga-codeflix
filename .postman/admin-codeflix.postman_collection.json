@@ -17,7 +17,7 @@
   "variable": [
     {
       "key": "keycloakUrl",
-      "value": "http://localhost:8081"
+      "value": "http://keycloak:8081"
     },
     {
       "key": "keycloakRealm",
