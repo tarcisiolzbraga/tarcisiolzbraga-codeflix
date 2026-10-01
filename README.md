@@ -42,8 +42,26 @@ curl -s -X POST http://localhost:8081/realms/codeflix/protocol/openid-connect/to
 O serviço não tem volume: o realm é inteiramente descrito pelo arquivo versionado, então o container é
 descartável e sempre reflete o que está no git. O que for criado à mão no console se perde ao recriá-lo.
 
-**A API ainda não exige token.** O resource server — validação do JWT e as roles por rota — entra em seguida;
-por ora o Keycloak existe para emitir e inspecionar token.
+**A API exige token.** Cada agregado tem a sua role, e `CODEFLIX_ADMIN` abre tudo:
+
+| Rota | Roles aceitas |
+|---|---|
+| `/categories/**` | `CODEFLIX_ADMIN`, `CODEFLIX_CATEGORIES` |
+| `/genres/**` | `CODEFLIX_ADMIN`, `CODEFLIX_GENRES` |
+| `/cast-members/**` | `CODEFLIX_ADMIN`, `CODEFLIX_CAST_MEMBERS` |
+| `/videos/**` | `CODEFLIX_ADMIN`, `CODEFLIX_VIDEOS` |
+| qualquer outra | `CODEFLIX_ADMIN` |
+
+A documentação da API (`/v3/api-docs` e o Swagger UI) fica aberta: não expõe dado nenhum, e em produção o
+springdoc já está desligado. Sem token a resposta é 401; com token válido e role insuficiente, 403.
+
+O realm traz dois clients: `admin-codeflix`, com a role de administrador, e `categories-codeflix`, só com a de
+categorias — este serve justamente para ver o 403 nas rotas dos outros agregados. As notas do realm estão em
+`.keycloak/README.md`, porque o Keycloak recusa comentário dentro do arquivo de import.
+
+O emissor é configurado por `keycloak.issuer-uri` (`KEYCLOAK_ISSUER_URI` fora do `development`). O decoder é
+construído do endereço das chaves, e não do emissor, de propósito: pelo emissor o Spring buscaria os metadados
+na subida, e a aplicação deixaria de subir sem o Keycloak no ar.
 
 ### Mídias dos vídeos
 
@@ -136,7 +154,10 @@ O `./gradlew build` também gera o relatório de cobertura (JaCoCo) dos três m�
 
 ### Regressão manual no Postman
 
-`.postman/admin-codeflix.postman_collection.json` cobre os endpoints dos quatro agregados. Importe no Postman e rode a coleção inteira no Collection Runner, de cima para baixo: as requisições guardam os ids que criam em variáveis, conferem status e corpo, e apagam tudo no fim, deixando o banco como estava.
+`.postman/admin-codeflix.postman_collection.json` cobre os endpoints dos quatro agregados. A primeira pasta pega
+um token no Keycloak e o guarda numa variável que as demais requisições herdam, então **ela precisa rodar
+primeiro**; preencha `clientSecret` com o `KEYCLOAK_CLIENT_SECRET` do seu `.env`, que não vai versionado. Essa
+pasta também confere que a API responde 401 sem token. Importe no Postman e rode a coleção inteira no Collection Runner, de cima para baixo: as requisições guardam os ids que criam em variáveis, conferem status e corpo, e apagam tudo no fim, deixando o banco como estava.
 
 O envio de mídia usa `.postman/files/duna.mp4`, versionado junto: no Collection Runner do Postman, selecione esse arquivo no campo `file` da requisição; pelo Newman, aponte a pasta com `newman run .postman/admin-codeflix.postman_collection.json --working-dir .postman`.
 
