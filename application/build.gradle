@@ -1,6 +1,9 @@
 import org.gradle.process.CommandLineArgumentProvider
 
-apply plugin: 'java-library'
+plugins {
+    id 'codeflix.java-conventions'
+    id 'java-library'
+}
 
 def mockitoVersion = '5.20.0'
 
