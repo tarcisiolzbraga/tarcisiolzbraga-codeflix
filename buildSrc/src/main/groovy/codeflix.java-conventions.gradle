@@ -44,6 +44,9 @@ tasks.withType(Test).configureEach {
     // passariam verdes sem rodar nada.
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
+    // A raiz do repositório, para o teste achar os arquivos de provisionamento dos containers
+    // (como o realm do Keycloak) sem depender de caminho relativo ao módulo.
+    systemProperty 'codeflix.rootDir', rootDir.absolutePath
 }
 
 // O test continua rodando tudo, e é ele que o build usa como porta de entrada dos commits.

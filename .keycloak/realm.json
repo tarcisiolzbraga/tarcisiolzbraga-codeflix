@@ -25,6 +25,17 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "secret": "__KEYCLOAK_CLIENT_SECRET__"
+    },
+    {
+      "clientId": "categories-codeflix",
+      "name": "Acesso restrito às categorias",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "secret": "__KEYCLOAK_CLIENT_SECRET__"
     }
   ],
 
@@ -34,6 +45,12 @@
       "enabled": true,
       "serviceAccountClientId": "admin-codeflix",
       "realmRoles": [ "CODEFLIX_ADMIN" ]
+    },
+    {
+      "username": "service-account-categories-codeflix",
+      "enabled": true,
+      "serviceAccountClientId": "categories-codeflix",
+      "realmRoles": [ "CODEFLIX_CATEGORIES" ]
     }
   ]
 }

@@ -4,7 +4,37 @@
     "description": "Regressão manual da API do catálogo. Roda de cima para baixo no Collection Runner: cada pasta cria o que precisa, confere pela própria API e apaga no fim, deixando o banco como estava. A ordem importa, porque o vídeo referencia categoria, gênero e elenco. Ajuste baseUrl se a API não estiver em localhost:8080.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
   "variable": [
+    {
+      "key": "keycloakUrl",
+      "value": "http://localhost:8081"
+    },
+    {
+      "key": "keycloakRealm",
+      "value": "codeflix"
+    },
+    {
+      "key": "clientId",
+      "value": "admin-codeflix"
+    },
+    {
+      "key": "clientSecret",
+      "value": ""
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
     {
       "key": "baseUrl",
       "value": "http://localhost:8080",
@@ -37,6 +67,96 @@
     }
   ],
   "item": [
+    {
+      "name": "0. Autenticação",
+      "item": [
+        {
+          "name": "Pega o token no Keycloak",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{keycloakUrl}}/realms/{{keycloakRealm}}/protocol/openid-connect/token",
+              "host": [
+                "{{keycloakUrl}}"
+              ],
+              "path": [
+                "realms",
+                "{{keycloakRealm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{clientSecret}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const corpo = pm.response.json();",
+                  "pm.collectionVariables.set(\"accessToken\", corpo.access_token);",
+                  "pm.test(\"devolve um token\", () => pm.expect(corpo.access_token).to.be.a(\"string\").and.not.empty);",
+                  "pm.test(\"é para uso de aplicação\", () => pm.expect(corpo.token_type.toLowerCase()).to.eql(\"bearer\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sem token a API recusa",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/videos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "videos"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
     {
       "name": "1. Categorias",
       "item": [
