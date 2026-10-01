@@ -1,0 +1,39 @@
+{
+  "realm": "codeflix",
+  "displayName": "Codeflix",
+  "enabled": true,
+  "sslRequired": "none",
+
+  "roles": {
+    "realm": [
+      { "name": "CODEFLIX_ADMIN", "description": "Acesso a todo o catálogo" },
+      { "name": "CODEFLIX_CATEGORIES", "description": "Acesso às categorias" },
+      { "name": "CODEFLIX_GENRES", "description": "Acesso aos gêneros" },
+      { "name": "CODEFLIX_CAST_MEMBERS", "description": "Acesso aos membros de elenco" },
+      { "name": "CODEFLIX_VIDEOS", "description": "Acesso aos vídeos" }
+    ]
+  },
+
+  "clients": [
+    {
+      "clientId": "admin-codeflix",
+      "name": "Administração do catálogo",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "secret": "__KEYCLOAK_CLIENT_SECRET__"
+    }
+  ],
+
+  "users": [
+    {
+      "username": "service-account-admin-codeflix",
+      "enabled": true,
+      "serviceAccountClientId": "admin-codeflix",
+      "realmRoles": [ "CODEFLIX_ADMIN" ]
+    }
+  ]
+}
