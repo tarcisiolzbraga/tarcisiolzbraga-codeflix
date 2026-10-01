@@ -10,13 +10,16 @@ import com.tarcisiolzbraga.codeflix.admin.e2e.CategoryE2EDsl;
 import com.tarcisiolzbraga.codeflix.admin.e2e.E2EMediaFile;
 import com.tarcisiolzbraga.codeflix.admin.e2e.VideoE2EDsl;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.E2ETest;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.KeycloakTestToken;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiError;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.CreateVideoRequest;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
@@ -32,9 +35,17 @@ class VideoE2ETest implements VideoE2EDsl, CategoryE2EDsl {
 
     private RestClient client;
 
+    @Autowired
+    private KeycloakTestToken token;
+
     @BeforeEach
     void setUpClient() {
-        this.client = RestClient.create("http://localhost:" + this.port);
+        // Toda chamada leva o token: a API exige role, e o E2E é o único lugar que prova isso contra
+        // um emissor de verdade.
+        this.client = RestClient.builder()
+                .baseUrl("http://localhost:" + this.port)
+                .defaultHeader(HttpHeaders.AUTHORIZATION, this.token.bearer())
+                .build();
     }
 
     @Override

@@ -22,7 +22,7 @@ import org.springframework.core.annotation.AliasFor;
 // busca, @TestConfiguration aninhada no teste também deixa de ser vista: precisa de @Import.
 @SpringBootTest(classes = Main.class)
 @Import({MySQLContainerConfiguration.class, GarageContainerConfiguration.class,
-        RabbitMQContainerConfiguration.class, KeycloakIssuerConfiguration.class})
+        RabbitMQContainerConfiguration.class, KeycloakContainerConfiguration.class})
 @ExtendWith({MySQLCleanUpExtension.class, RabbitCleanUpExtension.class})
 public @interface IntegrationTest {
 
