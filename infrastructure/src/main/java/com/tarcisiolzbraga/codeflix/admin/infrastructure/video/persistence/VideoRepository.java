@@ -1,5 +1,6 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.video.persistence;
 
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoPreview;
 import java.util.Set;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -11,8 +12,25 @@ public interface VideoRepository extends JpaRepository<VideoJpaEntity, String> {
 
     // Um conjunto nulo significa "não filtra por isso"; conjunto vazio nunca chega aqui, porque o
     // gateway troca por nulo antes de consultar.
-    @Query("""
-            select distinct v from Video v
+    //
+    // A consulta monta a prévia, não a entidade: sem isto a página traria os vínculos e as cinco
+    // mídias de cada vídeo para escrever seis campos. A contagem vem escrita à mão porque distinct
+    // junto de expressão de construtor derrota a derivação automática.
+    @Query(value = """
+            select distinct new com.tarcisiolzbraga.codeflix.admin.domain.video.VideoPreview(
+                v.id, v.title, v.yearLaunched, v.published, v.active, v.createdAt)
+            from Video v
+                left join v.categories categoryLink
+                left join v.genres genreLink
+                left join v.castMembers memberLink
+            where (:terms is null or upper(v.title) like :terms)
+              and (:categories is null or categoryLink.id.categoryId in :categories)
+              and (:genres is null or genreLink.id.genreId in :genres)
+              and (:castMembers is null or memberLink.id.castMemberId in :castMembers)
+            """,
+            countQuery = """
+            select count(distinct v.id)
+            from Video v
                 left join v.categories categoryLink
                 left join v.genres genreLink
                 left join v.castMembers memberLink
@@ -21,7 +39,7 @@ public interface VideoRepository extends JpaRepository<VideoJpaEntity, String> {
               and (:genres is null or genreLink.id.genreId in :genres)
               and (:castMembers is null or memberLink.id.castMemberId in :castMembers)
             """)
-    Page<VideoJpaEntity> findAll(
+    Page<VideoPreview> findAll(
             @Param("terms") String terms,
             @Param("categories") Set<String> categories,
             @Param("genres") Set<String> genres,

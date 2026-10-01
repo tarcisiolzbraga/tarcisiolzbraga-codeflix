@@ -11,10 +11,9 @@ import static org.mockito.Mockito.when;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.SearchQuery;
-import com.tarcisiolzbraga.codeflix.admin.domain.video.Video;
-import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoFixture;
+import com.tarcisiolzbraga.codeflix.admin.domain.util.InstantUtils;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoGateway;
-import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoReferences;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoPreview;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoSearchQuery;
 import java.util.List;
 import java.util.Set;
@@ -37,17 +36,17 @@ class ListVideosUseCaseTest {
 
     @Test
     void givenPersistedVideos_whenCallExecute_thenReturnThemAsOutput() {
-        final var video = Video.newVideo(
-                VideoFixture.details(), VideoReferences.none());
-        when(videoGateway.findAll(any())).thenReturn(new Pagination<>(0, 10, 1, List.of(video)));
+        final var preview = new VideoPreview("123", "Duna", 2021, false, true, InstantUtils.now());
+        when(videoGateway.findAll(any())).thenReturn(new Pagination<>(0, 10, 1, List.of(preview)));
 
         final var actualPage = useCase.execute(VideoSearchQuery.with(PAGE));
 
         assertEquals(1, actualPage.total());
         final var actualItem = actualPage.items().getFirst();
-        assertEquals(video.getId().getValue(), actualItem.id());
+        assertEquals("123", actualItem.id());
         assertEquals("Duna", actualItem.title());
         assertEquals(2021, actualItem.launchedAt());
+        assertEquals(preview.createdAt(), actualItem.createdAt());
         assertTrue(actualItem.active());
         assertFalse(actualItem.published());
     }
