@@ -104,3 +104,8 @@ amqp:
     # histórico — o histórico do vídeo está na auditoria dele.
     cleanup-interval: ${OUTBOX_CLEANUP_INTERVAL:3600000}
     retention: ${OUTBOX_RETENTION:7d}
+
+# Autenticação. Como no banco e no armazenamento, sem valor padrão: variável faltando derruba a
+# subida em vez de validar token contra o emissor errado.
+keycloak:
+  issuer-uri: ${KEYCLOAK_ISSUER_URI}

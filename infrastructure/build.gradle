@@ -23,6 +23,7 @@ dependencies {
     implementation 'org.hibernate.orm:hibernate-envers'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-amqp'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
     // fora do BOM do Boot; a linha 3.x é a compatível com o Boot 4
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
     implementation 'org.springframework.boot:spring-boot-starter-flyway'
