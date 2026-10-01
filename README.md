@@ -12,7 +12,20 @@ Copie o `.env.example` para `.env` e preencha usuário e senha do banco, mais as
 
 ```bash
 cp .env.example .env
-docker compose up -d
+echo '127.0.0.1 keycloak' | sudo tee -a /etc/hosts   # uma vez, ver "Autenticação"
+./gradlew bootJar
+docker compose up -d --build
+```
+
+Isso sobe o sistema inteiro, **a aplicação inclusive**, que é a forma de homolog e produção. O jar vem do host, por
+isso o `bootJar` antes. A aplicação fica em http://localhost:8080 e o depurador aceita conexão em
+`APP_DEBUG_PORT` (5005 por padrão) — basta anexar a IDE nessa porta.
+
+Para o ciclo curto de escrita, `./gradlew bootRun` continua valendo: ele reinicia em segundos, e o Filebeat
+colhe o log dele também. Nesse caso suba só a infraestrutura, sem o serviço da aplicação:
+
+```bash
+docker compose up -d mysql rabbitmq garage keycloak
 ./gradlew bootRun
 ```
 
@@ -58,6 +71,12 @@ springdoc já está desligado. Sem token a resposta é 401; com token válido e 
 O realm traz dois clients: `admin-codeflix`, com a role de administrador, e `categories-codeflix`, só com a de
 categorias — este serve justamente para ver o 403 nas rotas dos outros agregados. As notas do realm estão em
 `.keycloak/README.md`, porque o Keycloak recusa comentário dentro do arquivo de import.
+
+**A entrada no `/etc/hosts` não é opcional.** O `iss` do token é a URL que o cliente usou para pedi-lo, e a
+aplicação só aceita token cujo `iss` bate com o emissor configurado. Com a aplicação em container, ela fala com
+`http://keycloak:8081`; para o Postman e o `curl` da sua máquina usarem a **mesma** URL, `keycloak` precisa
+resolver no host. Medido: token pedido em `keycloak:8081` recebe 200, e o mesmo token pedido em `localhost:8081`
+recebe 401. É também por isso que o Keycloak serve na mesma porta dentro e fora do container.
 
 O emissor é configurado por `keycloak.issuer-uri` (`KEYCLOAK_ISSUER_URI` fora do `development`). O decoder é
 construído do endereço das chaves, e não do emissor, de propósito: pelo emissor o Spring buscaria os metadados
@@ -158,6 +177,11 @@ O Elasticsearch pede meio giga de heap, por isso não sobe junto. Uma rede à pa
 do projeto já liga todos pelo nome do serviço.
 
 ### O caminho do log
+
+O Filebeat tem duas entradas, porque a aplicação pode rodar de dois jeitos. Em container — a forma de homolog e
+produção — ele a descobre pela label `filebeat_collector` e lê o log do Docker, com `filestream` mais o parser
+`container`; `type: container` foi descontinuado no Filebeat 9 e é recusado. Com `bootRun`, ele colhe o arquivo
+montado de `build/logs`.
 
 No `development` a aplicação roda no host, então ela escreve o log em **ECS** — o esquema da própria Elastic — no
 arquivo `build/logs/admin-codeflix.json`, e o console segue legível para quem está desenvolvendo. O Filebeat monta
