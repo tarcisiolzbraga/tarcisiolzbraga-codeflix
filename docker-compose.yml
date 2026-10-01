@@ -86,11 +86,50 @@ services:
         template=$$(cat /realm-template.json)
         printf '%s' "$${template//__KEYCLOAK_CLIENT_SECRET__/$$KEYCLOAK_CLIENT_SECRET}" \
           > /opt/keycloak/data/import/realm.json
-        exec /opt/keycloak/bin/kc.sh start-dev --import-realm
+        exec /opt/keycloak/bin/kc.sh start-dev --import-realm --http-port=${KEYCLOAK_PORT}
     ports:
-      - "${KEYCLOAK_PORT}:8080"
+      # A mesma porta dentro e fora de propósito: o `iss` do token é a URL que o cliente usou, então
+      # http://keycloak:8081 tem de valer nos dois lados. Com portas diferentes, um token pedido do
+      # host seria recusado pela aplicação dentro da rede, e vice-versa.
+      - "${KEYCLOAK_PORT}:${KEYCLOAK_PORT}"
     volumes:
       - ./.keycloak/realm.json:/realm-template.json:ro
+
+  # A aplicação. O jar vem do host: rodar `./gradlew bootJar` antes de `docker compose up -d --build`.
+  # Fica no mesmo compose dos outros para `depends_on` e nomes de serviço valerem.
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: adm_videos_app
+    env_file:
+      - .env
+    environment:
+      # Dentro da rede do compose os serviços se acham pelo nome; o .env traz os valores de quem roda
+      # no host, e estas linhas os substituem. O Keycloak não está aqui de propósito: ele é o único
+      # endereçado pelo mesmo nome nos dois casos, porque o `iss` do token tem de bater — veja o
+      # KEYCLOAK_HOST no .env.example.
+      DB_HOST: mysql
+      DB_PORT: 3306
+      AMQP_HOST: rabbitmq
+      AMQP_PORT: 5672
+      STORAGE_HOST: garage
+      # Em container o log estruturado sai no stdout, que é de onde o Filebeat o colhe pela label
+      # abaixo. O arquivo vai para /tmp só porque o perfil development o declara.
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+      LOGGING_FILE_NAME: /tmp/admin-codeflix.json
+      # suspend=n para a aplicação subir sem esperar o depurador.
+      JAVA_TOOL_OPTIONS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+    ports:
+      - "${APP_PORT}:8080"
+      - "${APP_DEBUG_PORT}:5005"
+    depends_on:
+      - mysql
+      - rabbitmq
+      - garage
+      - keycloak
+    labels:
+      filebeat_collector: "true"
 
   # --- Observabilidade -------------------------------------------------------------------------
   # Os quatro serviços abaixo ficam atrás do profile "observability": o `docker compose up -d` do
