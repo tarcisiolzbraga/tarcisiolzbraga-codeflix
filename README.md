@@ -16,10 +16,34 @@ docker compose up -d
 ./gradlew bootRun
 ```
 
-O `docker compose` sobe três serviços: o MySQL, o RabbitMQ e o [Garage](https://garagehq.deuxfleurs.fr), armazenamento
+O `docker compose` sobe quatro serviços: o MySQL, o RabbitMQ, o Keycloak e o [Garage](https://garagehq.deuxfleurs.fr), armazenamento
 compatível com S3 onde ficam os arquivos das mídias. O Garage sobe com `--single-node --default-bucket`, então
 ele mesmo monta o layout e cria o bucket e a chave com as credenciais do `.env`, sem nenhum comando depois da
 subida. A permissão é por chave e por bucket: a chave da aplicação só enxerga o bucket dela.
+
+### Autenticação
+
+O Keycloak sobe com o realm `codeflix` já importado de `.keycloak/realm.json`: as cinco roles
+(`CODEFLIX_ADMIN`, `CODEFLIX_CATEGORIES`, `CODEFLIX_GENRES`, `CODEFLIX_CAST_MEMBERS` e `CODEFLIX_VIDEOS`) e o
+client `admin-codeflix`, que usa o fluxo de credenciais de cliente e já vem com a role de administrador. O
+console fica em http://localhost:8081, com as credenciais de `KEYCLOAK_ADMIN_USER` e `KEYCLOAK_ADMIN_PASSWORD`.
+
+O segredo do client **não** está no arquivo versionado, que traz um marcador no lugar. O Keycloak não substitui
+variável de ambiente dentro do arquivo de import, então a troca é feita no container, antes de ele ler o arquivo,
+com o valor de `KEYCLOAK_CLIENT_SECRET`. Para pegar um token:
+
+```bash
+curl -s -X POST http://localhost:8081/realms/codeflix/protocol/openid-connect/token \
+  -d grant_type=client_credentials \
+  -d client_id=admin-codeflix \
+  -d client_secret="$KEYCLOAK_CLIENT_SECRET"
+```
+
+O serviço não tem volume: o realm é inteiramente descrito pelo arquivo versionado, então o container é
+descartável e sempre reflete o que está no git. O que for criado à mão no console se perde ao recriá-lo.
+
+**A API ainda não exige token.** O resource server — validação do JWT e as roles por rota — entra em seguida;
+por ora o Keycloak existe para emitir e inspecionar token.
 
 ### Mídias dos vídeos
 
