@@ -2,37 +2,38 @@ package com.tarcisiolzbraga.codeflix.admin.infrastructure;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestClient;
 
-// Pede um token ao Keycloak do container pelo fluxo de credenciais de cliente, e guarda o valor: o
-// token vale minutos, bem mais que a suíte, então uma chamada basta para todos os testes.
+// Pede token ao Keycloak do container pelo fluxo de credenciais de cliente, e guarda por client: o
+// token vale minutos, bem mais que a suíte, então uma chamada por client basta.
 public class KeycloakTestToken {
 
     private final String issuerUri;
-    private final String clientId;
+    private final String defaultClientId;
     private final String clientSecret;
+    private final Map<String, String> cached = new ConcurrentHashMap<>();
 
-    private String cached;
-
-    public KeycloakTestToken(final String issuerUri, final String clientId, final String clientSecret) {
+    public KeycloakTestToken(final String issuerUri, final String defaultClientId, final String clientSecret) {
         this.issuerUri = Objects.requireNonNull(issuerUri, "'issuerUri' should not be null");
-        this.clientId = Objects.requireNonNull(clientId, "'clientId' should not be null");
+        this.defaultClientId = Objects.requireNonNull(defaultClientId, "'defaultClientId' should not be null");
         this.clientSecret = Objects.requireNonNull(clientSecret, "'clientSecret' should not be null");
     }
 
-    public synchronized String bearer() {
-        if (this.cached == null) {
-            this.cached = "Bearer " + request();
-        }
-        return this.cached;
+    public String bearer() {
+        return bearerOf(this.defaultClientId);
     }
 
-    private String request() {
+    public String bearerOf(final String clientId) {
+        return this.cached.computeIfAbsent(clientId, id -> "Bearer " + request(id));
+    }
+
+    private String request(final String clientId) {
         final var form = new LinkedMultiValueMap<String, String>();
         form.add("grant_type", "client_credentials");
-        form.add("client_id", this.clientId);
+        form.add("client_id", clientId);
         form.add("client_secret", this.clientSecret);
         final var response = RestClient.create()
                 .post()
