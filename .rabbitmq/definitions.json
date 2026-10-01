@@ -1,4 +1,13 @@
 {
+  "_comment": [
+    "Esta topologia está declarada em dois lugares: aqui e no AmqpConfig da infrastructure.",
+    "Mudança de exchange, fila, binding ou routing key tem de ser feita nos dois, senão a",
+    "aplicação sobe e falha com PRECONDITION_FAILED ao declarar algo diferente do que existe.",
+    "JSON não aceita comentário, e esta chave é ignorada pelo import do RabbitMQ; não usar",
+    "arguments para isso, porque ali viraria argumento de verdade e causaria justamente a",
+    "divergência que o aviso previne."
+  ],
+
   "vhosts": [ { "name": "/" } ],
 
   "users": [
