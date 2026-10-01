@@ -184,8 +184,13 @@ services:
     # strict.perms desligado porque o arquivo de configuração vem montado do repositório, e o
     # Filebeat recusa configuração que não seja dele.
     command: ["--strict.perms=false"]
+    # root para alcançar o socket do Docker e os arquivos de log dos containers.
+    user: root
     volumes:
       - ./.observability/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      # Para descobrir containers pela label e ler o log deles.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
       # O arquivo que o bootRun escreve, que roda com workingDir na raiz do projeto.
       - ./build/logs:/logs:ro
       # Onde o Filebeat guarda até onde já leu. Sem este volume o registro morre com o container, e

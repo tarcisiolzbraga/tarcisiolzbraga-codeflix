@@ -1,7 +1,35 @@
-# Lê o arquivo que a aplicação escreve em ECS e entrega ao Logstash.
+# Duas entradas, porque a aplicação pode rodar de dois jeitos.
 #
-# filestream, e não a entrada log, que está obsoleta. O parser ndjson decodifica cada linha para a
-# raiz do evento, que é o equivalente ao decode_json_fields das versões antigas.
+# 1) Em container, que é a forma de homolog e produção: o Filebeat descobre o container pela label
+#    filebeat_collector e lê o log que o Docker guarda. A entrada container desembrulha o envelope do
+#    Docker, e o parser ndjson decodifica o ECS que está dentro.
+filebeat.autodiscover:
+  providers:
+    - type: docker
+      labels.dedot: true
+      templates:
+        - condition:
+            equals:
+              container.labels.filebeat_collector: "true"
+          config:
+            # filestream com o parser container, e não `type: container`: esta última foi
+            # descontinuada no Filebeat 9 e o autodiscover recusa a configuração. O parser container
+            # desembrulha o envelope do Docker, e o ndjson decodifica o ECS que vem dentro.
+            - type: filestream
+              id: container-${data.docker.container.id}
+              paths:
+                - /var/lib/docker/containers/${data.docker.container.id}/*.log
+              parsers:
+                - container:
+                    stream: all
+                    format: docker
+                - ndjson:
+                    target: ""
+                    overwrite_keys: true
+                    add_error_key: true
+
+# 2) No host, com ./gradlew bootRun: aí o ECS sai em arquivo, e o Filebeat colhe a pasta montada.
+#    Fica aqui para o caminho curto de desenvolvimento continuar visível no Kibana.
 filebeat.inputs:
   - type: filestream
     id: admin-codeflix
