@@ -106,8 +106,8 @@ class VideoMySQLGatewayIT {
         final var actualPage = this.gateway.findAll(VideoSearchQuery.with(BY_TITLE));
 
         assertEquals(2, actualPage.total());
-        assertEquals(DUNA, actualPage.items().getFirst().getTitle());
-        assertEquals(MATRIX, actualPage.items().getLast().getTitle());
+        assertEquals(DUNA, actualPage.items().getFirst().title());
+        assertEquals(MATRIX, actualPage.items().getLast().title());
     }
 
     @Test
@@ -119,7 +119,7 @@ class VideoMySQLGatewayIT {
                 this.gateway.findAll(VideoSearchQuery.with(new SearchQuery(0, 10, "matr", "title", "asc")));
 
         assertEquals(1, actualPage.total());
-        assertEquals(MATRIX, actualPage.items().getFirst().getTitle());
+        assertEquals(MATRIX, actualPage.items().getFirst().title());
     }
 
     @Test
@@ -133,7 +133,7 @@ class VideoMySQLGatewayIT {
                 this.gateway.findAll(new VideoSearchQuery(BY_TITLE, Set.of(movies), Set.of(), Set.of()));
 
         assertEquals(1, actualPage.total());
-        assertEquals(DUNA, actualPage.items().getFirst().getTitle());
+        assertEquals(DUNA, actualPage.items().getFirst().title());
     }
 
     @Test
@@ -148,7 +148,21 @@ class VideoMySQLGatewayIT {
                 new VideoSearchQuery(BY_TITLE, Set.of(), Set.of(fiction), Set.of(actor)));
 
         assertEquals(1, actualPage.total());
-        assertEquals(DUNA, actualPage.items().getFirst().getTitle());
+        assertEquals(DUNA, actualPage.items().getFirst().title());
+    }
+
+    @Test
+    void givenAPersistedVideo_whenCallFindAll_thenThePreviewCarriesWhatTheListingShows() {
+        final var video = this.gateway.create(Video.newVideo(details(DUNA), VideoReferences.none()));
+
+        final var actualPreview = this.gateway.findAll(VideoSearchQuery.with(BY_TITLE)).items().getFirst();
+
+        assertEquals(video.getId().getValue(), actualPreview.id());
+        assertEquals(DUNA, actualPreview.title());
+        assertEquals(2021, actualPreview.launchedAt());
+        assertFalse(actualPreview.published());
+        assertTrue(actualPreview.active());
+        assertEquals(video.getCreatedAt(), actualPreview.createdAt());
     }
 
     @Test

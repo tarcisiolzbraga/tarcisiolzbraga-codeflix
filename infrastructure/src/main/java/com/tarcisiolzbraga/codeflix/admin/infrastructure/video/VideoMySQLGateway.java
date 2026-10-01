@@ -10,6 +10,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.pagination.SearchQuery;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Video;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoID;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoPreview;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoSearchQuery;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.persistence.VideoJpaEntity;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.persistence.VideoRepository;
@@ -64,7 +65,7 @@ public class VideoMySQLGateway implements VideoGateway {
     }
 
     @Override
-    public Pagination<Video> findAll(final VideoSearchQuery query) {
+    public Pagination<VideoPreview> findAll(final VideoSearchQuery query) {
         final var page = query.page();
         final var result = this.videoRepository.findAll(
                 termsOf(page),
@@ -76,7 +77,7 @@ public class VideoMySQLGateway implements VideoGateway {
                 result.getNumber(),
                 result.getSize(),
                 result.getTotalElements(),
-                result.map(VideoJpaEntity::toAggregate).toList());
+                result.toList());
     }
 
     @Override

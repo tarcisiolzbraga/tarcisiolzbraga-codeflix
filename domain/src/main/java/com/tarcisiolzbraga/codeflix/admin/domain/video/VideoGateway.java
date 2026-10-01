@@ -17,7 +17,9 @@ public interface VideoGateway {
     Optional<Video> findById(VideoID id);
 
     // VideoSearchQuery, e não SearchQuery: a busca de vídeo filtra também por categoria, gênero e elenco.
-    Pagination<Video> findAll(VideoSearchQuery query);
+    // Devolve a prévia, não o agregado: a listagem mostra poucos campos, e montar o vídeo inteiro
+    // carregaria vínculos e mídias para descartar.
+    Pagination<VideoPreview> findAll(VideoSearchQuery query);
 
     boolean existsByCategory(CategoryID categoryId);
 
