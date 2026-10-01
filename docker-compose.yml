@@ -149,6 +149,9 @@ services:
       - ./.observability/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
       # O arquivo que o bootRun escreve, que roda com workingDir na raiz do projeto.
       - ./build/logs:/logs:ro
+      # Onde o Filebeat guarda até onde já leu. Sem este volume o registro morre com o container, e
+      # um down/up relê o arquivo inteiro: medido, 154 documentos viraram 308.
+      - filebeat_data:/usr/share/filebeat/data
     depends_on:
       - logstash
 
@@ -158,3 +161,4 @@ volumes:
   garage_data:
   rabbitmq_data:
   elasticsearch_data:
+  filebeat_data:
