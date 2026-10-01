@@ -145,6 +145,62 @@ SPRING_PROFILES_ACTIVE=homolog java -jar build/libs/application.jar
 
 Com a aplicação no ar, a documentação da API (Swagger UI) fica em http://localhost:8080/swagger-ui.html, e o JSON do OpenAPI em http://localhost:8080/v3/api-docs.
 
+## Observabilidade
+
+Elasticsearch, Kibana, Logstash e Filebeat ficam atrás do profile `observability`, então o `docker compose up -d`
+do dia a dia continua subindo só os quatro serviços da aplicação. A pilha entra sob demanda:
+
+```bash
+docker compose --profile observability up -d
+```
+
+O Elasticsearch pede meio giga de heap, por isso não sobe junto. Uma rede à parte não é necessária: a rede padrão
+do projeto já liga todos pelo nome do serviço.
+
+### O caminho do log
+
+No `development` a aplicação roda no host, então ela escreve o log em **ECS** — o esquema da própria Elastic — no
+arquivo `build/logs/admin-codeflix.json`, e o console segue legível para quem está desenvolvendo. O Filebeat monta
+essa pasta e colhe o arquivo. Em `homolog` e `production`, onde a aplicação roda em container, é o inverso: o ECS
+sai no **stdout** e não há arquivo, porque ali quem recolhe é o coletor de logs do container.
+
+Quem formata é o próprio Boot 4, por `logging.structured.format`: não há `logback-spring.xml` nem encoder a mais
+no classpath.
+
+### Os pares chave:valor
+
+As mensagens da aplicação carregam pares no formato `[chave:valor]`, e o filtro `kv` do Logstash
+(`.observability/logstash/pipeline/logstash.conf`) os transforma em campos de verdade, com o prefixo `evento_`.
+Uma mensagem assim:
+
+```
+[message:video.encoded] [status:unreadable] [payload:{"status":"CANCELADO","videoId":"abc"}]
+```
+
+chega ao Elasticsearch com:
+
+```
+evento_message = video.encoded
+evento_status  = unreadable
+evento_payload = {"status":"CANCELADO","videoId":"abc"}
+```
+
+Repare que o `payload` sobrevive inteiro: o `kv` divide só no primeiro dois-pontos de cada par, então o JSON de
+dentro não é quebrado. Com isso dá para filtrar por `evento_status` no Kibana em vez de procurar texto.
+
+### Kibana
+
+O Kibana fica em http://localhost:5601. Na primeira subida, crie a *data view* do índice:
+
+```bash
+curl -s -X POST http://localhost:5601/api/data_views/data_view \
+  -H 'kbn-xsrf: true' -H 'content-type: application/json' \
+  -d '{"data_view":{"title":"admin-codeflix-*","name":"admin-codeflix","timeFieldName":"@timestamp"}}'
+```
+
+Ela fica guardada no volume do Elasticsearch, então sobrevive a reinícios. Depois, em *Discover*, os campos
+`evento_*` aparecem como qualquer outro.
+
 ## Testes
 ```bash
 ./gradlew test

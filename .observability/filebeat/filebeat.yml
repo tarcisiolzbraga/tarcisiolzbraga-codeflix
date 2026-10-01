@@ -1,0 +1,19 @@
+# Lê o arquivo que a aplicação escreve em ECS e entrega ao Logstash.
+#
+# filestream, e não a entrada log, que está obsoleta. O parser ndjson decodifica cada linha para a
+# raiz do evento, que é o equivalente ao decode_json_fields das versões antigas.
+filebeat.inputs:
+  - type: filestream
+    id: admin-codeflix
+    paths:
+      - /logs/*.json
+    parsers:
+      - ndjson:
+          target: ""
+          overwrite_keys: true
+          add_error_key: true
+
+output.logstash:
+  hosts: ["logstash:5044"]
+
+logging.metrics.enabled: false
