@@ -1,0 +1,34 @@
+{
+  "vhosts": [ { "name": "/" } ],
+
+  "users": [
+    { "name": "__AMQP_USER__", "password": "__AMQP_PASSWORD__", "tags": [ "administrator" ] }
+  ],
+
+  "permissions": [
+    { "user": "__AMQP_USER__", "vhost": "/", "configure": ".*", "write": ".*", "read": ".*" }
+  ],
+
+  "exchanges": [
+    {
+      "name": "video.events", "vhost": "/", "type": "direct",
+      "durable": true, "auto_delete": false, "internal": false, "arguments": {}
+    }
+  ],
+
+  "queues": [
+    { "name": "video.created.queue", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+    { "name": "video.encoded.queue", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} }
+  ],
+
+  "bindings": [
+    {
+      "source": "video.events", "vhost": "/", "destination": "video.created.queue",
+      "destination_type": "queue", "routing_key": "video.created", "arguments": {}
+    },
+    {
+      "source": "video.events", "vhost": "/", "destination": "video.encoded.queue",
+      "destination_type": "queue", "routing_key": "video.encoded", "arguments": {}
+    }
+  ]
+}
