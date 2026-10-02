@@ -1,0 +1,24 @@
+# A infraestrutura desta API. O Kafka e o Kafka Connect não estão aqui: eles moram no compose do
+# admin-codeflix, porque o Debezium precisa alcançar o MySQL dele pela rede do Docker. Esta API os
+# alcança pelo host, em localhost:29092 — é para isso que o broker lá anuncia dois endereços.
+services:
+  # O armazenamento de leitura do catálogo. É um Elasticsearch próprio, e não o do admin-codeflix:
+  # o de lá está atrás do profile de observabilidade e guarda log, não catálogo, e depender do
+  # profile opcional de outro serviço acoplaria os dois pelo lado errado.
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.4
+    container_name: videos_api_elasticsearch
+    environment:
+      discovery.type: single-node
+      # Desenvolvimento: sem TLS nem senha, para a aplicação falar direto.
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "${ELASTIC_PORT}:9200"
+    volumes:
+      # Com volume porque aqui mora o catálogo replicado: sem ele, cada subida exige que o Debezium
+      # refaça o snapshot do banco do admin para o índice voltar a existir.
+      - elasticsearch_data:/usr/share/elasticsearch/data
+
+volumes:
+  elasticsearch_data:

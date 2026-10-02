@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${APP_PORT:8082}
   compression:
     enabled: true
 
@@ -7,3 +7,9 @@ spring:
   threads:
     virtual:
       enabled: true
+  # O .env da raiz traz os valores de quem roda no host; é por isso que o bootRun usa workingDir
+  # na raiz do projeto.
+  config:
+    import: optional:file:.env[.properties]
+  elasticsearch:
+    uris: ${ELASTIC_URIS:http://localhost:9201}
