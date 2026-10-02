@@ -18,8 +18,16 @@ dependencies {
     implementation project(':application')
 
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    // BOM 2.x porque é a linha do core que o spring-boot-testcontainers traz; na 2.0 os módulos
+    // ganharam o prefixo testcontainers- e os artefatos antigos pararam na 1.21.
+    testImplementation platform('org.testcontainers:testcontainers-bom:2.0.5')
+    testImplementation 'org.testcontainers:testcontainers-elasticsearch'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
 }
 
 tasks.named('bootRun') {
