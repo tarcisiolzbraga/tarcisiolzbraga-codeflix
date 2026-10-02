@@ -149,6 +149,69 @@ passo seguinte seria travar a leitura com `SKIP LOCKED`.
 resposta à mão no painel do RabbitMQ (http://localhost:15672, com as credenciais do `.env`): na aba *Exchanges*,
 escolha `video.events`, use a routing key `video.encoded` e cole um dos JSON acima.
 
+### Replicação para o catálogo
+
+A API de catálogo (`videos-api-codeflix`) é alimentada por **change data capture**: o Debezium se registra como
+réplica do MySQL e lê o binlog, então gravar no banco já é publicar. Nada no código desta aplicação sabe que isso
+existe — não há evento a registrar, nem publicador, nem risco de alguém salvar uma categoria e esquecer de avisar.
+Isto é independente do RabbitMQ, que serve só à conversa com o codificador.
+
+Os dois serviços ficam atrás do profile `cdc`, porque a aplicação não depende deles:
+
+```bash
+docker compose --profile cdc up -d        # kafka e kafka-connect
+```
+
+O Kafka anuncia dois endereços: `kafka:9092` para quem está na rede do compose e `localhost:${KAFKA_PORT}` para
+quem roda no host, como o `bootRun` da API de catálogo. Um listener só não serviria, porque o endereço anunciado
+tem de ser alcançável por quem conecta.
+
+O Kafka Connect é a casa onde o conector roda, com API REST na `${KAFKA_CONNECT_PORT}`. O conector não mora em
+arquivo da aplicação: ele é registrado nessa API, com a configuração versionada em
+`.debezium/admin-mysql-cdc.json`, cujos marcadores de usuário e senha são trocados na hora pelos valores do `.env`:
+
+```bash
+CU=$(grep '^CDC_USER=' .env | cut -d= -f2-); CP=$(grep '^CDC_PASSWORD=' .env | cut -d= -f2-)
+python3 -c "
+import json
+cfg = json.load(open('.debezium/admin-mysql-cdc.json'))
+cfg['database.user'] = '$CU'; cfg['database.password'] = '$CP'
+print(json.dumps(cfg))" \
+  | curl -sS -X PUT http://localhost:8083/connectors/admin-mysql-cdc/config \
+      -H 'Content-Type: application/json' --data-binary @-
+
+curl -sS http://localhost:8083/connectors/admin-mysql-cdc/status   # deve dizer RUNNING
+```
+
+O usuário que lê o binlog tem permissões de **replicação**, não de leitura comum, e nasce do script
+`.mysql/init/10-cdc-user.sh`. Esse script roda uma única vez, **na criação do volume** `mysql_data`: num banco que
+já existe ele não roda, e o usuário se cria à mão uma vez:
+
+```sql
+CREATE USER IF NOT EXISTS 'debezium'@'%' IDENTIFIED BY '<CDC_PASSWORD do .env>';
+GRANT SELECT, RELOAD, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'debezium'@'%';
+FLUSH PRIVILEGES;
+```
+
+Sem `mysql_native_password`: o plugin vem desabilitado no MySQL 8.4, então o usuário fica com o
+`caching_sha2_password` padrão, e é por isso que o conector precisa de `database.allowPublicKeyRetrieval`. O resto
+da configuração do servidor não precisa de ajuste — o 8.4 já vem com `log_bin` ligado, formato `ROW` e
+`binlog_row_image=FULL`.
+
+Cada tabela capturada vira um tópico `adm_videos_mysql.adm_videos.<tabela>`, e a lista é só a das raízes
+(`category`, `genre`, `cast_member`, `video`) — nada de tabelas de junção, nem das `_aud` do Envers, nem da
+`outbox_event`. O tópico só nasce quando a tabela tem a primeira linha. O consumidor recebe a **linha**, não um
+evento de domínio, e usa o id dela para buscar o registro completo na API REST daqui.
+
+Três coisas que o consumidor precisa tratar, medidas contra este ambiente:
+
+- O snapshot inicial lê as tabelas inteiras e publica cada linha existente com `"op": "r"`, não `c`. É assim que o
+  catálogo nasce povoado, sem carga manual.
+- Um `DELETE` gera **duas** mensagens: o evento `"op": "d"`, com a linha em `before`, e em seguida um registro de
+  **valor nulo** (*tombstone*), para compactação de log. O consumidor tem de aceitar payload nulo e ignorá-lo.
+- `BOOLEAN` chega como `1`/`0` (é `TINYINT(1)` no MySQL) e `DATETIME(6)` chega como microssegundos desde a época.
+  Não afeta quem só lê o `id`.
+
 ### Perfis
 | Perfil | Quando | Configuração do banco | Swagger UI |
 |---|---|---|---|
