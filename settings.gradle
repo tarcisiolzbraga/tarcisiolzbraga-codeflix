@@ -1,0 +1,3 @@
+rootProject.name = 'videos-api-codeflix'
+
+include 'domain', 'application', 'infrastructure'

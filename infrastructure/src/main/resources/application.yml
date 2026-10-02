@@ -1,0 +1,9 @@
+server:
+  port: 8080
+  compression:
+    enabled: true
+
+spring:
+  threads:
+    virtual:
+      enabled: true

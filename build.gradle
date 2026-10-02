@@ -1,0 +1,6 @@
+// A configuração comum dos módulos está no plugin de convenção, em buildSrc. Aqui ficam só os
+// plugins que os módulos aplicam por conta própria, declarados com a versão e sem aplicar na raiz.
+plugins {
+    id 'org.springframework.boot' version '4.1.1' apply false
+    id 'io.spring.dependency-management' version '1.1.7' apply false
+}

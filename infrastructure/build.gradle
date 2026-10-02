@@ -1,0 +1,27 @@
+plugins {
+    id 'codeflix.java-conventions'
+    id 'org.springframework.boot'
+    id 'io.spring.dependency-management'
+}
+
+tasks.named('bootJar') {
+    archiveFileName = 'application.jar'
+    destinationDirectory = rootProject.layout.buildDirectory.dir('libs')
+}
+
+tasks.named('jar') {
+    enabled = false
+}
+
+dependencies {
+    implementation project(':domain')
+    implementation project(':application')
+
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+}
+
+tasks.named('bootRun') {
+    workingDir = rootProject.projectDir
+}
