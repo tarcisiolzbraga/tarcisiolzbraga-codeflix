@@ -18,8 +18,26 @@ dependencies {
     implementation project(':application')
 
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
+    // No Boot 4 a autoconfiguração do RestClient saiu do starter de web para um módulo próprio:
+    // sem ele não existe o RestClient.Builder que o cliente da API do admin injeta.
+    implementation 'org.springframework.boot:spring-boot-starter-restclient'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+    // O starter, e não o org.springframework.kafka:spring-kafka direto: no Boot 4 a
+    // autoconfiguração do Kafka mora em módulo próprio, e sem ela o @KafkaListener nunca sobe
+    // o container de escuta nem existe KafkaTemplate algum — falha silenciosa, sem erro.
+    implementation 'org.springframework.boot:spring-boot-starter-kafka'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    // BOM 2.x porque é a linha do core que o spring-boot-testcontainers traz; na 2.0 os módulos
+    // ganharam o prefixo testcontainers- e os artefatos antigos pararam na 1.21.
+    testImplementation platform('org.testcontainers:testcontainers-bom:2.0.5')
+    testImplementation 'org.testcontainers:testcontainers-elasticsearch'
+    testImplementation 'org.testcontainers:testcontainers-kafka'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
 }
 
 tasks.named('bootRun') {
