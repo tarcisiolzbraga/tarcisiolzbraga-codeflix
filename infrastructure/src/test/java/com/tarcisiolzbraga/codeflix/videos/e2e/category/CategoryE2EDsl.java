@@ -26,6 +26,17 @@ public interface CategoryE2EDsl {
         return post(document, SaveEnvelope.class).data().saveCategory();
     }
 
+    // Para a jornada do gênero provar que categoria inativa não aparece nas relações.
+    default GqlCategory givenAnInactiveCategory(final String id, final String name, final String description) {
+        final var document =
+                """
+                mutation { saveCategory(input: { id: "%s", name: "%s", description: "%s", active: false,
+                  createdAt: "2026-09-30T12:00:00Z", updatedAt: "2026-10-01T08:30:00Z" })
+                  { id name description } }"""
+                        .formatted(id, name, description);
+        return post(document, SaveEnvelope.class).data().saveCategory();
+    }
+
     default GqlCategoryPage listCategories() {
         return listCategories("", 0, 10);
     }
