@@ -1,0 +1,18 @@
+# A raiz do schema. Cada agregado estende Query e Mutation no próprio arquivo, então este fica só
+# com o que é comum. O campo _ existe porque GraphQL não aceita tipo sem campo algum, e a raiz nasce
+# vazia antes de os agregados a estenderem.
+
+type Query {
+    _: Boolean
+}
+
+type Mutation {
+    _: Boolean
+}
+
+""" Os números de uma página, iguais aos do Pagination do domínio """
+type PageMeta {
+    currentPage: Int!
+    perPage: Int!
+    total: Int!
+}

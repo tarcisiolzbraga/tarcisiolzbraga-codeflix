@@ -1,5 +1,8 @@
 server:
   port: ${APP_PORT:8082}
+  # Mesmo prefixo da referência, e é por isso que o GraphiQL fica em /api/graphiql.
+  servlet:
+    context-path: /api
   compression:
     enabled: true
 
@@ -31,6 +34,10 @@ spring:
     import: optional:file:.env[.properties]
   elasticsearch:
     uris: ${ELASTIC_URIS:http://localhost:9201}
+  graphql:
+    graphiql:
+      # O console que serve de documentação navegável do schema, em /api/graphiql.
+      enabled: ${GRAPHIQL_ENABLED:true}
   http:
     client:
       read-timeout: 1s
