@@ -9,6 +9,7 @@ import com.tarcisiolzbraga.codeflix.videos.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.videos.domain.pagination.SearchQuery;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.category.persistence.CategoryDocument;
+import com.tarcisiolzbraga.codeflix.videos.infrastructure.category.persistence.CategoryRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -27,6 +28,11 @@ class CategoryElasticsearchGatewayIT {
 
     @Autowired
     private ElasticsearchOperations operations;
+
+    // O repositório entra para provar que o inativo continua gravado: pelo gateway isso não é
+    // observável, e não deve ser — nenhuma leitura pública devolve inativo.
+    @Autowired
+    private CategoryRepository repository;
 
     @Test
     void givenACategory_whenCallSave_thenStoreItAndReadItBackWhole() {
@@ -47,12 +53,12 @@ class CategoryElasticsearchGatewayIT {
     void givenACategoryAlreadyStored_whenCallSaveAgain_thenReplaceIt() {
         gateway.save(aCategory("1", "Filmes", "A mais assistida", true));
 
-        gateway.save(aCategory("1", "Filmes e séries", "texto novo", false));
+        gateway.save(aCategory("1", "Filmes e séries", "texto novo", true));
 
         final var stored = gateway.findById(CategoryID.from("1")).orElseThrow();
         assertEquals("Filmes e séries", stored.getName());
-        assertFalse(stored.isActive());
-        assertEquals(1L, countAll());
+        assertEquals("texto novo", stored.getDescription());
+        assertEquals(1L, countListed());
     }
 
     @Test
@@ -75,7 +81,7 @@ class CategoryElasticsearchGatewayIT {
     void givenAnUnknownId_whenCallDeleteById_thenDoNotComplain() {
         gateway.deleteById(CategoryID.from("nao-existe"));
 
-        assertEquals(0L, countAll());
+        assertEquals(0L, countListed());
     }
 
     @Test
@@ -159,6 +165,61 @@ class CategoryElasticsearchGatewayIT {
         assertTrue(actualPage.items().isEmpty());
     }
 
+    @Test
+    void givenAnInactiveCategory_whenCallFindAll_thenHideIt() {
+        gateway.save(aCategory("1", "Filmes", "A mais assistida", true));
+        gateway.save(aCategory("2", "Séries", "Desativada no admin", false));
+        refresh();
+
+        final var actualPage = gateway.findAll(new SearchQuery(0, 10, null, "name", "asc"));
+
+        assertEquals(1L, actualPage.total());
+        assertEquals(List.of("Filmes"), namesOf(actualPage.items()));
+    }
+
+    @Test
+    void givenAnInactiveCategory_whenCallFindById_thenReturnEmptyAsIfItWereNotThere() {
+        gateway.save(aCategory("1", "Filmes", "Desativada no admin", false));
+
+        final var actualCategory = gateway.findById(CategoryID.from("1"));
+
+        assertTrue(actualCategory.isEmpty());
+    }
+
+    // O filtro é na leitura, não na gravação: reativar no admin faz reaparecer na hora, sem recarga.
+    @Test
+    void givenAnInactiveCategory_whenCallSave_thenStillStoreIt() {
+        gateway.save(aCategory("1", "Filmes", "Desativada no admin", false));
+
+        final var stored = repository.findById("1");
+
+        assertTrue(stored.isPresent());
+        assertFalse(stored.orElseThrow().isActive());
+    }
+
+    // É daqui que sai a resolução de relação: um vídeo ativo com categorias inativas vem sem elas.
+    @Test
+    void givenAMixOfActiveAndInactiveIds_whenCallFindAllById_thenLeaveTheInactiveOnesOut() {
+        gateway.save(aCategory("1", "Filmes", "A mais assistida", true));
+        gateway.save(aCategory("2", "Séries", "Desativada no admin", false));
+
+        final var actualCategories =
+                gateway.findAllById(Set.of(CategoryID.from("1"), CategoryID.from("2")));
+
+        assertEquals(1, actualCategories.size());
+        assertEquals("1", actualCategories.getFirst().getId().getValue());
+    }
+
+    @Test
+    void givenAnInactiveCategoryWhoseNameMatches_whenSearchByTerms_thenStillHideIt() {
+        gateway.save(aCategory("1", "Filmes", "Desativada no admin", false));
+        refresh();
+
+        final var actualPage = gateway.findAll(new SearchQuery(0, 10, "Filmes", "name", "asc"));
+
+        assertEquals(0L, actualPage.total());
+    }
+
     // Termo com espaço é o caso que o contains sozinho não atende: o Spring Data recusa construir
     // um wildcard com espaço dentro, e a listagem inteira falhava. Cada palavra entra separada, e
     // todas são exigidas.
@@ -194,7 +255,7 @@ class CategoryElasticsearchGatewayIT {
     private void seed() {
         gateway.save(aCategory("1", "Filmes", "A mais assistida", true));
         gateway.save(aCategory("2", "Séries", "A segunda mais assistida", true));
-        gateway.save(aCategory("3", "Documentários", "Catálogo de documentários", false));
+        gateway.save(aCategory("3", "Documentários", "Catálogo de documentários", true));
         refresh();
     }
 
@@ -204,7 +265,8 @@ class CategoryElasticsearchGatewayIT {
         operations.indexOps(CategoryDocument.class).refresh();
     }
 
-    private long countAll() {
+    // Conta o que a listagem mostra, que não é o mesmo que está gravado: a listagem esconde inativos.
+    private long countListed() {
         refresh();
         return gateway.findAll(new SearchQuery(0, 100, null, "name", "asc")).total();
     }

@@ -23,6 +23,13 @@ kafka:
       # catálogo nasceria vazio e só veria o que mudasse a partir de então.
       auto-offset-reset: earliest
       max-attempts: 4
+    cast-member:
+      id: kafka-listener-cast-member
+      topics: adm_videos_mysql.adm_videos.cast_member
+      group-id: videos-api-codeflix
+      concurrency: 1
+      auto-offset-reset: earliest
+      max-attempts: 4
 
 spring:
   threads:
@@ -52,7 +59,7 @@ spring:
         registration:
           admin-api:
             provider: keycloak
-            client-id: ${KEYCLOAK_CLIENT_ID:categories-codeflix}
+            client-id: ${KEYCLOAK_CLIENT_ID:videos-api-codeflix}
             client-secret: ${KEYCLOAK_CLIENT_SECRET}
             authorization-grant-type: client_credentials
         provider:
