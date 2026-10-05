@@ -1,0 +1,24 @@
+extend type Query {
+    """ Lista as categorias do catálogo, paginadas """
+    categories(
+        search: String = "",
+        page: Int = 0,
+        perPage: Int = 10,
+        sort: String = "name",
+        direction: String = "asc"
+    ): CategoryPage!
+}
+
+""" Uma página de categorias, com os números da paginação ao lado dos itens """
+type CategoryPage {
+    meta: PageMeta!
+    items: [Category!]!
+}
+
+""" Uma categoria do catálogo """
+type Category {
+    id: ID!
+    name: String!
+    description: String
+}
+
