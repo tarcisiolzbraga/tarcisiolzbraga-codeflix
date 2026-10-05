@@ -1,0 +1,33 @@
+extend type Query {
+    """ Lista os membros de elenco do catálogo, paginados """
+    castMembers(
+        search: String = "",
+        page: Int = 0,
+        perPage: Int = 10,
+        sort: String = "name",
+        direction: String = "asc"
+    ): CastMemberPage!
+}
+
+""" Uma página de membros de elenco, com os números da paginação ao lado dos itens """
+type CastMemberPage {
+    meta: PageMeta!
+    items: [CastMember!]!
+}
+
+""" Um membro de elenco do catálogo """
+type CastMember {
+    id: ID!
+    name: String!
+    type: CastMemberType!
+}
+
+""" O papel do membro de elenco. Enum, e não texto: o conjunto é fechado """
+enum CastMemberType {
+    ACTOR
+    DIRECTOR
+}
+
+# Sem mutation aqui de propósito. A saveCategory existe como exemplo único, para acompanhar o módulo
+# do curso; repeti-la por agregado espalharia portas de escrita num catálogo que só replica. O dado
+# do membro de elenco chega pelo CDC.
