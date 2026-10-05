@@ -1,20 +1,25 @@
 # Realm de desenvolvimento
 
 `realm.json` é importado pelo Keycloak na subida do `docker compose`, então o container entrega o realm
-`codeflix` pronto: as cinco roles e dois clients de credenciais de cliente.
+`codeflix` pronto: as cinco roles e três clients de credenciais de cliente.
 
 **Não é possível comentar dentro do arquivo.** Diferente do import de definitions do RabbitMQ, o Keycloak recusa
 campo desconhecido no realm — um `_comment` derruba a subida com `Unrecognized field`. Por isso estas notas
 estão aqui.
 
-## Os dois clients
+## Os três clients
 
 | Client | Role | Para quê |
 |---|---|---|
 | `admin-codeflix` | `CODEFLIX_ADMIN` | acesso a todo o catálogo |
 | `categories-codeflix` | `CODEFLIX_CATEGORIES` | exercitar a restrição: nas rotas dos outros agregados ele recebe 403 |
+| `videos-api-codeflix` | as quatro de leitura | a API de catálogo, que replica os quatro agregados |
 
-Os dois compartilham o mesmo segredo porque este realm é de desenvolvimento, local e descartável.
+O `videos-api-codeflix` existe porque o `categories-codeflix` **não** serve a esse propósito: ele é a peça que
+prova o 403, e usá-lo como credencial do catálogo o faria perder essa função. O do catálogo leva só as quatro
+roles de leitura, nunca a de administrador — ele lê e não escreve nada aqui.
+
+Os três compartilham o mesmo segredo porque este realm é de desenvolvimento, local e descartável.
 
 ## O segredo
 
