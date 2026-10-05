@@ -9,6 +9,18 @@ admin-api:
   # O nome do registro de client OAuth2 declarado abaixo, usado pelo interceptor do RestClient.
   client-registration-id: admin-api
 
+kafka:
+  consumers:
+    category:
+      id: kafka-listener-category
+      topics: adm_videos_mysql.adm_videos.category
+      group-id: videos-api-codeflix
+      concurrency: 1
+      # earliest para o snapshot inicial do Debezium ser consumido na primeira subida: com latest o
+      # catálogo nasceria vazio e só veria o que mudasse a partir de então.
+      auto-offset-reset: earliest
+      max-attempts: 4
+
 spring:
   threads:
     virtual:
@@ -22,6 +34,11 @@ spring:
   http:
     client:
       read-timeout: 1s
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
   security:
     oauth2:
       client:
