@@ -1,0 +1,33 @@
+extend type Query {
+    """ Lista os gêneros do catálogo, paginados, opcionalmente filtrados por categoria """
+    genres(
+        search: String = "",
+        page: Int = 0,
+        perPage: Int = 10,
+        sort: String = "name",
+        direction: String = "asc",
+        categories: [ID!] = []
+    ): GenrePage!
+}
+
+""" Uma página de gêneros, com os números da paginação ao lado dos itens """
+type GenrePage {
+    meta: PageMeta!
+    items: [Genre!]!
+}
+
+""" Um gênero do catálogo """
+type Genre {
+    id: ID!
+    name: String!
+    """ As categorias do gênero, resolvidas. Categoria inativa não aparece aqui """
+    categories: [Category!]!
+}
+
+# As categorias saem resolvidas, e não como lista de ids como na referência do curso, por dois
+# motivos. O primeiro é a regra do catálogo: nada inativo é devolvido, e expor ids crus deixaria
+# passar o id de uma categoria desativada. O segundo é que o cliente recebe o nome em vez de um id
+# opaco, sem precisar de uma segunda consulta.
+#
+# A resolução é em lote (@BatchMapping): as categorias de toda a página saem numa consulta só, em vez
+# de uma por gênero.
