@@ -52,7 +52,7 @@ spring:
         registration:
           admin-api:
             provider: keycloak
-            client-id: ${KEYCLOAK_CLIENT_ID:categories-codeflix}
+            client-id: ${KEYCLOAK_CLIENT_ID:videos-api-codeflix}
             client-secret: ${KEYCLOAK_CLIENT_SECRET}
             authorization-grant-type: client_credentials
         provider:
