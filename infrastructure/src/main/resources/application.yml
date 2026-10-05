@@ -23,6 +23,13 @@ kafka:
       # catálogo nasceria vazio e só veria o que mudasse a partir de então.
       auto-offset-reset: earliest
       max-attempts: 4
+    cast-member:
+      id: kafka-listener-cast-member
+      topics: adm_videos_mysql.adm_videos.cast_member
+      group-id: videos-api-codeflix
+      concurrency: 1
+      auto-offset-reset: earliest
+      max-attempts: 4
 
 spring:
   threads:
