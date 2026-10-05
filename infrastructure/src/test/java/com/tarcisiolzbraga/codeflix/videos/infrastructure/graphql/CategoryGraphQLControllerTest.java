@@ -8,6 +8,9 @@ import static org.mockito.Mockito.when;
 
 import com.tarcisiolzbraga.codeflix.videos.application.category.CategoryOutput;
 import com.tarcisiolzbraga.codeflix.videos.application.category.list.ListCategoriesUseCase;
+import com.tarcisiolzbraga.codeflix.videos.application.category.save.SaveCategoryCommand;
+import com.tarcisiolzbraga.codeflix.videos.application.category.save.SaveCategoryOutput;
+import com.tarcisiolzbraga.codeflix.videos.application.category.save.SaveCategoryUseCase;
 import com.tarcisiolzbraga.codeflix.videos.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.videos.domain.pagination.SearchQuery;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.GraphQLControllerTest;
@@ -30,6 +33,9 @@ class CategoryGraphQLControllerTest {
 
     @MockitoBean
     private ListCategoriesUseCase listCategoriesUseCase;
+
+    @MockitoBean
+    private SaveCategoryUseCase saveCategoryUseCase;
 
     @Autowired
     private GraphQlTester graphql;
@@ -114,6 +120,59 @@ class CategoryGraphQLControllerTest {
             assertEquals(1, errors.size());
             assertTrue(errors.getFirst().getMessage().contains("active"));
         });
+    }
+
+    @Test
+    void givenAValidInput_whenCallSaveCategory_thenHandEveryValueToTheUseCase() {
+        when(saveCategoryUseCase.execute(any())).thenReturn(new SaveCategoryOutput("1"));
+
+        graphql.document(saveDocument("\"Filmes\"", "\"A mais assistida\"", "false")).execute();
+
+        final var captor = ArgumentCaptor.forClass(SaveCategoryCommand.class);
+        verify(saveCategoryUseCase).execute(captor.capture());
+        final var actualCommand = captor.getValue();
+        assertEquals("1", actualCommand.id());
+        assertEquals("Filmes", actualCommand.name());
+        assertEquals("A mais assistida", actualCommand.description());
+        assertEquals(false, actualCommand.active());
+        assertEquals(CREATED_AT, actualCommand.createdAt());
+        assertEquals(UPDATED_AT, actualCommand.updatedAt());
+    }
+
+    @Test
+    void givenAValidInput_whenCallSaveCategory_thenReturnWhatWasSaved() {
+        when(saveCategoryUseCase.execute(any())).thenReturn(new SaveCategoryOutput("1"));
+
+        final var actualResult =
+                graphql.document(saveDocument("\"Filmes\"", "\"A mais assistida\"", "true")).execute();
+
+        actualResult.path("saveCategory.id").entity(String.class).isEqualTo("1");
+        actualResult.path("saveCategory.name").entity(String.class).isEqualTo("Filmes");
+        actualResult.path("saveCategory.description").entity(String.class).isEqualTo("A mais assistida");
+    }
+
+    @Test
+    void givenAnInputWithoutActive_whenCallSaveCategory_thenUseTheSchemaDefault() {
+        when(saveCategoryUseCase.execute(any())).thenReturn(new SaveCategoryOutput("1"));
+        final var document =
+                """
+                mutation { saveCategory(input: { id: "1", name: "Filmes",
+                  createdAt: "2026-09-30T12:00:00Z", updatedAt: "2026-10-01T08:30:00Z" })
+                  { id } }""";
+
+        graphql.document(document).execute();
+
+        final var captor = ArgumentCaptor.forClass(SaveCategoryCommand.class);
+        verify(saveCategoryUseCase).execute(captor.capture());
+        assertEquals(true, captor.getValue().active());
+    }
+
+    private static String saveDocument(final String name, final String description, final String active) {
+        return """
+                mutation { saveCategory(input: { id: "1", name: %s, description: %s, active: %s,
+                  createdAt: "2026-09-30T12:00:00Z", updatedAt: "2026-10-01T08:30:00Z" })
+                  { id name description } }"""
+                .formatted(name, description, active);
     }
 
     private SearchQuery capturedQuery() {
