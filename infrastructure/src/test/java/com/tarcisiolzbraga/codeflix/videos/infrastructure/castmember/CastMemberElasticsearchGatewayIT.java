@@ -11,6 +11,7 @@ import com.tarcisiolzbraga.codeflix.videos.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.videos.domain.pagination.SearchQuery;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.castmember.persistence.CastMemberDocument;
+import com.tarcisiolzbraga.codeflix.videos.infrastructure.castmember.persistence.CastMemberRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -30,6 +31,11 @@ class CastMemberElasticsearchGatewayIT {
     @Autowired
     private ElasticsearchOperations operations;
 
+    // O repositório entra para provar que o inativo continua gravado: pelo gateway isso não é
+    // observável, e não deve ser.
+    @Autowired
+    private CastMemberRepository repository;
+
     @Test
     void givenAMember_whenCallSave_thenStoreItAndReadItBackWhole() {
         final var member = aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR, true);
@@ -45,13 +51,16 @@ class CastMemberElasticsearchGatewayIT {
         assertEquals(UPDATED_AT, stored.getUpdatedAt());
     }
 
+    // O filtro é na leitura, não na gravação: reativar no admin faz reaparecer na hora, sem recarga.
     @Test
-    void givenAnInactiveMember_whenCallSave_thenKeepItInactive() {
+    void givenAnInactiveMember_whenCallSave_thenStillStoreItButHideItFromEveryRead() {
         gateway.save(aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR, false));
 
-        final var stored = gateway.findById(CastMemberID.from("1")).orElseThrow();
+        final var stored = repository.findById("1");
 
-        assertFalse(stored.isActive());
+        assertTrue(stored.isPresent());
+        assertFalse(stored.orElseThrow().isActive());
+        assertTrue(gateway.findById(CastMemberID.from("1")).isEmpty());
     }
 
     @Test
@@ -62,7 +71,7 @@ class CastMemberElasticsearchGatewayIT {
 
         final var stored = gateway.findById(CastMemberID.from("1")).orElseThrow();
         assertEquals(CastMemberType.ACTOR, stored.getType());
-        assertEquals(1L, countAll());
+        assertEquals(1L, countListed());
     }
 
     @Test
@@ -85,7 +94,7 @@ class CastMemberElasticsearchGatewayIT {
     void givenAnUnknownId_whenCallDeleteById_thenDoNotComplain() {
         gateway.deleteById(CastMemberID.from("nao-existe"));
 
-        assertEquals(0L, countAll());
+        assertEquals(0L, countListed());
     }
 
     @Test
@@ -156,6 +165,40 @@ class CastMemberElasticsearchGatewayIT {
         assertTrue(actualPage.items().isEmpty());
     }
 
+    @Test
+    void givenAnInactiveMember_whenCallFindAll_thenHideIt() {
+        gateway.save(aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR, true));
+        gateway.save(aMember("2", "Rebecca Ferguson", CastMemberType.ACTOR, false));
+        refresh();
+
+        final var actualPage = gateway.findAll(new SearchQuery(0, 10, null, "name", "asc"));
+
+        assertEquals(1L, actualPage.total());
+        assertEquals(List.of("Denis Villeneuve"), namesOf(actualPage));
+    }
+
+    // É daqui que sai a resolução de relação: um vídeo ativo com membros inativos vem sem eles.
+    @Test
+    void givenAMixOfActiveAndInactiveIds_whenCallFindAllById_thenLeaveTheInactiveOnesOut() {
+        gateway.save(aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR, true));
+        gateway.save(aMember("2", "Rebecca Ferguson", CastMemberType.ACTOR, false));
+
+        final var actualMembers = gateway.findAllById(Set.of(CastMemberID.from("1"), CastMemberID.from("2")));
+
+        assertEquals(1, actualMembers.size());
+        assertEquals("1", actualMembers.getFirst().getId().getValue());
+    }
+
+    @Test
+    void givenAnInactiveMemberWhoseNameMatches_whenSearchByTerms_thenStillHideIt() {
+        gateway.save(aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR, false));
+        refresh();
+
+        final var actualPage = gateway.findAll(new SearchQuery(0, 10, "Denis", "name", "asc"));
+
+        assertEquals(0L, actualPage.total());
+    }
+
     // Nome completo é o termo mais natural aqui, e é justamente o que tem espaço.
     @Test
     void givenTermsWithSeveralWords_whenCallFindAll_thenRequireAllOfThem() {
@@ -178,7 +221,7 @@ class CastMemberElasticsearchGatewayIT {
     private void seed() {
         gateway.save(aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR, true));
         gateway.save(aMember("2", "Timothée Chalamet", CastMemberType.ACTOR, true));
-        gateway.save(aMember("3", "Rebecca Ferguson", CastMemberType.ACTOR, false));
+        gateway.save(aMember("3", "Rebecca Ferguson", CastMemberType.ACTOR, true));
         refresh();
     }
 
@@ -188,7 +231,8 @@ class CastMemberElasticsearchGatewayIT {
         operations.indexOps(CastMemberDocument.class).refresh();
     }
 
-    private long countAll() {
+    // Conta o que a listagem mostra, que não é o mesmo que está gravado: a listagem esconde inativos.
+    private long countListed() {
         refresh();
         return gateway.findAll(new SearchQuery(0, 100, null, "name", "asc")).total();
     }

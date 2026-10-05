@@ -1,8 +1,5 @@
 package com.tarcisiolzbraga.codeflix.videos.infrastructure.castmember;
 
-import com.tarcisiolzbraga.codeflix.videos.infrastructure.elasticsearch.SearchTerms;
-import static org.springframework.data.elasticsearch.core.query.Criteria.where;
-
 import com.tarcisiolzbraga.codeflix.videos.domain.castmember.CastMember;
 import com.tarcisiolzbraga.codeflix.videos.domain.castmember.CastMemberGateway;
 import com.tarcisiolzbraga.codeflix.videos.domain.castmember.CastMemberID;
@@ -10,6 +7,7 @@ import com.tarcisiolzbraga.codeflix.videos.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.videos.domain.pagination.SearchQuery;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.castmember.persistence.CastMemberDocument;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.castmember.persistence.CastMemberRepository;
+import com.tarcisiolzbraga.codeflix.videos.infrastructure.elasticsearch.SearchTerms;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -19,6 +17,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchOperations;
+import org.springframework.data.elasticsearch.core.query.Criteria;
 import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
 import org.springframework.data.elasticsearch.core.query.Query;
 import org.springframework.stereotype.Component;
@@ -27,6 +26,7 @@ import org.springframework.stereotype.Component;
 public class CastMemberElasticsearchGateway implements CastMemberGateway {
 
     private static final String NAME = "name";
+    private static final String ACTIVE = "active";
     private static final String KEYWORD_SUFFIX = ".keyword";
 
     private final CastMemberRepository castMemberRepository;
@@ -50,9 +50,13 @@ public class CastMemberElasticsearchGateway implements CastMemberGateway {
         this.castMemberRepository.deleteById(id.getValue());
     }
 
+    // Vazio para o inativo, como no gateway da categoria: nada inativo é devolvido em leitura alguma.
     @Override
     public Optional<CastMember> findById(final CastMemberID id) {
-        return this.castMemberRepository.findById(id.getValue()).map(CastMemberDocument::toCastMember);
+        return this.castMemberRepository
+                .findById(id.getValue())
+                .filter(CastMemberDocument::isActive)
+                .map(CastMemberDocument::toCastMember);
     }
 
     @Override
@@ -61,7 +65,9 @@ public class CastMemberElasticsearchGateway implements CastMemberGateway {
             return List.of();
         }
         final var values = ids.stream().map(CastMemberID::getValue).toList();
+        // Resolução de relação: um vídeo ativo com membros de elenco inativos vem sem eles.
         return StreamSupport.stream(this.castMemberRepository.findAllById(values).spliterator(), false)
+                .filter(CastMemberDocument::isActive)
                 .map(CastMemberDocument::toCastMember)
                 .toList();
     }
@@ -79,12 +85,15 @@ public class CastMemberElasticsearchGateway implements CastMemberGateway {
         return new Pagination<>(query.page(), query.perPage(), result.getTotalHits(), items);
     }
 
+    // Só o que está ativo, como na categoria: desativar no admin-codeflix tira do catálogo sem
+    // apagar o registro.
     private static Query queryOf(final SearchQuery query, final PageRequest page) {
+        final var active = new Criteria(ACTIVE).is(true);
         final var terms = query.terms();
         if (terms == null || terms.isBlank()) {
-            return Query.findAll().setPageable(page);
+            return new CriteriaQuery(active, page);
         }
-        return new CriteriaQuery(SearchTerms.across(terms, NAME), page);
+        return new CriteriaQuery(active.subCriteria(SearchTerms.across(terms, NAME)), page);
     }
 
     private static Sort sortOf(final SearchQuery query) {
