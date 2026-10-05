@@ -30,6 +30,13 @@ kafka:
       concurrency: 1
       auto-offset-reset: earliest
       max-attempts: 4
+    genre:
+      id: kafka-listener-genre
+      topics: adm_videos_mysql.adm_videos.genre
+      group-id: videos-api-codeflix
+      concurrency: 1
+      auto-offset-reset: earliest
+      max-attempts: 4
 
 spring:
   threads:
