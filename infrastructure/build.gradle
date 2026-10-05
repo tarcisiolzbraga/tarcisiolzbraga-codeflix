@@ -19,6 +19,7 @@ dependencies {
 
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
+    implementation 'org.springframework.boot:spring-boot-starter-graphql'
     // No Boot 4 a autoconfiguração do RestClient saiu do starter de web para um módulo próprio:
     // sem ele não existe o RestClient.Builder que o cliente da API do admin injeta.
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
@@ -29,6 +30,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-kafka'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-graphql-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch-test'
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     // BOM 2.x porque é a linha do core que o spring-boot-testcontainers traz; na 2.0 os módulos
