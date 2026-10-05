@@ -36,6 +36,17 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "secret": "__KEYCLOAK_CLIENT_SECRET__"
+    },
+    {
+      "clientId": "videos-api-codeflix",
+      "name": "Leitura do catálogo pela videos-api-codeflix",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "secret": "__KEYCLOAK_CLIENT_SECRET__"
     }
   ],
 
@@ -51,6 +62,17 @@
       "enabled": true,
       "serviceAccountClientId": "categories-codeflix",
       "realmRoles": [ "CODEFLIX_CATEGORIES" ]
+    },
+    {
+      "username": "service-account-videos-api-codeflix",
+      "enabled": true,
+      "serviceAccountClientId": "videos-api-codeflix",
+      "realmRoles": [
+        "CODEFLIX_CATEGORIES",
+        "CODEFLIX_CAST_MEMBERS",
+        "CODEFLIX_GENRES",
+        "CODEFLIX_VIDEOS"
+      ]
     }
   ]
 }

@@ -68,8 +68,9 @@ descartável e sempre reflete o que está no git. O que for criado à mão no co
 A documentação da API (`/v3/api-docs` e o Swagger UI) fica aberta: não expõe dado nenhum, e em produção o
 springdoc já está desligado. Sem token a resposta é 401; com token válido e role insuficiente, 403.
 
-O realm traz dois clients: `admin-codeflix`, com a role de administrador, e `categories-codeflix`, só com a de
-categorias — este serve justamente para ver o 403 nas rotas dos outros agregados. As notas do realm estão em
+O realm traz três clients: `admin-codeflix`, com a role de administrador; `categories-codeflix`, só com a de
+categorias — este serve justamente para ver o 403 nas rotas dos outros agregados; e `videos-api-codeflix`, com
+as quatro roles de leitura, que é a credencial da API de catálogo e nunca escreve nada aqui. As notas do realm estão em
 `.keycloak/README.md`, porque o Keycloak recusa comentário dentro do arquivo de import.
 
 **A entrada no `/etc/hosts` não é opcional.** O `iss` do token é a URL que o cliente usou para pedi-lo, e a
