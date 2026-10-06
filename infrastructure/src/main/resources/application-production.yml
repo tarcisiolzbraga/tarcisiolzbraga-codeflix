@@ -1,0 +1,26 @@
+# Produção: variáveis de ambiente no lugar do .env e o schema fora do ar, para não expor o contrato
+# publicamente.
+#
+# Desligar o GraphiQL não bastaria: o console é só uma página, e quem quisesse o contrato pediria a
+# introspecção direto no /graphql, que é como o próprio console o descobre. As duas coisas saem
+# juntas, e é isso que corresponde ao api-docs desligado no admin-codeflix.
+spring:
+  graphql:
+    graphiql:
+      enabled: false
+    schema:
+      introspection:
+        enabled: false
+
+# Aqui a aplicação roda em container, então o log estruturado sai no stdout, que é de onde o coletor
+# o recolhe — sem arquivo, que num container seria uma camada a mais para ninguém ler. É o inverso do
+# development, onde o console fica legível e o arquivo é que sai em ECS.
+logging:
+  structured:
+    format:
+      console: ecs
+    ecs:
+      service:
+        environment: production
+  level:
+    com.tarcisiolzbraga.codeflix.videos: info
