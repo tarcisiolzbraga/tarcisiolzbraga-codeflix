@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
-import com.tarcisiolzbraga.codeflix.videos.application.video.VideoOutput;
 import com.tarcisiolzbraga.codeflix.videos.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.videos.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.videos.domain.video.Rating;
@@ -86,13 +85,4 @@ class ListVideosUseCaseTest {
         assertSame(expectedException, actualException);
     }
 
-    @Test
-    void givenAPage_whenCallExecute_thenEachItemIsAVideoOutput() {
-        when(videoGateway.findAll(EXPECTED_QUERY))
-                .thenReturn(new Pagination<>(0, 10, 1L, List.of(aVideo("1", "Duna", true))));
-
-        final var actualItems = useCase.execute(EXPECTED_QUERY).items();
-
-        assertTrue(actualItems.getFirst() instanceof VideoOutput);
-    }
 }

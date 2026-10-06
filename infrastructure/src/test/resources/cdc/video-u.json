@@ -1,0 +1,418 @@
+{
+  "schema": {
+    "type": "struct",
+    "fields": [
+      {
+        "type": "struct",
+        "fields": [
+          {
+            "type": "string",
+            "optional": false,
+            "field": "id"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "title"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "description"
+          },
+          {
+            "type": "int16",
+            "optional": false,
+            "field": "year_launched"
+          },
+          {
+            "type": "bytes",
+            "optional": false,
+            "name": "org.apache.kafka.connect.data.Decimal",
+            "version": 1,
+            "parameters": {
+              "scale": "2",
+              "connect.decimal.precision": "6"
+            },
+            "field": "duration"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "rating"
+          },
+          {
+            "type": "int16",
+            "optional": false,
+            "default": 0,
+            "field": "opened"
+          },
+          {
+            "type": "int16",
+            "optional": false,
+            "default": 0,
+            "field": "published"
+          },
+          {
+            "type": "int16",
+            "optional": false,
+            "default": 1,
+            "field": "active"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "name": "io.debezium.time.MicroTimestamp",
+            "version": 1,
+            "field": "created_at"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "name": "io.debezium.time.MicroTimestamp",
+            "version": 1,
+            "field": "updated_at"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "video_id"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "trailer_id"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "banner_id"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "thumbnail_id"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "thumbnail_half_id"
+          }
+        ],
+        "optional": true,
+        "name": "adm_videos_mysql.adm_videos.video.Value",
+        "field": "before"
+      },
+      {
+        "type": "struct",
+        "fields": [
+          {
+            "type": "string",
+            "optional": false,
+            "field": "id"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "title"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "description"
+          },
+          {
+            "type": "int16",
+            "optional": false,
+            "field": "year_launched"
+          },
+          {
+            "type": "bytes",
+            "optional": false,
+            "name": "org.apache.kafka.connect.data.Decimal",
+            "version": 1,
+            "parameters": {
+              "scale": "2",
+              "connect.decimal.precision": "6"
+            },
+            "field": "duration"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "rating"
+          },
+          {
+            "type": "int16",
+            "optional": false,
+            "default": 0,
+            "field": "opened"
+          },
+          {
+            "type": "int16",
+            "optional": false,
+            "default": 0,
+            "field": "published"
+          },
+          {
+            "type": "int16",
+            "optional": false,
+            "default": 1,
+            "field": "active"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "name": "io.debezium.time.MicroTimestamp",
+            "version": 1,
+            "field": "created_at"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "name": "io.debezium.time.MicroTimestamp",
+            "version": 1,
+            "field": "updated_at"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "video_id"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "trailer_id"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "banner_id"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "thumbnail_id"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "thumbnail_half_id"
+          }
+        ],
+        "optional": true,
+        "name": "adm_videos_mysql.adm_videos.video.Value",
+        "field": "after"
+      },
+      {
+        "type": "struct",
+        "fields": [
+          {
+            "type": "string",
+            "optional": false,
+            "field": "version"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "connector"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "name"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "field": "ts_ms"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "name": "io.debezium.data.Enum",
+            "version": 1,
+            "parameters": {
+              "allowed": "true,first,first_in_data_collection,last_in_data_collection,last,false,incremental"
+            },
+            "default": "false",
+            "field": "snapshot"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "db"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "sequence"
+          },
+          {
+            "type": "int64",
+            "optional": true,
+            "field": "ts_us"
+          },
+          {
+            "type": "int64",
+            "optional": true,
+            "field": "ts_ns"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "table"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "field": "server_id"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "gtid"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "file"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "field": "pos"
+          },
+          {
+            "type": "int32",
+            "optional": false,
+            "field": "row"
+          },
+          {
+            "type": "int64",
+            "optional": true,
+            "field": "thread"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "query"
+          }
+        ],
+        "optional": false,
+        "name": "io.debezium.connector.mysql.Source",
+        "version": 1,
+        "field": "source"
+      },
+      {
+        "type": "struct",
+        "fields": [
+          {
+            "type": "string",
+            "optional": false,
+            "field": "id"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "field": "total_order"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "field": "data_collection_order"
+          }
+        ],
+        "optional": true,
+        "name": "event.block",
+        "version": 1,
+        "field": "transaction"
+      },
+      {
+        "type": "string",
+        "optional": false,
+        "field": "op"
+      },
+      {
+        "type": "int64",
+        "optional": true,
+        "field": "ts_ms"
+      },
+      {
+        "type": "int64",
+        "optional": true,
+        "field": "ts_us"
+      },
+      {
+        "type": "int64",
+        "optional": true,
+        "field": "ts_ns"
+      }
+    ],
+    "optional": false,
+    "name": "adm_videos_mysql.adm_videos.video.Envelope",
+    "version": 2
+  },
+  "payload": {
+    "before": {
+      "id": "00000000-cdc0-4000-8000-0000000000f1",
+      "title": "Teste de CDC",
+      "description": "descricao de teste",
+      "year_launched": 2026,
+      "duration": "PIw=",
+      "rating": "14",
+      "opened": 0,
+      "published": 1,
+      "active": 1,
+      "created_at": 1791297557023931,
+      "updated_at": 1791297557023931,
+      "video_id": null,
+      "trailer_id": null,
+      "banner_id": null,
+      "thumbnail_id": null,
+      "thumbnail_half_id": null
+    },
+    "after": {
+      "id": "00000000-cdc0-4000-8000-0000000000f1",
+      "title": "Teste de CDC (alterado)",
+      "description": "descricao de teste",
+      "year_launched": 2026,
+      "duration": "PIw=",
+      "rating": "14",
+      "opened": 0,
+      "published": 1,
+      "active": 1,
+      "created_at": 1791297557023931,
+      "updated_at": 1791297557037624,
+      "video_id": null,
+      "trailer_id": null,
+      "banner_id": null,
+      "thumbnail_id": null,
+      "thumbnail_half_id": null
+    },
+    "source": {
+      "version": "3.6.3.Final",
+      "connector": "mysql",
+      "name": "adm_videos_mysql",
+      "ts_ms": 1791297557000,
+      "snapshot": "false",
+      "db": "adm_videos",
+      "sequence": null,
+      "ts_us": 1791297557000000,
+      "ts_ns": 1791297557000000000,
+      "table": "video",
+      "server_id": 1,
+      "gtid": null,
+      "file": "binlog.000009",
+      "pos": 4525,
+      "row": 0,
+      "thread": 16,
+      "query": null
+    },
+    "transaction": null,
+    "op": "u",
+    "ts_ms": 1791297557039,
+    "ts_us": 1791297557039632,
+    "ts_ns": 1791297557039632087
+  }
+}
