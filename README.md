@@ -37,7 +37,7 @@ docker compose --profile cdc up -d          # Kafka e Kafka Connect
 # e registrar o conector do Debezium — veja o README de lá
 ```
 
-### Credencial
+### Credencial que sai: falar com o admin
 
 Esta API lê a API do `admin-codeflix`, que exige token. A credencial é o client
 **`videos-api-codeflix`** no realm `codeflix`, com as quatro roles de leitura e nenhuma de escrita.
@@ -51,6 +51,42 @@ O `iss` do token é a URL por onde ele foi pedido, e o admin só aceita a que el
 aplicações rodam no host e o nome `keycloak` só resolve dentro da rede do Docker. Para rodar o admin
 em container, os dois voltam para `keycloak` e a máquina precisa de `127.0.0.1 keycloak` no
 `/etc/hosts`.
+
+### Token que entra: ler o catálogo
+
+O catálogo também **exige token de quem o consome**, e valida o mesmo emissor que o admin valida.
+São dois papéis:
+
+| Papel | O que abre |
+|---|---|
+| `CODEFLIX_SUBSCRIBER` | as consultas: categorias, gêneros, membros de elenco, vídeos |
+| `CODEFLIX_ADMIN` | tudo, inclusive a mutation de exemplo, que é a única porta de escrita |
+
+A autorização é **por consulta**, e não por rota, porque o GraphQL é um endereço só: no nível HTTP
+não haveria como distinguir ler o acervo de gravar. Sem token a resposta vem com classificação
+`UNAUTHORIZED`; com token válido e papel insuficiente, `FORBIDDEN`; token de outro emissor, ou
+expirado, é recusado antes com **401**, no filtro, sem chegar ao GraphQL.
+
+São **dois papéis, e não um por agregado** como na referência do curso. A granularidade por agregado
+não se sustentaria aqui: as relações saem resolvidas dentro do vídeo, então quem puder ler vídeos já
+vê o nome da categoria, do gênero e do elenco — ela anunciaria uma restrição que a API não cumpre.
+
+A segurança vale em **todos os perfis**, inclusive no `development`. A referência a desliga lá com
+`@Profile("!development")`, e isso não serve aqui: o `development` é o perfil padrão, inclusive o dos
+testes, então desligá-lo deixaria a autorização sem um único teste.
+
+Para usar o GraphiQL local, pegue um token do Keycloak do compose do admin e cole o cabeçalho
+`Authorization` na aba *Headers* do console:
+
+```bash
+curl -s -X POST http://localhost:8081/realms/codeflix/protocol/openid-connect/token \
+  -d grant_type=client_credentials \
+  -d client_id=subscriber-codeflix \
+  -d client_secret="$KEYCLOAK_CLIENT_SECRET" | jq -r .access_token
+```
+
+O client `subscriber-codeflix` é o do assinante; para a mutation de exemplo, use o `admin-codeflix`.
+Os dois vivem no realm do admin, que é um só — veja `.keycloak/README.md` de lá.
 
 ### Perfis
 
@@ -119,7 +155,8 @@ Três coisas que o consumidor trata, todas medidas contra o ambiente de verdade:
 ## O que o catálogo serve
 
 GraphQL em `/api/graphql`, com uma consulta por agregado, `video(id:)` para um título só, e os
-filtros do acervo: termo, classificação, ano e as três relações.
+filtros do acervo: termo, classificação, ano e as três relações. Toda consulta pede o papel de
+assinante, e a mutation de exemplo pede o de administrador.
 
 **Nada inativo é devolvido, em leitura alguma** — nem na listagem, nem por id, nem através de uma
 relação. Um vídeo ativo com categorias inativas vem **sem essas categorias**. O vídeo tem uma regra a
@@ -187,8 +224,16 @@ execução sobrescreve em vez de acumular, e gênero, membro de elenco e vídeo 
 vê-los com conteúdo é preciso o CDC rodando. As pastas deles passam com o catálogo vazio: afirmam o
 contrato, e o conteúdo quando houver.
 
-Fora do Postman, `npx newman run .postman/videos-api-codeflix.postman_collection.json` roda a mesma
-coleção na linha de comando.
+A primeira pasta pega os dois tokens no Keycloak e os guarda em variáveis da coleção: o de assinante
+vale para a coleção toda, e as requisições que gravam trocam para o de administrador. Preencha
+`clientSecret` com o `KEYCLOAK_CLIENT_SECRET` do `.env` do admin.
+
+Fora do Postman, a mesma coleção roda na linha de comando:
+
+```bash
+npx newman run .postman/videos-api-codeflix.postman_collection.json \
+  --env-var clientSecret="$KEYCLOAK_CLIENT_SECRET"
+```
 
 ## Referência
 
@@ -203,3 +248,7 @@ FC3, consultado lendo o repositório. Ele **informa, não decide**, e as diverg�
 | mutations | uma por agregado | uma só, de exemplo, na categoria |
 | `presenter` | classe de mapeamento | fábricas `from(...)` nos próprios records |
 | parâmetros | 18 na fábrica do `Video` | agrupados em value objects |
+| segurança no `development` | desligada por `@Profile` | ligada em todo perfil |
+| papéis | um por agregado, mais assinante | assinante e administrador, só |
+| papel da mutation | o mesmo das leituras | administrador |
+| teto de `perPage` | não há | 1 a 100, pedido fora é recusado |
