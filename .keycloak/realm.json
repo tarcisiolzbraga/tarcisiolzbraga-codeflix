@@ -10,7 +10,8 @@
       { "name": "CODEFLIX_CATEGORIES", "description": "Acesso às categorias" },
       { "name": "CODEFLIX_GENRES", "description": "Acesso aos gêneros" },
       { "name": "CODEFLIX_CAST_MEMBERS", "description": "Acesso aos membros de elenco" },
-      { "name": "CODEFLIX_VIDEOS", "description": "Acesso aos vídeos" }
+      { "name": "CODEFLIX_VIDEOS", "description": "Acesso aos vídeos" },
+      { "name": "CODEFLIX_SUBSCRIBER", "description": "Lê o catálogo servido pela videos-api-codeflix" }
     ]
   },
 
@@ -47,6 +48,17 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "secret": "__KEYCLOAK_CLIENT_SECRET__"
+    },
+    {
+      "clientId": "subscriber-codeflix",
+      "name": "Assinante, que lê o catálogo servido pela videos-api-codeflix",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "secret": "__KEYCLOAK_CLIENT_SECRET__"
     }
   ],
 
@@ -72,6 +84,14 @@
         "CODEFLIX_CAST_MEMBERS",
         "CODEFLIX_GENRES",
         "CODEFLIX_VIDEOS"
+      ]
+    },
+    {
+      "username": "service-account-subscriber-codeflix",
+      "enabled": true,
+      "serviceAccountClientId": "subscriber-codeflix",
+      "realmRoles": [
+        "CODEFLIX_SUBSCRIBER"
       ]
     }
   ]
