@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.tarcisiolzbraga.codeflix.videos.e2e.category.CategoryE2EDsl;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.E2ETest;
+import com.tarcisiolzbraga.codeflix.videos.infrastructure.KeycloakTestToken;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.castmember.CastMemberClient;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.castmember.models.CastMemberDTO;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.genre.GenreClient;
@@ -28,6 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -76,18 +78,36 @@ class VideoE2ETest implements VideoE2EDsl, CategoryE2EDsl {
     @MockitoBean
     private CastMemberClient castMemberClient;
 
+    @Autowired
+    private KeycloakTestToken token;
+
     private RestClient client;
+
+    private RestClient adminClient;
 
     @BeforeEach
     void bindToTheRunningServer() {
-        this.client = RestClient.builder()
+        this.client = clientWith(this.token.subscriber());
+        this.adminClient = clientWith(this.token.admin());
+    }
+
+    // O token vai no cabeçalho padrão do cliente: é como um consumidor de verdade fala com a API,
+    // e é o que faz esta jornada atravessar também a autorização.
+    private RestClient clientWith(final String bearer) {
+        return RestClient.builder()
                 .baseUrl("http://localhost:%d/api".formatted(this.port))
+                .defaultHeader(HttpHeaders.AUTHORIZATION, bearer)
                 .build();
     }
 
     @Override
     public RestClient client() {
         return this.client;
+    }
+
+    @Override
+    public RestClient adminClient() {
+        return this.adminClient;
     }
 
     @Test

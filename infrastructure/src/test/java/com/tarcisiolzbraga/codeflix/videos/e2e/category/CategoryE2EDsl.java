@@ -14,6 +14,11 @@ public interface CategoryE2EDsl {
 
     RestClient client();
 
+    // A semeadura usa um cliente à parte porque a mutation de exemplo é porta de escrita: ler o
+    // catálogo é coisa de assinante, gravar na réplica é de administrador. São dois papéis, então
+    // são dois tokens.
+    RestClient adminClient();
+
     // A mutation de exemplo é o único caminho de escrita que a API expõe, e é por ela que a jornada
     // monta o estado — o caminho de verdade, o CDC, já é coberto pelo CategoryListenerIT.
     default GqlCategory givenACategory(final String id, final String name, final String description) {
@@ -23,7 +28,7 @@ public interface CategoryE2EDsl {
                   createdAt: "2026-09-30T12:00:00Z", updatedAt: "2026-10-01T08:30:00Z" })
                   { id name description } }"""
                         .formatted(id, name, description);
-        return post(document, SaveEnvelope.class).data().saveCategory();
+        return postAs(adminClient(), document, SaveEnvelope.class).data().saveCategory();
     }
 
     // Para a jornada do gênero provar que categoria inativa não aparece nas relações.
@@ -34,7 +39,7 @@ public interface CategoryE2EDsl {
                   createdAt: "2026-09-30T12:00:00Z", updatedAt: "2026-10-01T08:30:00Z" })
                   { id name description } }"""
                         .formatted(id, name, description);
-        return post(document, SaveEnvelope.class).data().saveCategory();
+        return postAs(adminClient(), document, SaveEnvelope.class).data().saveCategory();
     }
 
     default GqlCategoryPage listCategories() {
@@ -57,7 +62,11 @@ public interface CategoryE2EDsl {
     }
 
     private <T> T post(final String document, final Class<T> envelope) {
-        return client().post()
+        return postAs(client(), document, envelope);
+    }
+
+    private static <T> T postAs(final RestClient client, final String document, final Class<T> envelope) {
+        return client.post()
                 .uri(GRAPHQL_PATH)
                 .body(Map.of("query", document))
                 .retrieve()
