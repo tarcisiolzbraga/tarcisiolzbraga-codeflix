@@ -3,6 +3,7 @@ extend type Query {
     categories(
         search: String = "",
         page: Int = 0,
+        """ Quantos itens a página traz. No máximo 100: acima disso o pedido é recusado """
         perPage: Int = 10,
         sort: String = "name",
         direction: String = "asc"

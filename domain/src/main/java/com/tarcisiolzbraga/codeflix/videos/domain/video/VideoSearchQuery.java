@@ -3,6 +3,7 @@ package com.tarcisiolzbraga.codeflix.videos.domain.video;
 import com.tarcisiolzbraga.codeflix.videos.domain.castmember.CastMemberID;
 import com.tarcisiolzbraga.codeflix.videos.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.videos.domain.genre.GenreID;
+import com.tarcisiolzbraga.codeflix.videos.domain.pagination.PageSize;
 import java.util.Set;
 
 // A listagem de vídeos filtra por classificação, ano e pelas três relações, então tem query própria,
@@ -20,6 +21,7 @@ public record VideoSearchQuery(
         Set<CastMemberID> castMembers) {
 
     public VideoSearchQuery {
+        perPage = PageSize.checked(perPage);
         categories = categories == null ? Set.of() : Set.copyOf(categories);
         genres = genres == null ? Set.of() : Set.copyOf(genres);
         castMembers = castMembers == null ? Set.of() : Set.copyOf(castMembers);

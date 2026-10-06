@@ -133,6 +133,11 @@ As relações saem **resolvidas**, não como lista de ids: o cliente recebe o no
 opaco, e id cru deixaria passar o de um registro desativado. A resolução é em lote — as relações de
 toda a página saem numa consulta por tipo, não numa por item.
 
+Toda listagem é paginada, e a **página tem teto**: `perPage` vai de 1 a 100, e pedido fora da faixa
+é recusado com `BAD_REQUEST` em vez de reduzido ao máximo — quem pedisse mil itens e recebesse cem
+pediria a página seguinte em cima de uma premissa errada. Paginar sem limitar o tamanho seria
+devolver coleção sem limite com um nome melhor.
+
 O `rating` é `String`, e não enum, por um impedimento do GraphQL: os rótulos do admin são `ER`, `L`,
 `10`, `12`, `14`, `16` e `18`, e valor de enum GraphQL não pode começar com dígito. O filtro valida o
 rótulo e **recusa o desconhecido** com `BAD_REQUEST`, em vez de ignorá-lo e devolver o acervo inteiro.
