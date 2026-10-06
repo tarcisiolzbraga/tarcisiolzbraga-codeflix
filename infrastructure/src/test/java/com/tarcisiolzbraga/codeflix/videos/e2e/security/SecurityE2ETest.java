@@ -23,6 +23,11 @@ class SecurityE2ETest {
 
     private static final String QUERY = "{ categories { meta { total } } }";
     private static final String CLASSIFICATION = "classification";
+    private static final String MUTATION =
+            """
+            mutation { saveCategory(input: { id: "seguranca", name: "Filmes",
+              createdAt: "2026-09-30T12:00:00Z", updatedAt: "2026-10-01T08:30:00Z" })
+              { id } }""";
 
     @Value("${local.server.port}")
     private int port;
@@ -72,12 +77,39 @@ class SecurityE2ETest {
         assertEquals(401, actualStatus.value());
     }
 
+    // A porta de escrita é mais estreita que a de leitura: o assinante que lê o acervo não grava
+    // nele. É aqui que essa diferença fica provada.
+    @Test
+    void givenTheSubscriberRole_whenCallTheExampleMutation_thenRefuseIt() {
+        final var actualResponse = save(this.token.subscriber());
+
+        assertEquals("FORBIDDEN", classificationOf(actualResponse));
+    }
+
+    @Test
+    void givenTheAdminRole_whenCallTheExampleMutation_thenAcceptIt() {
+        final var actualResponse = save(this.token.admin());
+
+        assertNull(actualResponse.get("errors"), String.valueOf(actualResponse.get("errors")));
+        assertNotNull(actualResponse.get("data"));
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> read(final String bearer) {
         return clientWith(bearer)
                 .post()
                 .uri("/graphql")
                 .body(Map.of("query", QUERY))
+                .retrieve()
+                .body(Map.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> save(final String bearer) {
+        return clientWith(bearer)
+                .post()
+                .uri("/graphql")
+                .body(Map.of("query", MUTATION))
                 .retrieve()
                 .body(Map.class);
     }
