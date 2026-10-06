@@ -19,6 +19,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.graphql.execution.ErrorType;
 import org.springframework.graphql.test.tester.GraphQlTester;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -165,6 +166,25 @@ class CategoryGraphQLControllerTest {
         final var captor = ArgumentCaptor.forClass(SaveCategoryCommand.class);
         verify(saveCategoryUseCase).execute(captor.capture());
         assertEquals(true, captor.getValue().active());
+    }
+
+    // Data fora do ISO-8601 é erro de quem chamou, não falha interna: sem tradução, o cliente levava
+    // INTERNAL_ERROR e o nome do campo errado ficava só no log do servidor.
+    @Test
+    void givenADateThatDoesNotConvert_whenCallSaveCategory_thenBlameTheClientAndNameTheField() {
+        final var document =
+                """
+                mutation { saveCategory(input: { id: "1", name: "Filmes",
+                  createdAt: "ontem", updatedAt: "2026-10-01T08:30:00Z" })
+                  { id } }""";
+
+        final var actualResponse = graphql.document(document).execute();
+
+        actualResponse.errors().satisfy(errors -> {
+            assertEquals(1, errors.size());
+            assertEquals(ErrorType.BAD_REQUEST, errors.getFirst().getErrorType());
+            assertEquals("'createdAt' received an invalid value: ontem", errors.getFirst().getMessage());
+        });
     }
 
     private static String saveDocument(final String name, final String description, final String active) {
