@@ -52,6 +52,41 @@ aplicações rodam no host e o nome `keycloak` só resolve dentro da rede do Doc
 em container, os dois voltam para `keycloak` e a máquina precisa de `127.0.0.1 keycloak` no
 `/etc/hosts`.
 
+### Perfis
+
+Três perfis, como no `admin-codeflix`. Sem perfil ativo — `bootRun` e os testes — vale o
+**`development`**; nos outros ambientes o perfil vem de `SPRING_PROFILES_ACTIVE`.
+
+| | `development` | `homolog` | `production` |
+| --- | --- | --- | --- |
+| de onde vêm os valores | `.env` da raiz | ambiente | ambiente |
+| GraphiQL | no ar | no ar | fora |
+| introspecção do schema | ligada | ligada | **desligada** |
+| log estruturado | arquivo em ECS, console legível | stdout em ECS | stdout em ECS |
+| nível do pacote da aplicação | `debug` | `info` | `info` |
+
+Em produção o GraphiQL sai do ar **junto com a introspecção**. Desligar só o console não esconderia
+nada: ele é uma página como outra qualquer, e quem quisesse o contrato pediria a introspecção direto
+no `/graphql`, que é exatamente como o console a descobre.
+
+O `application.yml` comum exige quatro variáveis **sem valor padrão**, e é o `development` que
+devolve os endereços locais:
+
+| variável | o que é | padrão no `development` |
+| --- | --- | --- |
+| `ELASTIC_URIS` | o Elasticsearch do catálogo | `http://localhost:9201` |
+| `KAFKA_BOOTSTRAP_SERVERS` | o broker, que sobe no compose do admin | `localhost:29092` |
+| `ADMIN_API_BASE_URL` | a API de onde vem o registro completo | `http://localhost:8080` |
+| `KEYCLOAK_TOKEN_URI` | o endpoint de token do realm | montado de `KEYCLOAK_HOST`, `KEYCLOAK_PORT` e `KEYCLOAK_REALM` |
+
+Ficarem sem padrão é deliberado, e o motivo é específico de um serviço de leitura: apontar para um
+Elasticsearch que não existe não produz erro visível, produz **catálogo vazio** — e catálogo vazio é
+indistinguível de catálogo que ainda não replicou. Fora do desenvolvimento, variável faltando
+derruba a subida, que é o sintoma que se quer.
+
+O token entra como URL inteira, e não montada a partir de host e porta, porque fora do
+desenvolvimento o Keycloak atende em `https`, atrás de domínio próprio e sem porta explícita.
+
 ## Como o dado chega
 
 ```

@@ -1,3 +1,6 @@
+# Configuração comum aos três perfis: development, homolog e production.
+# Sem perfil ativo (bootRun, testes), vale o development; nos outros ambientes o perfil vem de
+# SPRING_PROFILES_ACTIVE.
 server:
   port: ${APP_PORT:8082}
   # Mesmo prefixo da referência, e é por isso que o GraphiQL fica em /api/graphiql.
@@ -8,7 +11,7 @@ server:
 
 # A API do admin-codeflix, de onde vem o registro completo depois do aviso do CDC.
 admin-api:
-  base-url: ${ADMIN_API_BASE_URL:http://localhost:8080}
+  base-url: ${ADMIN_API_BASE_URL}
   # O nome do registro de client OAuth2 declarado abaixo, usado pelo interceptor do RestClient.
   client-registration-id: admin-api
 
@@ -18,6 +21,8 @@ kafka:
       id: kafka-listener-category
       topics: adm_videos_mysql.adm_videos.category
       group-id: videos-api-codeflix
+      # Um por tópico: os tópicos do Debezium nascem com uma partição, e concorrência acima do
+      # número de partições só deixa consumidor ocioso.
       concurrency: 1
       # earliest para o snapshot inicial do Debezium ser consumido na primeira subida: com latest o
       # catálogo nasceria vazio e só veria o que mudasse a partir de então.
@@ -46,24 +51,21 @@ kafka:
       max-attempts: 4
 
 spring:
+  profiles:
+    default: development
   threads:
     virtual:
       enabled: true
-  # O .env da raiz traz os valores de quem roda no host; é por isso que o bootRun usa workingDir
-  # na raiz do projeto.
-  config:
-    import: optional:file:.env[.properties]
   elasticsearch:
-    uris: ${ELASTIC_URIS:http://localhost:9201}
-  graphql:
-    graphiql:
-      # O console que serve de documentação navegável do schema, em /api/graphiql.
-      enabled: ${GRAPHIQL_ENABLED:true}
+    # Os endereços vêm sem valor padrão de propósito: num serviço de leitura, apontar para um
+    # Elasticsearch que não existe não dá erro visível, dá catálogo vazio — e catálogo vazio é
+    # indistinguível de catálogo que ainda não replicou. Variável faltando derruba a subida.
+    uris: ${ELASTIC_URIS}
   http:
     client:
       read-timeout: 1s
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     consumer:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -78,7 +80,13 @@ spring:
             authorization-grant-type: client_credentials
         provider:
           keycloak:
-            # O MESMO host que o admin usa como issuer, senão ele recusa o token: o `iss` é a
-            # URL por onde o token foi pedido. Em desenvolvimento é localhost, porque as
-            # aplicações rodam no host e `keycloak` só resolve dentro da rede do Docker.
-            token-uri: http://${KEYCLOAK_HOST:localhost}:${KEYCLOAK_PORT:8081}/realms/${KEYCLOAK_REALM:codeflix}/protocol/openid-connect/token
+            # A URL inteira numa variável, e não montada a partir de host e porta: fora do
+            # development o Keycloak atende em https, atrás de domínio próprio, sem porta.
+            token-uri: ${KEYCLOAK_TOKEN_URI}
+
+# Identifica a aplicação no log estruturado, que é como o Kibana a separa das outras.
+logging:
+  structured:
+    ecs:
+      service:
+        name: videos-api-codeflix
