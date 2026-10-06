@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tarcisiolzbraga.codeflix.videos.domain.category.CategoryID;
+import com.tarcisiolzbraga.codeflix.videos.domain.exceptions.DomainException;
 import java.util.HashSet;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -45,5 +46,15 @@ class GenreSearchQueryTest {
         final var actualCategories = actualQuery.categories();
 
         assertThrows(UnsupportedOperationException.class, () -> actualCategories.add(CategoryID.from("2")));
+    }
+
+    // O teto vale também para as queries com filtro próprio: a regra é do tamanho da página, não da
+    // listagem que a pede.
+    @Test
+    void givenAPerPageAboveTheCeiling_whenInstantiate_thenRefuseIt() {
+        final var actualException = assertThrows(
+                DomainException.class, () -> new GenreSearchQuery(0, 101, "", "name", "asc", Set.of()));
+
+        assertEquals("'perPage' should be between 1 and 100", actualException.getMessage());
     }
 }

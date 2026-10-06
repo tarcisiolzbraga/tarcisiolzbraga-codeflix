@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tarcisiolzbraga.codeflix.videos.domain.castmember.CastMemberID;
 import com.tarcisiolzbraga.codeflix.videos.domain.category.CategoryID;
+import com.tarcisiolzbraga.codeflix.videos.domain.exceptions.DomainException;
 import com.tarcisiolzbraga.codeflix.videos.domain.genre.GenreID;
 import java.util.HashSet;
 import java.util.Set;
@@ -61,5 +62,15 @@ class VideoSearchQueryTest {
         final var actualCategories = actualQuery.categories();
 
         assertThrows(UnsupportedOperationException.class, () -> actualCategories.add(CategoryID.from("c2")));
+    }
+
+    // O teto vale também para as queries com filtro próprio: a regra é do tamanho da página, não da
+    // listagem que a pede.
+    @Test
+    void givenAPerPageAboveTheCeiling_whenInstantiate_thenRefuseIt() {
+        final var actualException = assertThrows(DomainException.class, () -> new VideoSearchQuery(
+                0, 101, "", "title", "asc", null, null, Set.of(), Set.of(), Set.of()));
+
+        assertEquals("'perPage' should be between 1 and 100", actualException.getMessage());
     }
 }
