@@ -84,6 +84,12 @@ spring:
             # development o Keycloak atende em https, atrás de domínio próprio, sem porta.
             token-uri: ${KEYCLOAK_TOKEN_URI}
 
+# O emissor dos tokens que o catálogo aceita. Sem valor padrão, pelo mesmo motivo dos endereços
+# acima: validar token contra o emissor errado não dá erro visível, dá acesso concedido a quem não
+# devia — ou negado a quem devia.
+keycloak:
+  issuer-uri: ${KEYCLOAK_ISSUER_URI}
+
 # Identifica a aplicação no log estruturado, que é como o Kibana a separa das outras.
 logging:
   structured:

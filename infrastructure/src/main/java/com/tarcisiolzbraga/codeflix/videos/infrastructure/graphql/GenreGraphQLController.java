@@ -14,9 +14,11 @@ import java.util.Objects;
 import java.util.Comparator;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import com.tarcisiolzbraga.codeflix.videos.infrastructure.security.Roles;
 import org.springframework.graphql.data.method.annotation.Arguments;
 import org.springframework.graphql.data.method.annotation.BatchMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.security.access.annotation.Secured;
 import org.springframework.stereotype.Controller;
 
 @Controller
@@ -34,6 +36,7 @@ public class GenreGraphQLController {
     }
 
     @QueryMapping
+    @Secured({Roles.SUBSCRIBER, Roles.ADMIN})
     public GqlGenrePage genres(@Arguments final GqlGenreQuery query) {
         return GqlGenrePage.from(this.listGenresUseCase.execute(query.toSearchQuery()));
     }

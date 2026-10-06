@@ -22,7 +22,8 @@ import org.springframework.context.annotation.Import;
 @Inherited
 @Tag("e2eTest")
 @SpringBootTest(classes = Main.class, webEnvironment = WebEnvironment.RANDOM_PORT)
-@Import({ElasticsearchContainerConfiguration.class, KafkaContainerConfiguration.class})
+@Import({ElasticsearchContainerConfiguration.class, KafkaContainerConfiguration.class,
+        KeycloakContainerConfiguration.class})
 @ExtendWith(ElasticsearchCleanUpExtension.class)
 public @interface E2ETest {
 }

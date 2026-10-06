@@ -7,9 +7,11 @@ import com.tarcisiolzbraga.codeflix.videos.infrastructure.video.models.GqlVideo;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.video.models.GqlVideoPage;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.video.models.GqlVideoQuery;
 import java.util.Objects;
+import com.tarcisiolzbraga.codeflix.videos.infrastructure.security.Roles;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.Arguments;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.security.access.annotation.Secured;
 import org.springframework.stereotype.Controller;
 
 // As consultas do vídeo. As três relações são resolvidas no VideoRelationsGraphQLController, que é
@@ -28,6 +30,7 @@ public class VideoGraphQLController {
     }
 
     @QueryMapping
+    @Secured({Roles.SUBSCRIBER, Roles.ADMIN})
     public GqlVideoPage videos(@Arguments final GqlVideoQuery query) {
         return GqlVideoPage.from(this.listVideosUseCase.execute(query.toSearchQuery()));
     }
@@ -35,6 +38,7 @@ public class VideoGraphQLController {
     // Nulo quando o catálogo não serve o vídeo, o que inclui o que existe no admin mas está inativo
     // ou não publicado. O schema declara o campo como anulável justamente por isso.
     @QueryMapping
+    @Secured({Roles.SUBSCRIBER, Roles.ADMIN})
     public GqlVideo video(@Argument final String id) {
         return this.getVideoUseCase.execute(VideoID.from(id)).map(GqlVideo::from).orElse(null);
     }

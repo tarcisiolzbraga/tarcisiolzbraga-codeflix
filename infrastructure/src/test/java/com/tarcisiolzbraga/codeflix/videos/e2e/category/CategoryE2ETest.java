@@ -5,12 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.E2ETest;
+import com.tarcisiolzbraga.codeflix.videos.infrastructure.KeycloakTestToken;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.category.models.GqlCategory;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.client.RestClient;
 
 // A jornada de quem consome o catálogo: o estado é montado pela própria API e lido de volta por ela,
@@ -26,18 +29,36 @@ class CategoryE2ETest implements CategoryE2EDsl {
     @Value("${local.server.port}")
     private int port;
 
+    @Autowired
+    private KeycloakTestToken token;
+
     private RestClient client;
+
+    private RestClient adminClient;
 
     @BeforeEach
     void bindToTheRunningServer() {
-        this.client = RestClient.builder()
+        this.client = clientWith(this.token.subscriber());
+        this.adminClient = clientWith(this.token.admin());
+    }
+
+    // O token vai no cabeçalho padrão do cliente: é como um consumidor de verdade fala com a API,
+    // e é o que faz esta jornada atravessar também a autorização.
+    private RestClient clientWith(final String bearer) {
+        return RestClient.builder()
                 .baseUrl("http://localhost:%d/api".formatted(this.port))
+                .defaultHeader(HttpHeaders.AUTHORIZATION, bearer)
                 .build();
     }
 
     @Override
     public RestClient client() {
         return this.client;
+    }
+
+    @Override
+    public RestClient adminClient() {
+        return this.adminClient;
     }
 
     @Test

@@ -26,6 +26,11 @@ spring:
 admin-api:
   base-url: ${ADMIN_API_BASE_URL:http://localhost:8080}
 
+# O Keycloak do docker compose do admin-codeflix, montado das mesmas variáveis que o token-uri
+# acima: o emissor que o catálogo valida é o mesmo de quem pede o token.
+keycloak:
+  issuer-uri: http://${KEYCLOAK_HOST:localhost}:${KEYCLOAK_PORT:8081}/realms/${KEYCLOAK_REALM:codeflix}
+
 # O console segue legível para quem está desenvolvendo, e o arquivo sai em ECS, o esquema da própria
 # Elastic — é dele que o Filebeat se alimenta. O Boot 4 formata sozinho: nada de logback-spring.xml
 # nem de encoder a mais no classpath.

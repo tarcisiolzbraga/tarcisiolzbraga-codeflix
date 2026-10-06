@@ -4,10 +4,45 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "description": "Regressão manual do catálogo, que é uma API GraphQL: um só endpoint, POST {{baseUrl}}/graphql, e todas as respostas vêm com status 200 — quem diz que algo deu errado é o campo `errors` do corpo, e é nele que os testes olham.\n\nRoda de cima para baixo no Collection Runner. Diferente da coleção do admin-codeflix, esta não cria nem apaga o que lê: o catálogo não governa dado algum, ele replica o que o admin publica, e a única porta de escrita é a mutation `saveCategory`, que existe explicitamente como exemplo. Então as categorias são semeadas por ela, com ids fixos (`postman-cat-ativa`, `postman-cat-inativa`) para cada execução sobrescrever a anterior em vez de acumular, e gênero, membro de elenco e vídeo são só lidos — o dado deles entra pelo Kafka, e para vê-los com conteúdo é preciso o admin-codeflix de pé com o perfil `cdc` e o conector do Debezium registrado. As pastas 2 a 4 passam com o catálogo vazio: elas afirmam o contrato, e o conteúdo quando houver.\n\nAjuste `baseUrl` se a API não estiver em localhost:8082."
   },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{subscriberToken}}",
+        "type": "string"
+      }
+    ]
+  },
   "variable": [
     {
       "key": "baseUrl",
       "value": "http://localhost:8082/api",
+      "type": "string"
+    },
+    {
+      "key": "keycloakUrl",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
+      "key": "keycloakRealm",
+      "value": "codeflix",
+      "type": "string"
+    },
+    {
+      "key": "clientSecret",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "subscriberToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
       "type": "string"
     },
     {
@@ -23,7 +58,170 @@
   ],
   "item": [
     {
-      "name": "0. Pronto para atender",
+      "name": "0. Autenticação",
+      "description": "O catálogo valida o token de quem chama. Ler pede CODEFLIX_SUBSCRIBER, e a mutation de exemplo, que é a única porta de escrita, pede CODEFLIX_ADMIN — então a coleção pega dois tokens e usa o de administrador só nas requisições que gravam.\n\nOs dois clients moram no realm do admin-codeflix, que é um só. Preencha `clientSecret` com o KEYCLOAK_CLIENT_SECRET do .env dele.\n\nO `keycloakUrl` tem de ser o MESMO host que a aplicação valida: o `iss` do token é a URL por onde ele foi pedido. Em desenvolvimento é localhost, porque a API roda no host.",
+      "item": [
+        {
+          "name": "Pega o token do assinante",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{keycloakUrl}}/realms/{{keycloakRealm}}/protocol/openid-connect/token",
+              "host": [
+                "{{keycloakUrl}}"
+              ],
+              "path": [
+                "realms",
+                "{{keycloakRealm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "subscriber-codeflix"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{clientSecret}}"
+                }
+              ]
+            },
+            "description": "O client subscriber-codeflix, com a role CODEFLIX_SUBSCRIBER: é com ele que um consumidor lê o catálogo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const corpo = pm.response.json();",
+                  "pm.collectionVariables.set(\"subscriberToken\", corpo.access_token);",
+                  "pm.test(\"devolve um token\", () => pm.expect(corpo.access_token).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pega o token do administrador",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{keycloakUrl}}/realms/{{keycloakRealm}}/protocol/openid-connect/token",
+              "host": [
+                "{{keycloakUrl}}"
+              ],
+              "path": [
+                "realms",
+                "{{keycloakRealm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "admin-codeflix"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{clientSecret}}"
+                }
+              ]
+            },
+            "description": "O client admin-codeflix, com CODEFLIX_ADMIN, que abre tudo — inclusive a porta de escrita da mutation de exemplo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const corpo = pm.response.json();",
+                  "pm.collectionVariables.set(\"adminToken\", corpo.access_token);",
+                  "pm.test(\"devolve um token\", () => pm.expect(corpo.access_token).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sem token a API recusa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "{\n  categories {\n    meta {\n      total\n    }\n  }\n}",
+                "variables": ""
+              }
+            },
+            "description": "Status 200 com erro no corpo, como todo GraphQL: quem diz que faltou identificação é a classificação UNAUTHORIZED, não o código HTTP.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"devolve um erro\", () => pm.expect(r.errors).to.have.lengthOf(1));",
+                  "pm.test(\"diz que ninguém se identificou\",",
+                  "    () => pm.expect(r.errors[0].extensions.classification).to.eql(\"UNAUTHORIZED\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Pronto para atender",
       "description": "Duas perguntas antes das outras: a API responde, e ela recusa o que não está no schema.",
       "item": [
         {
@@ -116,7 +314,7 @@
       ]
     },
     {
-      "name": "1. Categorias",
+      "name": "2. Categorias",
       "description": "As únicas que esta coleção consegue semear, pela mutation de exemplo. É também aqui que a regra do catálogo fica visível: o que está inativo não é devolvido por leitura alguma.",
       "item": [
         {
@@ -145,7 +343,17 @@
                 "variables": "{\n  \"input\": {\n    \"id\": \"{{categoriaAtivaId}}\",\n    \"name\": \"Filmes\",\n    \"description\": \"A mais assistida\",\n    \"active\": true,\n    \"createdAt\": \"2026-09-30T12:00:00Z\",\n    \"updatedAt\": \"2026-10-01T08:30:00Z\"\n  }\n}"
               }
             },
-            "description": "A mutation existe EXPLICITAMENTE COMO EXEMPLO, para acompanhar o módulo do curso e semear à mão sem levantar Kafka e Debezium. Não é o caminho do dado: quem grava de verdade é o listener do CDC."
+            "description": "A mutation existe EXPLICITAMENTE COMO EXEMPLO, para acompanhar o módulo do curso e semear à mão sem levantar Kafka e Debezium. Não é o caminho do dado: quem grava de verdade é o listener do CDC.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "event": [
             {
@@ -191,7 +399,17 @@
                 "variables": "{\n  \"input\": {\n    \"id\": \"{{categoriaInativaId}}\",\n    \"name\": \"Categoria desativada\",\n    \"description\": \"Fora do catálogo\",\n    \"active\": false,\n    \"createdAt\": \"2026-09-30T12:00:00Z\",\n    \"updatedAt\": \"2026-10-01T08:30:00Z\"\n  }\n}"
               }
             },
-            "description": "Guardar o inativo é de propósito: a replicação o mantém em dia, e o filtro é na leitura — reativar no admin o faz reaparecer aqui sem replay do Kafka."
+            "description": "Guardar o inativo é de propósito: a replicação o mantém em dia, e o filtro é na leitura — reativar no admin o faz reaparecer aqui sem replay do Kafka.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "event": [
             {
@@ -513,7 +731,17 @@
                 "variables": "{\n  \"input\": {\n    \"id\": \"{{categoriaAtivaId}}\",\n    \"name\": \"Filmes e séries\",\n    \"description\": \"texto novo\",\n    \"active\": true,\n    \"createdAt\": \"2026-09-30T12:00:00Z\",\n    \"updatedAt\": \"2026-10-02T09:00:00Z\"\n  }\n}"
               }
             },
-            "description": "O id vem da fonte, então gravar duas vezes o mesmo id é atualizar a réplica. É o que o CDC faz a cada mudança."
+            "description": "O id vem da fonte, então gravar duas vezes o mesmo id é atualizar a réplica. É o que o CDC faz a cada mudança.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "event": [
             {
@@ -559,7 +787,17 @@
                 "variables": "{\n  \"input\": {\n    \"id\": \"{{categoriaAtivaId}}\",\n    \"name\": \"Filmes\",\n    \"description\": \"A mais assistida\",\n    \"active\": true,\n    \"createdAt\": \"2026-09-30T12:00:00Z\",\n    \"updatedAt\": \"2026-10-01T08:30:00Z\"\n  }\n}"
               }
             },
-            "description": "Fecha a pasta onde ela começou, para a próxima execução encontrar o mesmo estado. É o mais perto de limpeza que dá aqui: o catálogo não tem mutation de remoção."
+            "description": "Fecha a pasta onde ela começou, para a próxima execução encontrar o mesmo estado. É o mais perto de limpeza que dá aqui: o catálogo não tem mutation de remoção.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "event": [
             {
@@ -602,7 +840,17 @@
                 "variables": "{\n  \"input\": {\n    \"id\": \"{{categoriaAtivaId}}\",\n    \"name\": \"Filmes\",\n    \"description\": \"A mais assistida\",\n    \"active\": true,\n    \"createdAt\": \"ontem\",\n    \"updatedAt\": \"2026-10-01T08:30:00Z\"\n  }\n}"
               }
             },
-            "description": "Valor que não converte para o tipo do argumento é erro de quem chamou: vem como BAD_REQUEST nomeando o campo, e não como INTERNAL_ERROR com a pista só no log do servidor."
+            "description": "Valor que não converte para o tipo do argumento é erro de quem chamou: vem como BAD_REQUEST nomeando o campo, e não como INTERNAL_ERROR com a pista só no log do servidor.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
           },
           "event": [
             {
@@ -672,7 +920,7 @@
       ]
     },
     {
-      "name": "2. Gêneros",
+      "name": "3. Gêneros",
       "description": "Só leitura: o gênero entra pelo CDC. Com o catálogo vazio, estas requisições afirmam o contrato; com o CDC rodando, afirmam também o conteúdo.",
       "item": [
         {
@@ -772,7 +1020,7 @@
       ]
     },
     {
-      "name": "3. Membros de elenco",
+      "name": "4. Membros de elenco",
       "description": "Só leitura, pelo mesmo motivo dos gêneros.",
       "item": [
         {
@@ -868,7 +1116,7 @@
       ]
     },
     {
-      "name": "4. Vídeos",
+      "name": "5. Vídeos",
       "description": "O acervo. Só leitura, e com uma regra a mais que os outros: além de ativo, o vídeo precisa estar publicado para ser servido.",
       "item": [
         {
