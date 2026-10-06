@@ -1,0 +1,98 @@
+# Configuração comum aos três perfis: development, homolog e production.
+# Sem perfil ativo (bootRun, testes), vale o development; nos outros ambientes o perfil vem de
+# SPRING_PROFILES_ACTIVE.
+server:
+  port: ${APP_PORT:8082}
+  # Mesmo prefixo da referência, e é por isso que o GraphiQL fica em /api/graphiql.
+  servlet:
+    context-path: /api
+  compression:
+    enabled: true
+
+# A API do admin-codeflix, de onde vem o registro completo depois do aviso do CDC.
+admin-api:
+  base-url: ${ADMIN_API_BASE_URL}
+  # O nome do registro de client OAuth2 declarado abaixo, usado pelo interceptor do RestClient.
+  client-registration-id: admin-api
+
+kafka:
+  consumers:
+    category:
+      id: kafka-listener-category
+      topics: adm_videos_mysql.adm_videos.category
+      group-id: videos-api-codeflix
+      # Um por tópico: os tópicos do Debezium nascem com uma partição, e concorrência acima do
+      # número de partições só deixa consumidor ocioso.
+      concurrency: 1
+      # earliest para o snapshot inicial do Debezium ser consumido na primeira subida: com latest o
+      # catálogo nasceria vazio e só veria o que mudasse a partir de então.
+      auto-offset-reset: earliest
+      max-attempts: 4
+    cast-member:
+      id: kafka-listener-cast-member
+      topics: adm_videos_mysql.adm_videos.cast_member
+      group-id: videos-api-codeflix
+      concurrency: 1
+      auto-offset-reset: earliest
+      max-attempts: 4
+    genre:
+      id: kafka-listener-genre
+      topics: adm_videos_mysql.adm_videos.genre
+      group-id: videos-api-codeflix
+      concurrency: 1
+      auto-offset-reset: earliest
+      max-attempts: 4
+    video:
+      id: kafka-listener-video
+      topics: adm_videos_mysql.adm_videos.video
+      group-id: videos-api-codeflix
+      concurrency: 1
+      auto-offset-reset: earliest
+      max-attempts: 4
+
+spring:
+  profiles:
+    default: development
+  threads:
+    virtual:
+      enabled: true
+  elasticsearch:
+    # Os endereços vêm sem valor padrão de propósito: num serviço de leitura, apontar para um
+    # Elasticsearch que não existe não dá erro visível, dá catálogo vazio — e catálogo vazio é
+    # indistinguível de catálogo que ainda não replicou. Variável faltando derruba a subida.
+    uris: ${ELASTIC_URIS}
+  http:
+    client:
+      read-timeout: 1s
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  security:
+    oauth2:
+      client:
+        registration:
+          admin-api:
+            provider: keycloak
+            client-id: ${KEYCLOAK_CLIENT_ID:videos-api-codeflix}
+            client-secret: ${KEYCLOAK_CLIENT_SECRET}
+            authorization-grant-type: client_credentials
+        provider:
+          keycloak:
+            # A URL inteira numa variável, e não montada a partir de host e porta: fora do
+            # development o Keycloak atende em https, atrás de domínio próprio, sem porta.
+            token-uri: ${KEYCLOAK_TOKEN_URI}
+
+# O emissor dos tokens que o catálogo aceita. Sem valor padrão, pelo mesmo motivo dos endereços
+# acima: validar token contra o emissor errado não dá erro visível, dá acesso concedido a quem não
+# devia — ou negado a quem devia.
+keycloak:
+  issuer-uri: ${KEYCLOAK_ISSUER_URI}
+
+# Identifica a aplicação no log estruturado, que é como o Kibana a separa das outras.
+logging:
+  structured:
+    ecs:
+      service:
+        name: videos-api-codeflix

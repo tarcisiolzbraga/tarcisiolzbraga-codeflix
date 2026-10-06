@@ -1,0 +1,57 @@
+extend type Query {
+    """ Lista os vídeos do catálogo, paginados, com os filtros do acervo """
+    videos(
+        search: String = "",
+        page: Int = 0,
+        """ Quantos itens a página traz. No máximo 100: acima disso o pedido é recusado """
+        perPage: Int = 10,
+        sort: String = "title",
+        direction: String = "asc",
+        rating: String,
+        yearLaunched: Int,
+        categories: [ID!] = [],
+        genres: [ID!] = [],
+        castMembers: [ID!] = []
+    ): VideoPage!
+
+    """ Um vídeo do catálogo. Nulo quando ele não é servido aqui """
+    video(id: ID!): Video
+}
+
+""" Uma página de vídeos, com os números da paginação ao lado dos itens """
+type VideoPage {
+    meta: PageMeta!
+    items: [Video!]!
+}
+
+""" Um vídeo do catálogo """
+type Video {
+    id: ID!
+    title: String!
+    description: String!
+    yearLaunched: Int!
+    duration: Float!
+    """ A classificação indicativa, no mesmo rótulo que o admin publica: ER, L, 10, 12, 14, 16, 18 """
+    rating: String!
+    """ Se o vídeo é aberto a todos ou restrito; não filtra o catálogo """
+    opened: Boolean!
+    video: String
+    trailer: String
+    banner: String
+    thumbnail: String
+    thumbnailHalf: String
+    """ As categorias do vídeo, resolvidas. Categoria inativa não aparece aqui """
+    categories: [Category!]!
+    """ Os gêneros do vídeo, resolvidos. Gênero inativo não aparece aqui """
+    genres: [Genre!]!
+    """ Os membros de elenco do vídeo, resolvidos. Membro inativo não aparece aqui """
+    castMembers: [CastMember!]!
+}
+
+# O rating é String, e não enum como o CastMemberType, por um impedimento do GraphQL: os rótulos que
+# o admin publica são ER, L, 10, 12, 14, 16 e 18, e valor de enum GraphQL não pode começar com
+# dígito. Usar os nomes das constantes (AGE_10) divergiria do contrato do admin. O filtro valida o
+# rótulo e recusa o desconhecido, em vez de ignorá-lo e devolver o acervo inteiro.
+#
+# active e published não são expostos: tudo que sai daqui é active e published, então eles seriam
+# sempre true e não informariam nada.

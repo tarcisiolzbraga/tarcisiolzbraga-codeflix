@@ -1,0 +1,51 @@
+plugins {
+    id 'codeflix.java-conventions'
+    id 'org.springframework.boot'
+    id 'io.spring.dependency-management'
+}
+
+tasks.named('bootJar') {
+    archiveFileName = 'application.jar'
+    destinationDirectory = rootProject.layout.buildDirectory.dir('libs')
+}
+
+tasks.named('jar') {
+    enabled = false
+}
+
+dependencies {
+    implementation project(':domain')
+    implementation project(':application')
+
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
+    implementation 'org.springframework.boot:spring-boot-starter-graphql'
+    // No Boot 4 a autoconfiguração do RestClient saiu do starter de web para um módulo próprio:
+    // sem ele não existe o RestClient.Builder que o cliente da API do admin injeta.
+    implementation 'org.springframework.boot:spring-boot-starter-restclient'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+    // O cliente acima é para o token que SAI, pedido ao Keycloak para falar com a API do admin.
+    // Este é para o token que ENTRA: valida o que o cliente do catálogo apresenta. São módulos
+    // separados no Boot, e ter um não traz o outro.
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    // O starter, e não o org.springframework.kafka:spring-kafka direto: no Boot 4 a
+    // autoconfiguração do Kafka mora em módulo próprio, e sem ela o @KafkaListener nunca sobe
+    // o container de escuta nem existe KafkaTemplate algum — falha silenciosa, sem erro.
+    implementation 'org.springframework.boot:spring-boot-starter-kafka'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-graphql-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    // BOM 2.x porque é a linha do core que o spring-boot-testcontainers traz; na 2.0 os módulos
+    // ganharam o prefixo testcontainers- e os artefatos antigos pararam na 1.21.
+    testImplementation platform('org.testcontainers:testcontainers-bom:2.0.5')
+    testImplementation 'org.testcontainers:testcontainers-elasticsearch'
+    testImplementation 'org.testcontainers:testcontainers-kafka'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
+}
+
+tasks.named('bootRun') {
+    workingDir = rootProject.projectDir
+}

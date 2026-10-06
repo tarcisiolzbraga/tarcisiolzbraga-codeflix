@@ -1,0 +1,8 @@
+// O buildSrc é compilado antes do resto e dá origem aos plugins de convenção usados pelos módulos.
+plugins {
+    id 'groovy-gradle-plugin'
+}
+
+repositories {
+    mavenCentral()
+}

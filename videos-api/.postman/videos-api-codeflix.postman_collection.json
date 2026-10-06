@@ -1,0 +1,1349 @@
+{
+  "info": {
+    "name": "videos-api-codeflix",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Regressão manual do catálogo, que é uma API GraphQL: um só endpoint, POST {{baseUrl}}/graphql, e todas as respostas vêm com status 200 — quem diz que algo deu errado é o campo `errors` do corpo, e é nele que os testes olham.\n\nRoda de cima para baixo no Collection Runner. Diferente da coleção do admin-codeflix, esta não cria nem apaga o que lê: o catálogo não governa dado algum, ele replica o que o admin publica, e a única porta de escrita é a mutation `saveCategory`, que existe explicitamente como exemplo. Então as categorias são semeadas por ela, com ids fixos (`postman-cat-ativa`, `postman-cat-inativa`) para cada execução sobrescrever a anterior em vez de acumular, e gênero, membro de elenco e vídeo são só lidos — o dado deles entra pelo Kafka, e para vê-los com conteúdo é preciso o admin-codeflix de pé com o perfil `cdc` e o conector do Debezium registrado. As pastas 2 a 4 passam com o catálogo vazio: elas afirmam o contrato, e o conteúdo quando houver.\n\nAjuste `baseUrl` se a API não estiver em localhost:8082."
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{subscriberToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8082/api",
+      "type": "string"
+    },
+    {
+      "key": "keycloakUrl",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
+      "key": "keycloakRealm",
+      "value": "codeflix",
+      "type": "string"
+    },
+    {
+      "key": "clientSecret",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "subscriberToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "categoriaAtivaId",
+      "value": "postman-cat-ativa",
+      "type": "string"
+    },
+    {
+      "key": "categoriaInativaId",
+      "value": "postman-cat-inativa",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Autenticação",
+      "description": "O catálogo valida o token de quem chama. Ler pede CODEFLIX_SUBSCRIBER, e a mutation de exemplo, que é a única porta de escrita, pede CODEFLIX_ADMIN — então a coleção pega dois tokens e usa o de administrador só nas requisições que gravam.\n\nOs dois clients moram no realm do admin-codeflix, que é um só. Preencha `clientSecret` com o KEYCLOAK_CLIENT_SECRET do .env dele.\n\nO `keycloakUrl` tem de ser o MESMO host que a aplicação valida: o `iss` do token é a URL por onde ele foi pedido. Em desenvolvimento é localhost, porque a API roda no host.",
+      "item": [
+        {
+          "name": "Pega o token do assinante",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{keycloakUrl}}/realms/{{keycloakRealm}}/protocol/openid-connect/token",
+              "host": [
+                "{{keycloakUrl}}"
+              ],
+              "path": [
+                "realms",
+                "{{keycloakRealm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "subscriber-codeflix"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{clientSecret}}"
+                }
+              ]
+            },
+            "description": "O client subscriber-codeflix, com a role CODEFLIX_SUBSCRIBER: é com ele que um consumidor lê o catálogo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const corpo = pm.response.json();",
+                  "pm.collectionVariables.set(\"subscriberToken\", corpo.access_token);",
+                  "pm.test(\"devolve um token\", () => pm.expect(corpo.access_token).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pega o token do administrador",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{keycloakUrl}}/realms/{{keycloakRealm}}/protocol/openid-connect/token",
+              "host": [
+                "{{keycloakUrl}}"
+              ],
+              "path": [
+                "realms",
+                "{{keycloakRealm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "admin-codeflix"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{clientSecret}}"
+                }
+              ]
+            },
+            "description": "O client admin-codeflix, com CODEFLIX_ADMIN, que abre tudo — inclusive a porta de escrita da mutation de exemplo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const corpo = pm.response.json();",
+                  "pm.collectionVariables.set(\"adminToken\", corpo.access_token);",
+                  "pm.test(\"devolve um token\", () => pm.expect(corpo.access_token).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sem token a API recusa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "{\n  categories {\n    meta {\n      total\n    }\n  }\n}",
+                "variables": ""
+              }
+            },
+            "description": "Status 200 com erro no corpo, como todo GraphQL: quem diz que faltou identificação é a classificação UNAUTHORIZED, não o código HTTP.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"devolve um erro\", () => pm.expect(r.errors).to.have.lengthOf(1));",
+                  "pm.test(\"diz que ninguém se identificou\",",
+                  "    () => pm.expect(r.errors[0].extensions.classification).to.eql(\"UNAUTHORIZED\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Pronto para atender",
+      "description": "Duas perguntas antes das outras: a API responde, e ela recusa o que não está no schema.",
+      "item": [
+        {
+          "name": "A API responde",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "{\n  __typename\n}",
+                "variables": ""
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "pm.test(\"é a raiz Query\", () => pm.expect(r.data.__typename).to.eql(\"Query\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Campo fora do schema é recusado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "{\n  categories {\n    items {\n      naoExiste\n    }\n  }\n}",
+                "variables": ""
+              }
+            },
+            "description": "O schema é o contrato: campo desconhecido não chega ao servidor de dados, é barrado na validação da consulta."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"recusa antes de executar\", () => pm.expect(r.errors).to.have.lengthOf(1));",
+                  "pm.test(\"diz que é erro de validação\", () => pm.expect(r.errors[0].extensions.classification)",
+                  "    .to.eql(\"ValidationError\"));",
+                  "pm.test(\"não executa nada\", () => pm.expect(r.data).to.be.undefined);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Categorias",
+      "description": "As únicas que esta coleção consegue semear, pela mutation de exemplo. É também aqui que a regra do catálogo fica visível: o que está inativo não é devolvido por leitura alguma.",
+      "item": [
+        {
+          "name": "Semeia a categoria ativa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation SalvaCategoria($input: CategoryInput!) {\n  saveCategory(input: $input) {\n    id\n    name\n    description\n  }\n}",
+                "variables": "{\n  \"input\": {\n    \"id\": \"{{categoriaAtivaId}}\",\n    \"name\": \"Filmes\",\n    \"description\": \"A mais assistida\",\n    \"active\": true,\n    \"createdAt\": \"2026-09-30T12:00:00Z\",\n    \"updatedAt\": \"2026-10-01T08:30:00Z\"\n  }\n}"
+              }
+            },
+            "description": "A mutation existe EXPLICITAMENTE COMO EXEMPLO, para acompanhar o módulo do curso e semear à mão sem levantar Kafka e Debezium. Não é o caminho do dado: quem grava de verdade é o listener do CDC.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "pm.test(\"devolve o id semeado\", () => pm.expect(r.data.saveCategory.id)",
+                  "    .to.eql(pm.collectionVariables.get(\"categoriaAtivaId\")));",
+                  "pm.test(\"devolve os campos pedidos\", () => pm.expect(Object.keys(r.data.saveCategory).sort())",
+                  "    .to.eql([\"description\",\"id\",\"name\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Semeia uma categoria inativa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation SalvaCategoria($input: CategoryInput!) {\n  saveCategory(input: $input) {\n    id\n    name\n    description\n  }\n}",
+                "variables": "{\n  \"input\": {\n    \"id\": \"{{categoriaInativaId}}\",\n    \"name\": \"Categoria desativada\",\n    \"description\": \"Fora do catálogo\",\n    \"active\": false,\n    \"createdAt\": \"2026-09-30T12:00:00Z\",\n    \"updatedAt\": \"2026-10-01T08:30:00Z\"\n  }\n}"
+              }
+            },
+            "description": "Guardar o inativo é de propósito: a replicação o mantém em dia, e o filtro é na leitura — reativar no admin o faz reaparecer aqui sem replay do Kafka.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "pm.test(\"a escrita aceita o inativo\", () => pm.expect(r.data.saveCategory.id)",
+                  "    .to.eql(pm.collectionVariables.get(\"categoriaInativaId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lista as categorias",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "{\n  categories(search: \"\", page: 0, perPage: 10, sort: \"name\", direction: \"asc\") {\n    meta {\n      currentPage\n      perPage\n      total\n    }\n    items {\n      id\n      name\n      description\n    }\n  }\n}",
+                "variables": ""
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "pm.test(\"campos da paginação\", () => pm.expect(Object.keys(r.data.categories.meta).sort())",
+                  "    .to.eql([\"currentPage\",\"perPage\",\"total\"]));",
+                  "pm.test(\"devolve a página pedida\", () => {",
+                  "    pm.expect(r.data.categories.meta.currentPage).to.eql(0);",
+                  "    pm.expect(r.data.categories.meta.perPage).to.eql(10);",
+                  "});",
+                  "pm.test(\"acha a categoria semeada\", () => pm.expect(r.data.categories.items.map(i => i.id))",
+                  "    .to.include(pm.collectionVariables.get(\"categoriaAtivaId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A categoria inativa não aparece",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "{\n  categories(perPage: 100) {\n    items {\n      id\n    }\n  }\n}",
+                "variables": ""
+              }
+            },
+            "description": "A regra central deste serviço: nada inativo é devolvido, por leitura alguma. Desativar no admin tira do catálogo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "const ids = r.data.categories.items.map(i => i.id);",
+                  "pm.test(\"a inativa fica de fora\", () => pm.expect(ids)",
+                  "    .to.not.include(pm.collectionVariables.get(\"categoriaInativaId\")));",
+                  "pm.test(\"acha a categoria semeada\", () => pm.expect(r.data.categories.items.map(i => i.id))",
+                  "    .to.include(pm.collectionVariables.get(\"categoriaAtivaId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Busca por um termo que só está na descrição",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "{\n  categories(search: \"mais assistida\") {\n    meta {\n      total\n    }\n    items {\n      id\n      name\n    }\n  }\n}",
+                "variables": ""
+              }
+            },
+            "description": "O termo procura no nome e na descrição: o cliente não precisa saber em qual campo a palavra está."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "pm.test(\"acha alguma coisa\", () => pm.expect(r.data.categories.meta.total).to.be.above(0));",
+                  "pm.test(\"acha a categoria semeada\", () => pm.expect(r.data.categories.items.map(i => i.id))",
+                  "    .to.include(pm.collectionVariables.get(\"categoriaAtivaId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pede a segunda página",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "{\n  categories(page: 1, perPage: 1) {\n    meta {\n      currentPage\n      perPage\n      total\n    }\n    items {\n      id\n    }\n  }\n}",
+                "variables": ""
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "const m = r.data.categories.meta;",
+                  "pm.test(\"devolve a página 1\", () => pm.expect(m.currentPage).to.eql(1));",
+                  "pm.test(\"o total é do acervo, não da página\", () => pm.expect(m.total).to.be.above(1));",
+                  "pm.test(\"a página respeita o perPage\", () => pm.expect(r.data.categories.items.length)",
+                  "    .to.be.at.most(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pedir página maior que o teto é recusado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "{\n  categories(perPage: 101) {\n    items {\n      id\n    }\n  }\n}",
+                "variables": ""
+              }
+            },
+            "description": "O teto é 100, e o pedido acima dele é recusado em vez de reduzido ao máximo: quem pedisse mil itens e recebesse cem pediria a página seguinte em cima de uma premissa errada. Vale para as quatro listagens."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"devolve um erro\", () => pm.expect(r.errors).to.have.lengthOf(1));",
+                  "pm.test(\"classificado como erro do cliente\",",
+                  "    () => pm.expect(r.errors[0].extensions.classification).to.eql(\"BAD_REQUEST\"));",
+                  "pm.test(\"a mensagem diz a faixa aceita\",",
+                  "    () => pm.expect(r.errors[0].message).to.eql(\"'perPage' should be between 1 and 100\"));",
+                  "pm.test(\"não devolve página cortada\", () => pm.expect(r.data).to.be.null);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inverte a ordem",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "{\n  categories(sort: \"name\", direction: \"desc\", perPage: 100) {\n    items {\n      name\n    }\n  }\n}",
+                "variables": ""
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "const nomes = r.data.categories.items.map(i => i.name);",
+                  "const descendente = [...nomes].sort().reverse();",
+                  "pm.test(\"vem em ordem descendente\", () => pm.expect(nomes).to.eql(descendente));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sobrescrever o mesmo id substitui, não duplica",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation SalvaCategoria($input: CategoryInput!) {\n  saveCategory(input: $input) {\n    id\n    name\n    description\n  }\n}",
+                "variables": "{\n  \"input\": {\n    \"id\": \"{{categoriaAtivaId}}\",\n    \"name\": \"Filmes e séries\",\n    \"description\": \"texto novo\",\n    \"active\": true,\n    \"createdAt\": \"2026-09-30T12:00:00Z\",\n    \"updatedAt\": \"2026-10-02T09:00:00Z\"\n  }\n}"
+              }
+            },
+            "description": "O id vem da fonte, então gravar duas vezes o mesmo id é atualizar a réplica. É o que o CDC faz a cada mudança.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "pm.test(\"mesmo id, nome novo\", () => {",
+                  "    pm.expect(r.data.saveCategory.id).to.eql(pm.collectionVariables.get(\"categoriaAtivaId\"));",
+                  "    pm.expect(r.data.saveCategory.name).to.eql(\"Filmes e séries\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Devolve a categoria ao estado inicial",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation SalvaCategoria($input: CategoryInput!) {\n  saveCategory(input: $input) {\n    id\n    name\n    description\n  }\n}",
+                "variables": "{\n  \"input\": {\n    \"id\": \"{{categoriaAtivaId}}\",\n    \"name\": \"Filmes\",\n    \"description\": \"A mais assistida\",\n    \"active\": true,\n    \"createdAt\": \"2026-09-30T12:00:00Z\",\n    \"updatedAt\": \"2026-10-01T08:30:00Z\"\n  }\n}"
+              }
+            },
+            "description": "Fecha a pasta onde ela começou, para a próxima execução encontrar o mesmo estado. É o mais perto de limpeza que dá aqui: o catálogo não tem mutation de remoção.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "pm.test(\"volta a ser Filmes\", () => pm.expect(r.data.saveCategory.name).to.eql(\"Filmes\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Data fora do ISO-8601 é recusada, dizendo qual campo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation SalvaCategoria($input: CategoryInput!) {\n  saveCategory(input: $input) {\n    id\n    name\n    description\n  }\n}",
+                "variables": "{\n  \"input\": {\n    \"id\": \"{{categoriaAtivaId}}\",\n    \"name\": \"Filmes\",\n    \"description\": \"A mais assistida\",\n    \"active\": true,\n    \"createdAt\": \"ontem\",\n    \"updatedAt\": \"2026-10-01T08:30:00Z\"\n  }\n}"
+              }
+            },
+            "description": "Valor que não converte para o tipo do argumento é erro de quem chamou: vem como BAD_REQUEST nomeando o campo, e não como INTERNAL_ERROR com a pista só no log do servidor.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"devolve um erro\", () => pm.expect(r.errors).to.have.lengthOf(1));",
+                  "pm.test(\"classificado como erro do cliente\",",
+                  "    () => pm.expect(r.errors[0].extensions.classification).to.eql(\"BAD_REQUEST\"));",
+                  "pm.test(\"nomeia o campo e mostra o valor recusado\",",
+                  "    () => pm.expect(r.errors[0].message).to.eql(\"'createdAt' received an invalid value: ontem\"));",
+                  "pm.test(\"não grava nada\", () => pm.expect(r.data).to.be.null);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Direção de ordenação inválida é recusada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "{\n  categories(direction: \"xpto\") {\n    items {\n      id\n    }\n  }\n}",
+                "variables": ""
+              }
+            },
+            "description": "Entrada ruim do cliente é resposta ao cliente, não falha interna: vem como BAD_REQUEST, com a mensagem que diz o que é válido."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"devolve um erro\", () => pm.expect(r.errors).to.have.lengthOf(1));",
+                  "pm.test(\"classificado como erro do cliente\",",
+                  "    () => pm.expect(r.errors[0].extensions.classification).to.eql(\"BAD_REQUEST\"));",
+                  "pm.test(\"a mensagem diz o que é aceito\",",
+                  "    () => pm.expect(r.errors[0].message).to.match(/asc/i));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Gêneros",
+      "description": "Só leitura: o gênero entra pelo CDC. Com o catálogo vazio, estas requisições afirmam o contrato; com o CDC rodando, afirmam também o conteúdo.",
+      "item": [
+        {
+          "name": "Lista os gêneros com as categorias resolvidas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "{\n  genres(search: \"\", page: 0, perPage: 10) {\n    meta {\n      currentPage\n      perPage\n      total\n    }\n    items {\n      id\n      name\n      categories {\n        id\n        name\n      }\n    }\n  }\n}",
+                "variables": ""
+              }
+            },
+            "description": "As categorias saem resolvidas, e não como lista de ids como na referência do curso: id cru deixaria passar o id de uma categoria desativada, e o cliente receberia um identificador opaco em vez do nome. A resolução é em lote, uma consulta para a página toda."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "const p = r.data.genres;",
+                  "pm.test(\"campos da paginação\", () => pm.expect(Object.keys(p.meta).sort())",
+                  "    .to.eql([\"currentPage\",\"perPage\",\"total\"]));",
+                  "pm.test(\"a categoria vem resolvida, não como id solto\", () => p.items.forEach(g => {",
+                  "    pm.expect(g.categories).to.be.an(\"array\");",
+                  "    g.categories.forEach(c => pm.expect(Object.keys(c).sort()).to.eql([\"id\",\"name\"]));",
+                  "}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filtra os gêneros por categoria",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query PorCategoria($categorias: [ID!]) {\n  genres(categories: $categorias) {\n    meta {\n      total\n    }\n    items {\n      name\n      categories {\n        id\n      }\n    }\n  }\n}",
+                "variables": "{\n  \"categorias\": [\n    \"{{categoriaAtivaId}}\"\n  ]\n}"
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "const alvo = pm.collectionVariables.get(\"categoriaAtivaId\");",
+                  "pm.test(\"todo gênero devolvido tem a categoria pedida\",",
+                  "    () => r.data.genres.items.forEach(g => pm.expect(g.categories.map(c => c.id))",
+                  "        .to.include(alvo)));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Membros de elenco",
+      "description": "Só leitura, pelo mesmo motivo dos gêneros.",
+      "item": [
+        {
+          "name": "Lista os membros de elenco",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "{\n  castMembers(search: \"\", page: 0, perPage: 10, sort: \"name\") {\n    meta {\n      currentPage\n      perPage\n      total\n    }\n    items {\n      id\n      name\n      type\n    }\n  }\n}",
+                "variables": ""
+              }
+            },
+            "description": "O papel é enum no schema, e não texto: o conjunto é fechado em ACTOR e DIRECTOR, então valor fora dele é recusado na validação da consulta."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "pm.test(\"campos da paginação\", () => pm.expect(Object.keys(r.data.castMembers.meta).sort())",
+                  "    .to.eql([\"currentPage\",\"perPage\",\"total\"]));",
+                  "pm.test(\"o papel é do conjunto fechado\",",
+                  "    () => r.data.castMembers.items.forEach(m => pm.expect(m.type)",
+                  "        .to.be.oneOf([\"ACTOR\",\"DIRECTOR\"])));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Busca um membro por termo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query PorTermo($termo: String) {\n  castMembers(search: $termo) {\n    meta {\n      total\n    }\n    items {\n      name\n    }\n  }\n}",
+                "variables": "{\n  \"termo\": \"a\"\n}"
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "pm.test(\"o total nunca é negativo\",",
+                  "    () => pm.expect(r.data.castMembers.meta.total).to.be.at.least(0));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Vídeos",
+      "description": "O acervo. Só leitura, e com uma regra a mais que os outros: além de ativo, o vídeo precisa estar publicado para ser servido.",
+      "item": [
+        {
+          "name": "Lista o acervo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "{\n  videos(search: \"\", page: 0, perPage: 10, sort: \"title\") {\n    meta {\n      currentPage\n      perPage\n      total\n    }\n    items {\n      id\n      title\n      yearLaunched\n      duration\n      rating\n      opened\n      video\n      trailer\n    }\n  }\n}",
+                "variables": ""
+              }
+            },
+            "description": "active e published não são expostos: tudo que sai daqui é os dois, então eles seriam sempre true e não informariam nada. O opened é exposto e não filtra — ele diz se o vídeo é aberto a todos ou restrito, que é assunto de autenticação."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "pm.test(\"campos da paginação\", () => pm.expect(Object.keys(r.data.videos.meta).sort())",
+                  "    .to.eql([\"currentPage\",\"perPage\",\"total\"]));",
+                  "pm.test(\"a classificação é um dos rótulos do admin\",",
+                  "    () => r.data.videos.items.forEach(v => pm.expect(v.rating)",
+                  "        .to.be.oneOf([\"ER\",\"L\",\"10\",\"12\",\"14\",\"16\",\"18\"])));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Um vídeo pelo id",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query PorId($id: ID!) {\n  video(id: $id) {\n    id\n    title\n    categories {\n      id\n      name\n    }\n    genres {\n      id\n      name\n    }\n    castMembers {\n      id\n      name\n      type\n    }\n  }\n}",
+                "variables": "{\n  \"id\": \"nao-existe\"\n}"
+              }
+            },
+            "description": "Nulo, e não erro: o vídeo pode não existir, estar inativo ou não estar publicado, e o cliente não precisa saber qual dos três é — para ele, não está no catálogo. Troque o id pelo de um vídeo replicado para ver as três relações resolvidas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "pm.test(\"id que o catálogo não serve devolve nulo, sem erro\",",
+                  "    () => pm.expect(r.data.video).to.be.null);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filtra por classificação",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query PorClassificacao($rating: String) {\n  videos(rating: $rating) {\n    meta {\n      total\n    }\n    items {\n      title\n      rating\n    }\n  }\n}",
+                "variables": "{\n  \"rating\": \"14\"\n}"
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "pm.test(\"todo vídeo devolvido tem a classificação pedida\",",
+                  "    () => r.data.videos.items.forEach(v => pm.expect(v.rating).to.eql(\"14\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Classificação desconhecida é recusada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "{\n  videos(rating: \"XPTO\") {\n    meta {\n      total\n    }\n  }\n}",
+                "variables": ""
+              }
+            },
+            "description": "O rating é String no schema porque valor de enum GraphQL não pode começar com dígito, e os rótulos do admin incluem 10, 12, 14, 16 e 18. Então a validação é no filtro: rótulo desconhecido é recusado, e não ignorado — ignorar devolveria o acervo inteiro como se o filtro tivesse sido aplicado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"devolve um erro\", () => pm.expect(r.errors).to.have.lengthOf(1));",
+                  "pm.test(\"classificado como erro do cliente\",",
+                  "    () => pm.expect(r.errors[0].extensions.classification).to.eql(\"BAD_REQUEST\"));",
+                  "pm.test(\"a mensagem lista os rótulos aceitos\",",
+                  "    () => pm.expect(r.errors[0].message).to.include(\"ER\"));",
+                  "pm.test(\"não devolve o acervo inteiro\", () => pm.expect(r.data).to.be.null);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filtra por ano de lançamento",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query PorAno($ano: Int) {\n  videos(yearLaunched: $ano) {\n    meta {\n      total\n    }\n    items {\n      title\n      yearLaunched\n    }\n  }\n}",
+                "variables": "{\n  \"ano\": 2026\n}"
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem erros\", () => pm.expect(r.errors, JSON.stringify(r.errors)).to.be.undefined);",
+                  "pm.test(\"todo vídeo devolvido é do ano pedido\",",
+                  "    () => r.data.videos.items.forEach(v => pm.expect(v.yearLaunched).to.eql(2026)));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

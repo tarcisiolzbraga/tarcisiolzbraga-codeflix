@@ -1,0 +1,20 @@
+# Homologação: espelha a produção, com variáveis de ambiente no lugar do .env, mas mantém o GraphiQL
+# no ar para quem valida a API — aqui ele é a documentação navegável do schema, o equivalente ao
+# Swagger UI do admin-codeflix.
+# Aqui a aplicação roda em container, então o log estruturado sai no stdout, que é de onde o coletor
+# o recolhe — sem arquivo, que num container seria uma camada a mais para ninguém ler. É o inverso do
+# development, onde o console fica legível e o arquivo é que sai em ECS.
+spring:
+  graphql:
+    graphiql:
+      enabled: ${GRAPHIQL_ENABLED:true}
+
+logging:
+  structured:
+    format:
+      console: ecs
+    ecs:
+      service:
+        environment: homolog
+  level:
+    com.tarcisiolzbraga.codeflix.videos: info

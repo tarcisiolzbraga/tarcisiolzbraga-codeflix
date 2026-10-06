@@ -1,0 +1,275 @@
+{
+  "schema": {
+    "type": "struct",
+    "fields": [
+      {
+        "type": "struct",
+        "fields": [
+          {
+            "type": "string",
+            "optional": false,
+            "field": "id"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "name"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "description"
+          },
+          {
+            "type": "int16",
+            "optional": false,
+            "default": 1,
+            "field": "active"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "name": "io.debezium.time.MicroTimestamp",
+            "version": 1,
+            "field": "created_at"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "name": "io.debezium.time.MicroTimestamp",
+            "version": 1,
+            "field": "updated_at"
+          }
+        ],
+        "optional": true,
+        "name": "adm_videos_mysql.adm_videos.category.Value",
+        "field": "before"
+      },
+      {
+        "type": "struct",
+        "fields": [
+          {
+            "type": "string",
+            "optional": false,
+            "field": "id"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "name"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "description"
+          },
+          {
+            "type": "int16",
+            "optional": false,
+            "default": 1,
+            "field": "active"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "name": "io.debezium.time.MicroTimestamp",
+            "version": 1,
+            "field": "created_at"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "name": "io.debezium.time.MicroTimestamp",
+            "version": 1,
+            "field": "updated_at"
+          }
+        ],
+        "optional": true,
+        "name": "adm_videos_mysql.adm_videos.category.Value",
+        "field": "after"
+      },
+      {
+        "type": "struct",
+        "fields": [
+          {
+            "type": "string",
+            "optional": false,
+            "field": "version"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "connector"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "name"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "field": "ts_ms"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "name": "io.debezium.data.Enum",
+            "version": 1,
+            "parameters": {
+              "allowed": "true,first,first_in_data_collection,last_in_data_collection,last,false,incremental"
+            },
+            "default": "false",
+            "field": "snapshot"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "db"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "sequence"
+          },
+          {
+            "type": "int64",
+            "optional": true,
+            "field": "ts_us"
+          },
+          {
+            "type": "int64",
+            "optional": true,
+            "field": "ts_ns"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "table"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "field": "server_id"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "gtid"
+          },
+          {
+            "type": "string",
+            "optional": false,
+            "field": "file"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "field": "pos"
+          },
+          {
+            "type": "int32",
+            "optional": false,
+            "field": "row"
+          },
+          {
+            "type": "int64",
+            "optional": true,
+            "field": "thread"
+          },
+          {
+            "type": "string",
+            "optional": true,
+            "field": "query"
+          }
+        ],
+        "optional": false,
+        "name": "io.debezium.connector.mysql.Source",
+        "version": 1,
+        "field": "source"
+      },
+      {
+        "type": "struct",
+        "fields": [
+          {
+            "type": "string",
+            "optional": false,
+            "field": "id"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "field": "total_order"
+          },
+          {
+            "type": "int64",
+            "optional": false,
+            "field": "data_collection_order"
+          }
+        ],
+        "optional": true,
+        "name": "event.block",
+        "version": 1,
+        "field": "transaction"
+      },
+      {
+        "type": "string",
+        "optional": false,
+        "field": "op"
+      },
+      {
+        "type": "int64",
+        "optional": true,
+        "field": "ts_ms"
+      },
+      {
+        "type": "int64",
+        "optional": true,
+        "field": "ts_us"
+      },
+      {
+        "type": "int64",
+        "optional": true,
+        "field": "ts_ns"
+      }
+    ],
+    "optional": false,
+    "name": "adm_videos_mysql.adm_videos.category.Envelope",
+    "version": 2
+  },
+  "payload": {
+    "before": null,
+    "after": {
+      "id": "7be1dcaa-ea14-4995-a0ed-205a76499c25",
+      "name": "Documentários",
+      "description": "Catálogo de documentários",
+      "active": 1,
+      "created_at": 1790890530549972,
+      "updated_at": 1790890530549972
+    },
+    "source": {
+      "version": "3.6.3.Final",
+      "connector": "mysql",
+      "name": "adm_videos_mysql",
+      "ts_ms": 1790955580000,
+      "snapshot": "first",
+      "db": "adm_videos",
+      "sequence": null,
+      "ts_us": 1790955580000000,
+      "ts_ns": 1790955580000000000,
+      "table": "category",
+      "server_id": 0,
+      "gtid": null,
+      "file": "binlog.000008",
+      "pos": 935,
+      "row": 0,
+      "thread": null,
+      "query": null
+    },
+    "transaction": null,
+    "op": "r",
+    "ts_ms": 1790955580850,
+    "ts_us": 1790955580850997,
+    "ts_ns": 1790955580850997789
+  }
+}

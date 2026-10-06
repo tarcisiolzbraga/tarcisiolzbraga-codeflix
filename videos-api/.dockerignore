@@ -1,0 +1,3 @@
+# O build acontece fora da imagem, então só o jar precisa entrar no contexto.
+*
+!build/libs/application.jar

@@ -1,0 +1,27 @@
+import org.gradle.process.CommandLineArgumentProvider
+
+plugins {
+    id 'codeflix.java-conventions'
+    id 'java-library'
+}
+
+def mockitoVersion = '5.20.0'
+
+configurations {
+    mockitoAgent {
+        transitive = false
+    }
+}
+
+dependencies {
+    api project(':domain')
+
+    testImplementation "org.mockito:mockito-junit-jupiter:$mockitoVersion"
+    mockitoAgent "org.mockito:mockito-core:$mockitoVersion"
+}
+
+// O Mockito precisa ser carregado como agente: a auto-anexação deixará de funcionar no JDK.
+tasks.named('test') {
+    def agentJar = configurations.mockitoAgent
+    jvmArgumentProviders.add({ ["-javaagent:${agentJar.asPath}".toString()] } as CommandLineArgumentProvider)
+}

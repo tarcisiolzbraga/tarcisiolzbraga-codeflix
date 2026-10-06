@@ -1,0 +1,48 @@
+extend type Query {
+    """ Lista as categorias do catálogo, paginadas """
+    categories(
+        search: String = "",
+        page: Int = 0,
+        """ Quantos itens a página traz. No máximo 100: acima disso o pedido é recusado """
+        perPage: Int = 10,
+        sort: String = "name",
+        direction: String = "asc"
+    ): CategoryPage!
+}
+
+""" Uma página de categorias, com os números da paginação ao lado dos itens """
+type CategoryPage {
+    meta: PageMeta!
+    items: [Category!]!
+}
+
+""" Uma categoria do catálogo """
+type Category {
+    id: ID!
+    name: String!
+    description: String
+}
+
+# ---------------------------------------------------------------------------------------------
+# A mutation abaixo existe EXPLICITAMENTE COMO EXEMPLO, para acompanhar o módulo do curso e para
+# semear uma categoria à mão sem levantar Kafka e Debezium.
+#
+# Ela NÃO é o caminho normal do dado: este catálogo não governa categoria alguma, ele replica o que
+# o admin-codeflix publica, e quem grava de verdade é o listener do CDC. Um cliente chamando isto
+# consegue inventar categoria que não existe no admin, ou sobrescrever uma com dado errado — e o
+# próximo evento do CDC corrige ou não, em silêncio.
+# ---------------------------------------------------------------------------------------------
+extend type Mutation {
+    """ Exemplo: grava uma categoria à mão, fora do caminho da replicação """
+    saveCategory(input: CategoryInput!): Category!
+}
+
+""" Exemplo: os campos de uma categoria, como o admin-codeflix os publica """
+input CategoryInput {
+    id: ID!
+    name: String!
+    description: String
+    active: Boolean! = true
+    createdAt: String!
+    updatedAt: String!
+}

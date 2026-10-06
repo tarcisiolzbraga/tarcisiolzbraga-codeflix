@@ -1,0 +1,67 @@
+{
+  "realm": "codeflix",
+  "displayName": "Codeflix (realm de teste do catálogo)",
+  "enabled": true,
+  "sslRequired": "none",
+  "roles": {
+    "realm": [
+      { "name": "CODEFLIX_SUBSCRIBER", "description": "Lê o catálogo" },
+      { "name": "CODEFLIX_ADMIN", "description": "Acesso a todo o catálogo" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "catalog-subscriber-test",
+      "name": "Assinante, para os testes do catálogo",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "secret": "segredo-de-teste"
+    },
+    {
+      "clientId": "catalog-admin-test",
+      "name": "Administrador, para os testes do catálogo",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "secret": "segredo-de-teste"
+    },
+    {
+      "clientId": "catalog-stranger-test",
+      "name": "Sem papel algum, para provar a recusa",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "secret": "segredo-de-teste"
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-catalog-subscriber-test",
+      "enabled": true,
+      "serviceAccountClientId": "catalog-subscriber-test",
+      "realmRoles": ["CODEFLIX_SUBSCRIBER"]
+    },
+    {
+      "username": "service-account-catalog-admin-test",
+      "enabled": true,
+      "serviceAccountClientId": "catalog-admin-test",
+      "realmRoles": ["CODEFLIX_ADMIN"]
+    },
+    {
+      "username": "service-account-catalog-stranger-test",
+      "enabled": true,
+      "serviceAccountClientId": "catalog-stranger-test",
+      "realmRoles": []
+    }
+  ]
+}
