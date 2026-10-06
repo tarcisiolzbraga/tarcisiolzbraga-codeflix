@@ -24,6 +24,10 @@ dependencies {
     // sem ele não existe o RestClient.Builder que o cliente da API do admin injeta.
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+    // O cliente acima é para o token que SAI, pedido ao Keycloak para falar com a API do admin.
+    // Este é para o token que ENTRA: valida o que o cliente do catálogo apresenta. São módulos
+    // separados no Boot, e ter um não traz o outro.
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
     // O starter, e não o org.springframework.kafka:spring-kafka direto: no Boot 4 a
     // autoconfiguração do Kafka mora em módulo próprio, e sem ela o @KafkaListener nunca sobe
     // o container de escuta nem existe KafkaTemplate algum — falha silenciosa, sem erro.
