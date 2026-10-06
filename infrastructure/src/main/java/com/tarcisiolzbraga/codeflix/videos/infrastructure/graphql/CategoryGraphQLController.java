@@ -7,10 +7,12 @@ import com.tarcisiolzbraga.codeflix.videos.infrastructure.category.models.GqlCat
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.category.models.GqlCategoryPage;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.category.models.GqlCategoryQuery;
 import java.util.Objects;
+import com.tarcisiolzbraga.codeflix.videos.infrastructure.security.Roles;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.Arguments;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.security.access.annotation.Secured;
 import org.springframework.stereotype.Controller;
 
 @Controller
@@ -30,6 +32,7 @@ public class CategoryGraphQLController {
     // @Arguments agrupa os cinco argumentos nomeados do schema num record só, então o método fica
     // com um parâmetro. O cliente continua vendo argumentos com valor padrão.
     @QueryMapping
+    @Secured({Roles.SUBSCRIBER, Roles.ADMIN})
     public GqlCategoryPage categories(@Arguments final GqlCategoryQuery query) {
         return GqlCategoryPage.from(this.listCategoriesUseCase.execute(query.toSearchQuery()));
     }
