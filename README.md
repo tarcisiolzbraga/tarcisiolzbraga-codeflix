@@ -174,6 +174,22 @@ Nos testes que esperam a chegada de uma mensagem, a presença é afirmada **ante
 `AssertionError`, e o Awaitility não a repetiria — o teste falharia na primeira tentativa em vez de
 esperar.
 
+### Regressão manual
+
+`.postman/videos-api-codeflix.postman_collection.json` é a coleção do Postman do catálogo, feita para
+rodar de cima para baixo no Collection Runner. Como é uma API GraphQL, tudo é `POST` no mesmo
+endereço e toda resposta vem com status 200 — quem diz que algo deu errado é o campo `errors`, e é
+nele que os testes olham.
+
+Diferente da coleção do `admin-codeflix`, esta **não cria nem apaga o que lê**: a única porta de
+escrita daqui é a mutation de exemplo. As categorias são semeadas por ela, com ids fixos que cada
+execução sobrescreve em vez de acumular, e gênero, membro de elenco e vídeo são só lidos — para
+vê-los com conteúdo é preciso o CDC rodando. As pastas deles passam com o catálogo vazio: afirmam o
+contrato, e o conteúdo quando houver.
+
+Fora do Postman, `npx newman run .postman/videos-api-codeflix.postman_collection.json` roda a mesma
+coleção na linha de comando.
+
 ## Referência
 
 [FC3-api-de-videos-java](https://github.com/devfullcycle/FC3-api-de-videos-java), do curso FullCycle
