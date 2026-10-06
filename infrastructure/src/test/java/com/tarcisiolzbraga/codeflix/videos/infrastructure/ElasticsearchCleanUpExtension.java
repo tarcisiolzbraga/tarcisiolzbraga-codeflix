@@ -3,6 +3,7 @@ package com.tarcisiolzbraga.codeflix.videos.infrastructure;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.castmember.persistence.CastMemberRepository;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.category.persistence.CategoryRepository;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.genre.persistence.GenreRepository;
+import com.tarcisiolzbraga.codeflix.videos.infrastructure.video.persistence.VideoRepository;
 import java.util.List;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -21,7 +22,8 @@ public class ElasticsearchCleanUpExtension implements BeforeEachCallback {
         cleanUp(List.of(
                 applicationContext.getBean(CategoryRepository.class),
                 applicationContext.getBean(CastMemberRepository.class),
-                applicationContext.getBean(GenreRepository.class)));
+                applicationContext.getBean(GenreRepository.class),
+                applicationContext.getBean(VideoRepository.class)));
     }
 
     private void cleanUp(final List<CrudRepository<?, ?>> repositories) {
