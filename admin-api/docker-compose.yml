@@ -68,7 +68,7 @@ services:
       - ./.rabbitmq/rabbitmq.conf:/etc/rabbitmq/conf.d/20-definitions.conf:ro
       - rabbitmq_data:/var/lib/rabbitmq
 
-  # Autenticação. O realm, as roles e o client vêm de .keycloak/realm.json, importado na subida,
+  # Autenticação. O realm, as roles e o client vêm de ../.keycloak/realm.json, na raiz do
   # então o compose entrega um servidor pronto para emitir token.
   #
   # Sem volume de propósito: o realm é inteiramente descrito pelo arquivo versionado, então o
@@ -99,7 +99,7 @@ services:
       # host seria recusado pela aplicação dentro da rede, e vice-versa.
       - "${KEYCLOAK_PORT}:${KEYCLOAK_PORT}"
     volumes:
-      - ./.keycloak/realm.json:/realm-template.json:ro
+      - ../.keycloak/realm.json:/realm-template.json:ro
 
   # A aplicação. O jar vem do host: rodar `./gradlew bootJar` antes de `docker compose up -d --build`.
   # Fica no mesmo compose dos outros para `depends_on` e nomes de serviço valerem.

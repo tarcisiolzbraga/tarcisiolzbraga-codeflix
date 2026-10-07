@@ -1,5 +1,8 @@
 # Realm de desenvolvimento
 
+Este arquivo fica na **raiz do monorepo**, e não dentro de um serviço, porque o realm é um só e os
+dois lados o usam: a `admin-api` valida token nele e a `videos-api` também, com papéis diferentes.
+
 `realm.json` é importado pelo Keycloak na subida do `docker compose`, então o container entrega o realm
 `codeflix` pronto: as seis roles e quatro clients de credenciais de cliente.
 
@@ -20,11 +23,11 @@ O `videos-api-codeflix` existe porque o `categories-codeflix` **não** serve a e
 prova o 403, e usá-lo como credencial do catálogo o faria perder essa função. O do catálogo leva só as quatro
 roles de leitura, nunca a de administrador — ele lê e não escreve nada aqui.
 
-O `subscriber-codeflix` e a role `CODEFLIX_SUBSCRIBER` não têm uso nesta API: aqui eles só recebem 403, porque
-toda rota pede `CODEFLIX_ADMIN` ou a role do agregado. Eles estão neste arquivo porque o realm é um só, e é a
+O `subscriber-codeflix` e a role `CODEFLIX_SUBSCRIBER` não têm uso na `admin-api`: lá eles só recebem 403,
+porque toda rota pede `CODEFLIX_ADMIN` ou a role do agregado. Eles estão neste arquivo porque o realm é um só, e é a
 `videos-api-codeflix` que os consome — é com eles que um assinante lê o catálogo lá. A role de leitura de um
 agregado **não** foi reaproveitada para isso: `CODEFLIX_CATEGORIES` significa poder administrar categorias
-nesta API, e emprestá-la ao catálogo juntaria duas permissões diferentes numa só.
+na `admin-api`, e emprestá-la ao catálogo juntaria duas permissões diferentes numa só.
 
 Os três compartilham o mesmo segredo porque este realm é de desenvolvimento, local e descartável.
 

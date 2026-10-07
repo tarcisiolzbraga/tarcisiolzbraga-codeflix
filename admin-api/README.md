@@ -36,7 +36,8 @@ subida. A permissão é por chave e por bucket: a chave da aplicação só enxer
 
 ### Autenticação
 
-O Keycloak sobe com o realm `codeflix` já importado de `.keycloak/realm.json`: as cinco roles
+O Keycloak sobe com o realm `codeflix` já importado de `../.keycloak/realm.json`, na raiz do
+monorepo: as seis roles
 (`CODEFLIX_ADMIN`, `CODEFLIX_CATEGORIES`, `CODEFLIX_GENRES`, `CODEFLIX_CAST_MEMBERS` e `CODEFLIX_VIDEOS`) e o
 client `admin-codeflix`, que usa o fluxo de credenciais de cliente e já vem com a role de administrador. O
 console fica em http://localhost:8081, com as credenciais de `KEYCLOAK_ADMIN_USER` e `KEYCLOAK_ADMIN_PASSWORD`.
@@ -73,7 +74,7 @@ categorias — este serve justamente para ver o 403 nas rotas dos outros agregad
 as quatro roles de leitura, que é a credencial da API de catálogo e nunca escreve nada aqui; e
 `subscriber-codeflix`, com a role de assinante, que **não** serve para nada aqui — ela existe para ler o
 catálogo do outro lado, e está neste realm porque o realm é um só. As notas do realm estão em
-`.keycloak/README.md`, porque o Keycloak recusa comentário dentro do arquivo de import.
+`../.keycloak/README.md`, porque o Keycloak recusa comentário dentro do arquivo de import.
 
 **A entrada no `/etc/hosts` não é opcional.** O `iss` do token é a URL que o cliente usou para pedi-lo, e a
 aplicação só aceita token cujo `iss` bate com o emissor configurado. Com a aplicação em container, ela fala com

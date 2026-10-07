@@ -61,7 +61,7 @@ public class KeycloakContainerConfiguration {
     // O arquivo versionado traz um marcador no lugar do segredo, do mesmo jeito que o docker compose
     // encontra: aqui a troca é por um valor fixo de teste.
     private static String realmDefinition() {
-        final var path = Path.of(System.getProperty("codeflix.rootDir"), ".keycloak", "realm.json");
+        final var path = Path.of(System.getProperty("codeflix.rootDir"), "..", ".keycloak", "realm.json");
         try {
             return Files.readString(path).replace(SECRET_PLACEHOLDER, CLIENT_SECRET);
         } catch (final IOException exception) {
