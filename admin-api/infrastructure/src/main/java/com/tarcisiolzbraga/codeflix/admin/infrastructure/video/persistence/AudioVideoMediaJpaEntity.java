@@ -23,7 +23,7 @@ public class AudioVideoMediaJpaEntity {
     @Id
     @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "id", length = 36)
-    private String id;
+    private UUID id;
 
     @Column(name = "checksum", nullable = false)
     private String checksum;
@@ -45,7 +45,7 @@ public class AudioVideoMediaJpaEntity {
     }
 
     private AudioVideoMediaJpaEntity(final AudioVideoMedia media) {
-        this.id = UUID.randomUUID().toString();
+        this.id = UUID.randomUUID();
         this.checksum = media.checksum();
         this.name = media.name();
         this.rawLocation = media.rawLocation();
@@ -62,7 +62,7 @@ public class AudioVideoMediaJpaEntity {
                 this.checksum, this.name, this.rawLocation, this.encodedLocation, this.mediaStatus);
     }
 
-    public String getId() {
+    public UUID getId() {
         return this.id;
     }
 }

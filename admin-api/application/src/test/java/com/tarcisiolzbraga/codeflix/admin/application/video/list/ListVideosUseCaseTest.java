@@ -16,6 +16,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoPreview;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoSearchQuery;
 import java.util.List;
+import java.util.UUID;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,19 +32,21 @@ class ListVideosUseCaseTest {
     @Mock
     private VideoGateway videoGateway;
 
+    private static final UUID PREVIEW_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+
     @InjectMocks
     private DefaultListVideosUseCase useCase;
 
     @Test
     void givenPersistedVideos_whenCallExecute_thenReturnThemAsOutput() {
-        final var preview = new VideoPreview("123", "Duna", 2021, false, true, InstantUtils.now());
+        final var preview = new VideoPreview(PREVIEW_ID, "Duna", 2021, false, true, InstantUtils.now());
         when(videoGateway.findAll(any())).thenReturn(new Pagination<>(0, 10, 1, List.of(preview)));
 
         final var actualPage = useCase.execute(VideoSearchQuery.with(PAGE));
 
         assertEquals(1, actualPage.total());
         final var actualItem = actualPage.items().getFirst();
-        assertEquals("123", actualItem.id());
+        assertEquals(PREVIEW_ID.toString(), actualItem.id());
         assertEquals("Duna", actualItem.title());
         assertEquals(2021, actualItem.launchedAt());
         assertEquals(preview.createdAt(), actualItem.createdAt());

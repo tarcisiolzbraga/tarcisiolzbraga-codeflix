@@ -157,7 +157,7 @@ class VideoMySQLGatewayIT {
 
         final var actualPreview = this.gateway.findAll(VideoSearchQuery.with(BY_TITLE)).items().getFirst();
 
-        assertEquals(video.getId().getValue(), actualPreview.id());
+        assertEquals(video.getId().value(), actualPreview.id());
         assertEquals(DUNA, actualPreview.title());
         assertEquals(2021, actualPreview.launchedAt());
         assertFalse(actualPreview.published());

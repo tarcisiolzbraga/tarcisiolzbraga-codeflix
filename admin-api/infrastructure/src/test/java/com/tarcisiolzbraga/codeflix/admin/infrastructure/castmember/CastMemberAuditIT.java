@@ -10,6 +10,7 @@ import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.castmember.persistence.CastMemberJpaEntity;
 import jakarta.persistence.EntityManagerFactory;
 import java.util.List;
+import java.util.UUID;
 import org.hibernate.envers.AuditReaderFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,10 +30,10 @@ class CastMemberAuditIT {
     void givenCreatedCastMember_whenReadFirstRevision_thenHaveTheNameAndType() {
         final var castMember = givenPersistedCastMember();
 
-        final var revisions = revisionsOf(castMember.getId().getValue());
+        final var revisions = revisionsOf(castMember.getId().value());
 
         assertEquals(1, revisions.size());
-        final var audited = auditedAt(castMember.getId().getValue(), revisions.getFirst());
+        final var audited = auditedAt(castMember.getId().value(), revisions.getFirst());
         assertEquals(VIN_DIESEL, audited.getName());
         assertEquals(CastMemberType.ACTOR, audited.getType());
     }
@@ -42,15 +43,15 @@ class CastMemberAuditIT {
         final var castMember = givenPersistedCastMember();
         this.castMemberGateway.update(castMember.update(VIN_DIESEL, CastMemberType.DIRECTOR));
 
-        final var revisions = revisionsOf(castMember.getId().getValue());
+        final var revisions = revisionsOf(castMember.getId().value());
 
         assertEquals(2, revisions.size());
         assertEquals(
                 CastMemberType.ACTOR,
-                auditedAt(castMember.getId().getValue(), revisions.getFirst()).getType());
+                auditedAt(castMember.getId().value(), revisions.getFirst()).getType());
         assertEquals(
                 CastMemberType.DIRECTOR,
-                auditedAt(castMember.getId().getValue(), revisions.get(1)).getType());
+                auditedAt(castMember.getId().value(), revisions.get(1)).getType());
     }
 
     @Test
@@ -59,9 +60,9 @@ class CastMemberAuditIT {
         castMember.deactivate();
         this.castMemberGateway.update(castMember);
 
-        final var revisions = revisionsOf(castMember.getId().getValue());
+        final var revisions = revisionsOf(castMember.getId().value());
 
-        assertFalse(auditedAt(castMember.getId().getValue(), revisions.get(1)).isActive());
+        assertFalse(auditedAt(castMember.getId().value(), revisions.get(1)).isActive());
     }
 
     @Test
@@ -69,23 +70,23 @@ class CastMemberAuditIT {
         final var castMember = givenPersistedCastMember();
         this.castMemberGateway.deleteById(castMember.getId());
 
-        final var revisions = revisionsOf(castMember.getId().getValue());
+        final var revisions = revisionsOf(castMember.getId().value());
 
         assertEquals(2, revisions.size());
-        assertNull(auditedAt(castMember.getId().getValue(), revisions.get(1)));
+        assertNull(auditedAt(castMember.getId().value(), revisions.get(1)));
     }
 
     private CastMember givenPersistedCastMember() {
         return this.castMemberGateway.create(CastMember.newCastMember(VIN_DIESEL, CastMemberType.ACTOR, true));
     }
 
-    private List<Number> revisionsOf(final String id) {
+    private List<Number> revisionsOf(final UUID id) {
         try (var entityManager = this.entityManagerFactory.createEntityManager()) {
             return AuditReaderFactory.get(entityManager).getRevisions(CastMemberJpaEntity.class, id);
         }
     }
 
-    private CastMemberJpaEntity auditedAt(final String id, final Number revision) {
+    private CastMemberJpaEntity auditedAt(final UUID id, final Number revision) {
         try (var entityManager = this.entityManagerFactory.createEntityManager()) {
             return AuditReaderFactory.get(entityManager).find(CastMemberJpaEntity.class, id, revision);
         }

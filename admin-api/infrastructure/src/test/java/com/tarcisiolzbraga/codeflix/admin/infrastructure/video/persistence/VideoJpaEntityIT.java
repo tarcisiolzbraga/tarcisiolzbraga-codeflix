@@ -167,7 +167,7 @@ class VideoJpaEntityIT {
     private Video saveAndReload(final Video video) {
         this.videoRepository.saveAndFlush(VideoJpaEntity.from(video));
         return this.videoRepository
-                .findById(video.getId().getValue())
+                .findById(video.getId().value())
                 .orElseThrow()
                 .toAggregate();
     }

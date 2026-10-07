@@ -18,7 +18,7 @@ public class OutboxEventJpaEntity {
     @Id
     @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "id", length = 36)
-    private String id;
+    private UUID id;
 
     @Column(name = "routing_key", nullable = false)
     private String routingKey;
@@ -39,7 +39,7 @@ public class OutboxEventJpaEntity {
     }
 
     private OutboxEventJpaEntity(final String routingKey, final String payload, final Instant createdAt) {
-        this.id = UUID.randomUUID().toString();
+        this.id = UUID.randomUUID();
         this.routingKey = routingKey;
         this.payload = payload;
         this.createdAt = createdAt;
@@ -54,7 +54,7 @@ public class OutboxEventJpaEntity {
         this.sentAt = sentAt;
     }
 
-    public String getId() {
+    public UUID getId() {
         return this.id;
     }
 

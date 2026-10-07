@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.UUID;
 import java.util.Objects;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -16,29 +17,29 @@ public class VideoGenreID implements Serializable {
 
     @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "video_id", length = 36, nullable = false)
-    private String videoId;
+    private UUID videoId;
 
     @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "genre_id", length = 36, nullable = false)
-    private String genreId;
+    private UUID genreId;
 
     protected VideoGenreID() {
     }
 
-    private VideoGenreID(final String videoId, final String genreId) {
+    private VideoGenreID(final UUID videoId, final UUID genreId) {
         this.videoId = videoId;
         this.genreId = genreId;
     }
 
-    public static VideoGenreID from(final String videoId, final String genreId) {
+    public static VideoGenreID from(final UUID videoId, final UUID genreId) {
         return new VideoGenreID(videoId, genreId);
     }
 
-    public String getVideoId() {
+    public UUID getVideoId() {
         return this.videoId;
     }
 
-    public String getGenreId() {
+    public UUID getGenreId() {
         return this.genreId;
     }
 

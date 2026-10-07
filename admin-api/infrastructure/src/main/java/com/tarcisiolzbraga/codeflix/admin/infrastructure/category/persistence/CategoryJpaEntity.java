@@ -23,7 +23,7 @@ public class CategoryJpaEntity extends BaseJpaEntity {
     }
 
     private CategoryJpaEntity(final Category category) {
-        super(category.getId().getValue(), category.isActive(), category.getCreatedAt(), category.getUpdatedAt());
+        super(category.getId().value(), category.isActive(), category.getCreatedAt(), category.getUpdatedAt());
         this.name = category.getName();
         this.description = category.getDescription();
     }

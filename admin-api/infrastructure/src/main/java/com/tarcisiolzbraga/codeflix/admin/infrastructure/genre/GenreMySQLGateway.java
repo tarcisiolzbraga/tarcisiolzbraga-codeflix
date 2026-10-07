@@ -12,6 +12,7 @@ import com.tarcisiolzbraga.codeflix.admin.infrastructure.util.SpecificationUtils
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -39,7 +40,7 @@ public class GenreMySQLGateway implements GenreGateway {
 
     @Override
     public void deleteById(final GenreID id) {
-        final var value = id.getValue();
+        final var value = id.value();
         if (this.genreRepository.existsById(value)) {
             this.genreRepository.deleteById(value);
         }
@@ -47,7 +48,7 @@ public class GenreMySQLGateway implements GenreGateway {
 
     @Override
     public Optional<Genre> findById(final GenreID id) {
-        return this.genreRepository.findById(id.getValue()).map(GenreJpaEntity::toAggregate);
+        return this.genreRepository.findById(id.value()).map(GenreJpaEntity::toAggregate);
     }
 
     @Override
@@ -66,7 +67,7 @@ public class GenreMySQLGateway implements GenreGateway {
         if (ids.isEmpty()) {
             return Set.of();
         }
-        final var values = ids.stream().map(GenreID::getValue).collect(Collectors.toSet());
+        final var values = ids.stream().map(GenreID::value).collect(Collectors.toSet());
         return this.genreRepository.findExistingIds(values).stream()
                 .map(GenreID::from)
                 .collect(Collectors.toUnmodifiableSet());
@@ -74,7 +75,7 @@ public class GenreMySQLGateway implements GenreGateway {
 
     @Override
     public boolean existsByCategory(final CategoryID categoryId) {
-        return this.genreRepository.existsByCategoryId(categoryId.getValue());
+        return this.genreRepository.existsByCategoryId(categoryId.value());
     }
 
     private Genre save(final Genre genre) {

@@ -8,6 +8,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.events.DomainEvent;
 import com.tarcisiolzbraga.codeflix.admin.domain.util.InstantUtils;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationHandler;
 import java.time.Instant;
+import java.util.UUID;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -65,12 +66,7 @@ class AggregateRootTest {
         assertEquals("'publisher' should not be null", actualException.getMessage());
     }
 
-    private record SampleId(String value) implements Identifier {
-
-        @Override
-        public String getValue() {
-            return this.value;
-        }
+    private record SampleId(UUID value) implements Identifier {
     }
 
     private record SampleEvent(Instant occurredOn) implements DomainEvent {
@@ -83,7 +79,7 @@ class AggregateRootTest {
     private static final class SampleAggregate extends AggregateRoot<SampleId> {
 
         private SampleAggregate() {
-            super(new SampleId("1"), true, InstantUtils.now(), InstantUtils.now());
+            super(new SampleId(UUID.randomUUID()), true, InstantUtils.now(), InstantUtils.now());
         }
 
         @Override

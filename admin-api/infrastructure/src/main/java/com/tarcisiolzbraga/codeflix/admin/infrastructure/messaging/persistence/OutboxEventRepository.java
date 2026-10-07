@@ -1,5 +1,6 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.messaging.persistence;
 
+import java.util.UUID;
 import java.time.Instant;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -8,7 +9,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface OutboxEventRepository extends JpaRepository<OutboxEventJpaEntity, String> {
+public interface OutboxEventRepository extends JpaRepository<OutboxEventJpaEntity, UUID> {
 
     // Paginado, e não List: a fila de saída pode estar grande depois de uma indisponibilidade, e a
     // regra do projeto não admite coleção sem limite vinda do banco.

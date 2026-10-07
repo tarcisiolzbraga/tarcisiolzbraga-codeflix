@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import java.time.Instant;
+import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.envers.Audited;
 import org.hibernate.type.SqlTypes;
@@ -12,10 +13,13 @@ import org.hibernate.type.SqlTypes;
 @MappedSuperclass
 public abstract class BaseJpaEntity {
 
+    // UUID, e não String: o id sempre foi um, e o tipo passa a dizer. O @JdbcTypeCode(CHAR)
+    // mantém a coluna como está — CHAR(36) com a forma canônica —, então não há migration nem
+    // mudança no que já está gravado; muda só o que o Java carrega.
     @Id
     @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "id", length = 36)
-    private String id;
+    private UUID id;
 
     @Column(name = "active", nullable = false)
     private boolean active;
@@ -30,14 +34,14 @@ public abstract class BaseJpaEntity {
     }
 
     protected BaseJpaEntity(
-            final String id, final boolean active, final Instant createdAt, final Instant updatedAt) {
+            final UUID id, final boolean active, final Instant createdAt, final Instant updatedAt) {
         this.id = id;
         this.active = active;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
 
-    public String getId() {
+    public UUID getId() {
         return this.id;
     }
 

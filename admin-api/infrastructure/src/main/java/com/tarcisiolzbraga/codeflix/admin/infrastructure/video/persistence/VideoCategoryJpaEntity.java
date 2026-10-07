@@ -27,7 +27,7 @@ public class VideoCategoryJpaEntity {
     }
 
     private VideoCategoryJpaEntity(final VideoJpaEntity video, final CategoryID categoryId) {
-        this.id = VideoCategoryID.from(video.getId(), categoryId.getValue());
+        this.id = VideoCategoryID.from(video.getId(), categoryId.value());
         this.video = video;
     }
 

@@ -98,7 +98,7 @@ public class VideoJpaEntity extends BaseJpaEntity {
     }
 
     private VideoJpaEntity(final Video video) {
-        super(video.getId().getValue(), video.isActive(), video.getCreatedAt(), video.getUpdatedAt());
+        super(video.getId().value(), video.isActive(), video.getCreatedAt(), video.getUpdatedAt());
         this.title = video.getTitle();
         this.description = video.getDescription();
         this.yearLaunched = video.getLaunchedAt() == null ? 0 : video.getLaunchedAt().getValue();

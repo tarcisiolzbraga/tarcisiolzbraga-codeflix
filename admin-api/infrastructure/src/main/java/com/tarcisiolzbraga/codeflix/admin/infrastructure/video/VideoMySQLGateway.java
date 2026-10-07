@@ -17,6 +17,7 @@ import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.persistence.Video
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -53,7 +54,7 @@ public class VideoMySQLGateway implements VideoGateway {
 
     @Override
     public void deleteById(final VideoID id) {
-        final var value = id.getValue();
+        final var value = id.value();
         if (this.videoRepository.existsById(value)) {
             this.videoRepository.deleteById(value);
         }
@@ -61,7 +62,7 @@ public class VideoMySQLGateway implements VideoGateway {
 
     @Override
     public Optional<Video> findById(final VideoID id) {
-        return this.videoRepository.findById(id.getValue()).map(VideoJpaEntity::toAggregate);
+        return this.videoRepository.findById(id.value()).map(VideoJpaEntity::toAggregate);
     }
 
     @Override
@@ -82,17 +83,17 @@ public class VideoMySQLGateway implements VideoGateway {
 
     @Override
     public boolean existsByCategory(final CategoryID categoryId) {
-        return this.videoRepository.existsByCategoryId(categoryId.getValue());
+        return this.videoRepository.existsByCategoryId(categoryId.value());
     }
 
     @Override
     public boolean existsByGenre(final GenreID genreId) {
-        return this.videoRepository.existsByGenreId(genreId.getValue());
+        return this.videoRepository.existsByGenreId(genreId.value());
     }
 
     @Override
     public boolean existsByCastMember(final CastMemberID castMemberId) {
-        return this.videoRepository.existsByCastMemberId(castMemberId.getValue());
+        return this.videoRepository.existsByCastMemberId(castMemberId.value());
     }
 
     // O aviso é gravado junto, na mesma transação, e sai uma vez: quem publica esvazia a lista do
@@ -115,12 +116,12 @@ public class VideoMySQLGateway implements VideoGateway {
                 .orElse(null);
     }
 
-    private Set<String> valuesOf(final Set<? extends Identifier> ids) {
-        return ids.stream().map(Identifier::getValue).collect(Collectors.toUnmodifiableSet());
+    private Set<UUID> valuesOf(final Set<? extends Identifier> ids) {
+        return ids.stream().map(Identifier::value).collect(Collectors.toUnmodifiableSet());
     }
 
     // Conjunto vazio significaria "nenhum resultado"; nulo é o que a consulta entende como sem filtro.
-    private Set<String> nullIfEmpty(final Set<String> values) {
+    private Set<UUID> nullIfEmpty(final Set<UUID> values) {
         return values.isEmpty() ? null : values;
     }
 }

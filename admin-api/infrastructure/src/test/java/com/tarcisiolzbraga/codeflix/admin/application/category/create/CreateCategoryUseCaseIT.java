@@ -10,6 +10,7 @@ import static org.mockito.Mockito.doThrow;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryGateway;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.CategoryRepository;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -38,7 +39,7 @@ class CreateCategoryUseCaseIT {
         assertTrue(actualResult.isRight());
         assertEquals(1, this.categoryRepository.count());
         final var persisted = this.categoryRepository
-                .findById(actualResult.get().id())
+                .findById(UUID.fromString(actualResult.get().id()))
                 .orElseThrow();
         assertEquals(EXPECTED_NAME, persisted.getName());
         assertTrue(persisted.isActive());
@@ -51,7 +52,7 @@ class CreateCategoryUseCaseIT {
         final var actualResult = this.useCase.execute(command);
 
         final var persisted = this.categoryRepository
-                .findById(actualResult.get().id())
+                .findById(UUID.fromString(actualResult.get().id()))
                 .orElseThrow();
         assertEquals(false, persisted.isActive());
     }

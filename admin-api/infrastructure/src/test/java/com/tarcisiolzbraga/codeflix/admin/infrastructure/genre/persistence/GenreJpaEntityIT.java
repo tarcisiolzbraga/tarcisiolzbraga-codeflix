@@ -68,9 +68,9 @@ class GenreJpaEntityIT {
 
         assertThrows(
                 DataIntegrityViolationException.class,
-                () -> this.categoryRepository.deleteById(category.getValue()));
+                () -> this.categoryRepository.deleteById(category.value()));
 
-        assertTrue(this.categoryRepository.existsById(category.getValue()));
+        assertTrue(this.categoryRepository.existsById(category.value()));
     }
 
     private CategoryID existingCategory(final String name) {
@@ -82,7 +82,7 @@ class GenreJpaEntityIT {
     private Genre saveAndReload(final Genre genre) {
         this.genreRepository.saveAndFlush(GenreJpaEntity.from(genre));
         return this.genreRepository
-                .findById(genre.getId().getValue())
+                .findById(genre.getId().value())
                 .map(GenreJpaEntity::toAggregate)
                 .orElseThrow();
     }

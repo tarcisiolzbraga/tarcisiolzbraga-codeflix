@@ -43,7 +43,7 @@ class CategoryJpaEntityIT {
     private Category saveAndReload(final Category category) {
         this.categoryRepository.saveAndFlush(CategoryJpaEntity.from(category));
         return this.categoryRepository
-                .findById(category.getId().getValue())
+                .findById(category.getId().value())
                 .map(CategoryJpaEntity::toAggregate)
                 .orElseThrow();
     }

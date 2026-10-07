@@ -27,7 +27,7 @@ public class VideoCastMemberJpaEntity {
     }
 
     private VideoCastMemberJpaEntity(final VideoJpaEntity video, final CastMemberID castMemberId) {
-        this.id = VideoCastMemberID.from(video.getId(), castMemberId.getValue());
+        this.id = VideoCastMemberID.from(video.getId(), castMemberId.value());
         this.video = video;
     }
 

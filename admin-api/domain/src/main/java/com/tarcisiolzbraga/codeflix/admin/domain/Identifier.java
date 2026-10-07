@@ -7,7 +7,15 @@ import java.util.UUID;
 
 public interface Identifier {
 
-    String getValue();
+    // O valor tipado. Os quatro ids são records de um UUID, então o acessor do record já implementa
+    // isto sem nenhum código.
+    UUID value();
+
+    // A forma canônica em texto, para quem precisa dela: coluna, JSON, rota, mensagem de erro. É
+    // sempre minúscula, porque é o toString() do UUID.
+    default String getValue() {
+        return value().toString();
+    }
 
     // Converte no limite do domínio: id que vem de fora — rota, payload, evento de CDC — ou é UUID
     // aqui, ou não entra. Fica nesta interface porque os quatro ids fazem exatamente isto, e um

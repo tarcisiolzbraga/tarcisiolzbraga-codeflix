@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.UUID;
 import java.util.Objects;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -16,29 +17,29 @@ public class GenreCategoryID implements Serializable {
 
     @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "genre_id", length = 36, nullable = false)
-    private String genreId;
+    private UUID genreId;
 
     @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "category_id", length = 36, nullable = false)
-    private String categoryId;
+    private UUID categoryId;
 
     protected GenreCategoryID() {
     }
 
-    private GenreCategoryID(final String genreId, final String categoryId) {
+    private GenreCategoryID(final UUID genreId, final UUID categoryId) {
         this.genreId = genreId;
         this.categoryId = categoryId;
     }
 
-    public static GenreCategoryID from(final String genreId, final String categoryId) {
+    public static GenreCategoryID from(final UUID genreId, final UUID categoryId) {
         return new GenreCategoryID(genreId, categoryId);
     }
 
-    public String getGenreId() {
+    public UUID getGenreId() {
         return this.genreId;
     }
 
-    public String getCategoryId() {
+    public UUID getCategoryId() {
         return this.categoryId;
     }
 

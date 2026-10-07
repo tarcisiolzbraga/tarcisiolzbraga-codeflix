@@ -11,6 +11,7 @@ import com.tarcisiolzbraga.codeflix.admin.infrastructure.util.SpecificationUtils
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -39,7 +40,7 @@ public class CastMemberMySQLGateway implements CastMemberGateway {
 
     @Override
     public void deleteById(final CastMemberID id) {
-        final var value = id.getValue();
+        final var value = id.value();
         if (this.castMemberRepository.existsById(value)) {
             this.castMemberRepository.deleteById(value);
         }
@@ -47,7 +48,7 @@ public class CastMemberMySQLGateway implements CastMemberGateway {
 
     @Override
     public Optional<CastMember> findById(final CastMemberID id) {
-        return this.castMemberRepository.findById(id.getValue()).map(CastMemberJpaEntity::toAggregate);
+        return this.castMemberRepository.findById(id.value()).map(CastMemberJpaEntity::toAggregate);
     }
 
     @Override
@@ -66,7 +67,7 @@ public class CastMemberMySQLGateway implements CastMemberGateway {
         if (ids.isEmpty()) {
             return Set.of();
         }
-        final var values = ids.stream().map(CastMemberID::getValue).collect(Collectors.toSet());
+        final var values = ids.stream().map(CastMemberID::value).collect(Collectors.toSet());
         return this.castMemberRepository.findExistingIds(values).stream()
                 .map(CastMemberID::from)
                 .collect(Collectors.toUnmodifiableSet());

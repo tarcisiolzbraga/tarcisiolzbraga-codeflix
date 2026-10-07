@@ -25,10 +25,4 @@ public record CategoryID(UUID value) implements Identifier {
         return new CategoryID(value);
     }
 
-    // toString() do UUID é sempre minúsculo, então a normalização que antes era feita à mão num
-    // dos dois from(...) — e esquecida no outro — passa a ser propriedade do tipo.
-    @Override
-    public String getValue() {
-        return this.value.toString();
-    }
 }

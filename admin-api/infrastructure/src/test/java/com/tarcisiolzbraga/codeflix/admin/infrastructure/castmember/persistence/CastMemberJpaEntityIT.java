@@ -53,7 +53,7 @@ class CastMemberJpaEntityIT {
     private CastMember saveAndReload(final CastMember castMember) {
         this.castMemberRepository.saveAndFlush(CastMemberJpaEntity.from(castMember));
         return this.castMemberRepository
-                .findById(castMember.getId().getValue())
+                .findById(castMember.getId().value())
                 .orElseThrow()
                 .toAggregate();
     }

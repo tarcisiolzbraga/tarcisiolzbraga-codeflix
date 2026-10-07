@@ -11,6 +11,7 @@ import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.CategoryMySQLG
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.genre.persistence.GenreJpaEntity;
 import jakarta.persistence.EntityManagerFactory;
 import java.util.List;
+import java.util.UUID;
 import java.util.Set;
 import org.hibernate.envers.AuditReaderFactory;
 import org.junit.jupiter.api.Test;
@@ -33,10 +34,10 @@ class GenreAuditIT {
         final var movies = existingCategory("Filmes");
         final var genre = this.genreGateway.create(Genre.newGenre("Ação", true).addCategory(movies));
 
-        final var revisions = revisionsOf(genre.getId().getValue());
+        final var revisions = revisionsOf(genre.getId().value());
 
         assertEquals(1, revisions.size());
-        assertEquals(Set.of(movies), categoriesAt(genre.getId().getValue(), revisions.getFirst()));
+        assertEquals(Set.of(movies), categoriesAt(genre.getId().value(), revisions.getFirst()));
     }
 
     @Test
@@ -45,11 +46,11 @@ class GenreAuditIT {
         final var genre = this.genreGateway.create(Genre.newGenre("Ação", true).addCategory(movies));
         this.genreGateway.update(genre.removeCategory(movies));
 
-        final var revisions = revisionsOf(genre.getId().getValue());
+        final var revisions = revisionsOf(genre.getId().value());
 
         assertEquals(2, revisions.size());
-        assertEquals(Set.of(movies), categoriesAt(genre.getId().getValue(), revisions.getFirst()));
-        assertEquals(Set.of(), categoriesAt(genre.getId().getValue(), revisions.get(1)));
+        assertEquals(Set.of(movies), categoriesAt(genre.getId().value(), revisions.getFirst()));
+        assertEquals(Set.of(), categoriesAt(genre.getId().value(), revisions.get(1)));
     }
 
     @Test
@@ -57,30 +58,30 @@ class GenreAuditIT {
         final var genre = this.genreGateway.create(Genre.newGenre("Ação", true).addCategory(existingCategory("Filmes")));
         this.genreGateway.deleteById(genre.getId());
 
-        final var revisions = revisionsOf(genre.getId().getValue());
+        final var revisions = revisionsOf(genre.getId().value());
 
         assertEquals(2, revisions.size());
-        assertNull(auditedAt(genre.getId().getValue(), revisions.get(1)));
+        assertNull(auditedAt(genre.getId().value(), revisions.get(1)));
     }
 
     private CategoryID existingCategory(final String name) {
         return this.categoryGateway.create(Category.newCategory(name, null, true)).getId();
     }
 
-    private List<Number> revisionsOf(final String id) {
+    private List<Number> revisionsOf(final UUID id) {
         try (var entityManager = this.entityManagerFactory.createEntityManager()) {
             return AuditReaderFactory.get(entityManager).getRevisions(GenreJpaEntity.class, id);
         }
     }
 
     // Lê as categorias com o EntityManager aberto: o Envers carrega a coleção auditada sob demanda.
-    private Set<CategoryID> categoriesAt(final String id, final Number revision) {
+    private Set<CategoryID> categoriesAt(final UUID id, final Number revision) {
         try (var entityManager = this.entityManagerFactory.createEntityManager()) {
             return AuditReaderFactory.get(entityManager).find(GenreJpaEntity.class, id, revision).getCategoryIds();
         }
     }
 
-    private GenreJpaEntity auditedAt(final String id, final Number revision) {
+    private GenreJpaEntity auditedAt(final UUID id, final Number revision) {
         try (var entityManager = this.entityManagerFactory.createEntityManager()) {
             return AuditReaderFactory.get(entityManager).find(GenreJpaEntity.class, id, revision);
         }

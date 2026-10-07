@@ -30,7 +30,7 @@ public class CastMemberJpaEntity extends BaseJpaEntity {
 
     private CastMemberJpaEntity(final CastMember castMember) {
         super(
-                castMember.getId().getValue(),
+                castMember.getId().value(),
                 castMember.isActive(),
                 castMember.getCreatedAt(),
                 castMember.getUpdatedAt());

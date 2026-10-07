@@ -18,7 +18,7 @@ public class ImageMediaJpaEntity {
     @Id
     @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "id", length = 36)
-    private String id;
+    private UUID id;
 
     @Column(name = "checksum", nullable = false)
     private String checksum;
@@ -33,7 +33,7 @@ public class ImageMediaJpaEntity {
     }
 
     private ImageMediaJpaEntity(final ImageMedia media) {
-        this.id = UUID.randomUUID().toString();
+        this.id = UUID.randomUUID();
         this.checksum = media.checksum();
         this.name = media.name();
         this.location = media.location();
@@ -47,7 +47,7 @@ public class ImageMediaJpaEntity {
         return ImageMedia.with(this.checksum, this.name, this.location);
     }
 
-    public String getId() {
+    public UUID getId() {
         return this.id;
     }
 }

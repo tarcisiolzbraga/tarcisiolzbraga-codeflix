@@ -11,6 +11,7 @@ import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.category.persistence.CategoryJpaEntity;
 import jakarta.persistence.EntityManagerFactory;
 import java.util.List;
+import java.util.UUID;
 import org.hibernate.envers.AuditReaderFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,10 +29,10 @@ class CategoryAuditIT {
     void givenCreatedCategory_whenReadRevisions_thenHaveOneRevision() {
         final var category = this.categoryGateway.create(Category.newCategory("Filmes", "A mais assistida", true));
 
-        final var revisions = revisionsOf(category.getId().getValue());
+        final var revisions = revisionsOf(category.getId().value());
 
         assertEquals(1, revisions.size());
-        assertEquals("Filmes", nameAt(category.getId().getValue(), revisions.getFirst()));
+        assertEquals("Filmes", nameAt(category.getId().value(), revisions.getFirst()));
     }
 
     @Test
@@ -39,11 +40,11 @@ class CategoryAuditIT {
         final var category = this.categoryGateway.create(Category.newCategory("Flmes", null, true));
         this.categoryGateway.update(category.update("Filmes", "A mais assistida"));
 
-        final var revisions = revisionsOf(category.getId().getValue());
+        final var revisions = revisionsOf(category.getId().value());
 
         assertEquals(2, revisions.size());
-        assertEquals("Flmes", nameAt(category.getId().getValue(), revisions.getFirst()));
-        assertEquals("Filmes", nameAt(category.getId().getValue(), revisions.get(1)));
+        assertEquals("Flmes", nameAt(category.getId().value(), revisions.getFirst()));
+        assertEquals("Filmes", nameAt(category.getId().value(), revisions.get(1)));
     }
 
     @Test
@@ -51,11 +52,11 @@ class CategoryAuditIT {
         final var category = this.categoryGateway.create(Category.newCategory("Filmes", null, true));
         this.categoryGateway.deleteById(category.getId());
 
-        final var revisions = revisionsOf(category.getId().getValue());
+        final var revisions = revisionsOf(category.getId().value());
 
         assertEquals(2, revisions.size());
-        assertNull(nameAt(category.getId().getValue(), revisions.get(1)));
-        assertNotNull(nameAt(category.getId().getValue(), revisions.getFirst()));
+        assertNull(nameAt(category.getId().value(), revisions.get(1)));
+        assertNotNull(nameAt(category.getId().value(), revisions.getFirst()));
     }
 
     @Test
@@ -63,29 +64,29 @@ class CategoryAuditIT {
         final var category = this.categoryGateway.create(Category.newCategory("Filmes", null, true));
         category.deactivate();
         this.categoryGateway.update(category);
-        final var revisions = revisionsOf(category.getId().getValue());
+        final var revisions = revisionsOf(category.getId().value());
 
-        final var audited = auditedAt(category.getId().getValue(), revisions.getLast());
+        final var audited = auditedAt(category.getId().value(), revisions.getLast());
 
-        assertEquals(category.getId().getValue(), audited.getId());
+        assertEquals(category.getId().value(), audited.getId());
         assertNotNull(audited.getCreatedAt());
         assertNotNull(audited.getUpdatedAt());
         assertFalse(audited.isActive());
-        assertTrue(auditedAt(category.getId().getValue(), revisions.getFirst()).isActive());
+        assertTrue(auditedAt(category.getId().value(), revisions.getFirst()).isActive());
     }
 
-    private List<Number> revisionsOf(final String id) {
+    private List<Number> revisionsOf(final UUID id) {
         try (var entityManager = this.entityManagerFactory.createEntityManager()) {
             return AuditReaderFactory.get(entityManager).getRevisions(CategoryJpaEntity.class, id);
         }
     }
 
-    private String nameAt(final String id, final Number revision) {
+    private String nameAt(final UUID id, final Number revision) {
         final var audited = auditedAt(id, revision);
         return audited == null ? null : audited.getName();
     }
 
-    private CategoryJpaEntity auditedAt(final String id, final Number revision) {
+    private CategoryJpaEntity auditedAt(final UUID id, final Number revision) {
         try (var entityManager = this.entityManagerFactory.createEntityManager()) {
             return AuditReaderFactory.get(entityManager).find(CategoryJpaEntity.class, id, revision);
         }

@@ -32,7 +32,7 @@ public class GenreJpaEntity extends BaseJpaEntity {
     }
 
     private GenreJpaEntity(final Genre genre) {
-        super(genre.getId().getValue(), genre.isActive(), genre.getCreatedAt(), genre.getUpdatedAt());
+        super(genre.getId().value(), genre.isActive(), genre.getCreatedAt(), genre.getUpdatedAt());
         this.name = genre.getName();
         genre.getCategories().forEach(categoryId -> this.categories.add(GenreCategoryJpaEntity.from(this, categoryId)));
     }

@@ -11,6 +11,7 @@ import com.tarcisiolzbraga.codeflix.admin.infrastructure.security.KeycloakJwtCon
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import java.util.Map;
 import org.hibernate.envers.AuditReaderFactory;
 import org.junit.jupiter.api.AfterEach;
@@ -45,7 +46,7 @@ class AuditRevisionIT {
 
         final var category = this.categoryGateway.create(Category.newCategory("Filmes", null, true));
 
-        assertEquals(SUBJECT, authorOfLastRevisionOf(category.getId().getValue()));
+        assertEquals(SUBJECT, authorOfLastRevisionOf(category.getId().value()));
     }
 
     // O retorno do codificador e o relay da saída gravam assim, sem token nenhum.
@@ -53,7 +54,7 @@ class AuditRevisionIT {
     void givenNoAuthentication_whenWrite_thenLeaveTheAuthorNull() {
         final var category = this.categoryGateway.create(Category.newCategory("Séries", null, true));
 
-        assertNull(authorOfLastRevisionOf(category.getId().getValue()));
+        assertNull(authorOfLastRevisionOf(category.getId().value()));
     }
 
     @Test
@@ -64,7 +65,7 @@ class AuditRevisionIT {
 
         this.categoryGateway.update(category.update("Filmes", null));
 
-        final var revisions = revisionsOf(category.getId().getValue());
+        final var revisions = revisionsOf(category.getId().value());
         assertEquals(SUBJECT, authorOf(revisions.getFirst()));
         assertNull(authorOf(revisions.getLast()));
     }
@@ -82,11 +83,11 @@ class AuditRevisionIT {
         SecurityContextHolder.setContext(context);
     }
 
-    private String authorOfLastRevisionOf(final String id) {
+    private String authorOfLastRevisionOf(final UUID id) {
         return authorOf(revisionsOf(id).getLast());
     }
 
-    private List<Number> revisionsOf(final String id) {
+    private List<Number> revisionsOf(final UUID id) {
         try (var entityManager = this.entityManagerFactory.createEntityManager()) {
             return AuditReaderFactory.get(entityManager).getRevisions(CategoryJpaEntity.class, id);
         }

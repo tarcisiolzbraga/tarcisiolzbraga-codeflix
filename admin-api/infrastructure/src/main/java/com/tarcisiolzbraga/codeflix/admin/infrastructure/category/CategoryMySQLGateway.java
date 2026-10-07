@@ -11,6 +11,7 @@ import com.tarcisiolzbraga.codeflix.admin.infrastructure.util.SpecificationUtils
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -38,7 +39,7 @@ public class CategoryMySQLGateway implements CategoryGateway {
 
     @Override
     public void deleteById(final CategoryID id) {
-        final var value = id.getValue();
+        final var value = id.value();
         if (this.categoryRepository.existsById(value)) {
             this.categoryRepository.deleteById(value);
         }
@@ -46,7 +47,7 @@ public class CategoryMySQLGateway implements CategoryGateway {
 
     @Override
     public Optional<Category> findById(final CategoryID id) {
-        return this.categoryRepository.findById(id.getValue()).map(CategoryJpaEntity::toAggregate);
+        return this.categoryRepository.findById(id.value()).map(CategoryJpaEntity::toAggregate);
     }
 
     @Override
@@ -65,7 +66,7 @@ public class CategoryMySQLGateway implements CategoryGateway {
         if (ids.isEmpty()) {
             return Set.of();
         }
-        final var values = ids.stream().map(CategoryID::getValue).collect(Collectors.toSet());
+        final var values = ids.stream().map(CategoryID::value).collect(Collectors.toSet());
         return this.categoryRepository.findExistingIds(values).stream()
                 .map(CategoryID::from)
                 .collect(Collectors.toUnmodifiableSet());

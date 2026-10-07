@@ -2,13 +2,14 @@ package com.tarcisiolzbraga.codeflix.admin.infrastructure.video.persistence;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoPreview;
 import java.util.Set;
+import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface VideoRepository extends JpaRepository<VideoJpaEntity, String> {
+public interface VideoRepository extends JpaRepository<VideoJpaEntity, UUID> {
 
     // Um conjunto nulo significa "não filtra por isso"; conjunto vazio nunca chega aqui, porque o
     // gateway troca por nulo antes de consultar.
@@ -41,17 +42,17 @@ public interface VideoRepository extends JpaRepository<VideoJpaEntity, String> {
             """)
     Page<VideoPreview> findAll(
             @Param("terms") String terms,
-            @Param("categories") Set<String> categories,
-            @Param("genres") Set<String> genres,
-            @Param("castMembers") Set<String> castMembers,
+            @Param("categories") Set<UUID> categories,
+            @Param("genres") Set<UUID> genres,
+            @Param("castMembers") Set<UUID> castMembers,
             Pageable page);
 
     @Query("select count(link) > 0 from VideoCategory link where link.id.categoryId = :categoryId")
-    boolean existsByCategoryId(@Param("categoryId") String categoryId);
+    boolean existsByCategoryId(@Param("categoryId") UUID categoryId);
 
     @Query("select count(link) > 0 from VideoGenre link where link.id.genreId = :genreId")
-    boolean existsByGenreId(@Param("genreId") String genreId);
+    boolean existsByGenreId(@Param("genreId") UUID genreId);
 
     @Query("select count(link) > 0 from VideoCastMember link where link.id.castMemberId = :castMemberId")
-    boolean existsByCastMemberId(@Param("castMemberId") String castMemberId);
+    boolean existsByCastMemberId(@Param("castMemberId") UUID castMemberId);
 }
