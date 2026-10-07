@@ -12,9 +12,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.ObjectMapper;
 
-// Prova que o realm de teste subiu como o esperado. Sem isto, uma importação de realm que falhasse
-// em silêncio apareceria depois como "autorização recusada" em todos os testes de segurança, e o
-// motivo verdadeiro — o papel que não foi concedido — ficaria escondido.
+// Prova que o realm da raiz subiu como o esperado. Sem isto, uma importação que falhasse em silêncio
+// apareceria depois como "autorização recusada" em todos os testes de segurança, e o motivo
+// verdadeiro — o papel que não foi concedido — ficaria escondido.
 @IntegrationTest
 class KeycloakTestTokenIT {
 
@@ -41,12 +41,14 @@ class KeycloakTestTokenIT {
         assertTrue(actualRoles.contains("CODEFLIX_ADMIN"));
     }
 
-    // O client sem papel existe para provar a recusa: sem ele, um teste de 403 poderia passar por
-    // acidente, com o token sendo recusado por outro motivo.
+    // O desconhecido prova a recusa, e prova mais do que ausência de papel: ele tem um papel do
+    // realm, só não um que valha aqui. Sem isso, um teste de 403 poderia passar por acidente, com o
+    // token sendo recusado por não ter papel nenhum.
     @Test
-    void givenTheStrangerClient_whenAskForAToken_thenCarryNeitherRole() {
+    void givenTheStrangerClient_whenAskForAToken_thenCarryARoleThatDoesNotCountHere() {
         final var actualRoles = realmRolesIn(this.token.bearerOf(KeycloakTestToken.STRANGER));
 
+        assertTrue(actualRoles.contains("CODEFLIX_CATEGORIES"));
         assertFalse(actualRoles.contains("CODEFLIX_SUBSCRIBER"));
         assertFalse(actualRoles.contains("CODEFLIX_ADMIN"));
     }

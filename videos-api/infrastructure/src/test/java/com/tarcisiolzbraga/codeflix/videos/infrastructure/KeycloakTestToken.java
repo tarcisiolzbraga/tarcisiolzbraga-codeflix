@@ -10,15 +10,18 @@ import org.springframework.web.client.RestClient;
 // Pede token ao Keycloak do container pelo fluxo de credenciais de cliente, e guarda por client: o
 // token vale minutos, bem mais que a suíte, então uma chamada por client basta.
 //
-// Cada client do realm de teste carrega um papel diferente, e é assim que o teste escolhe com quem
-// está batendo na API: assinante, administrador, ou alguém sem papel algum.
+// Os clients são os do realm de verdade, o da raiz do monorepo, e é assim que o teste escolhe com
+// quem está batendo na API. O categories-codeflix faz o papel do desconhecido: ele existe no realm
+// para provar o 403 nas rotas da admin-api, e para o catálogo ele é justamente alguém identificado
+// que não tem papel algum aqui — sem precisar de um client inventado só para isso.
 public class KeycloakTestToken {
 
-    public static final String SUBSCRIBER = "catalog-subscriber-test";
-    public static final String ADMIN = "catalog-admin-test";
-    public static final String STRANGER = "catalog-stranger-test";
+    public static final String SUBSCRIBER = "subscriber-codeflix";
+    public static final String ADMIN = "admin-codeflix";
+    public static final String STRANGER = "categories-codeflix";
 
-    private static final String SECRET = "segredo-de-teste";
+    // O mesmo valor que o KeycloakContainerConfiguration põe no lugar do marcador do realm.
+    public static final String SECRET = "segredo-de-teste";
 
     private final String issuerUri;
     private final Map<String, String> cached = new ConcurrentHashMap<>();

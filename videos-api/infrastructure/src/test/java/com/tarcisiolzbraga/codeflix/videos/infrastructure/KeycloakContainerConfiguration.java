@@ -2,23 +2,27 @@ package com.tarcisiolzbraga.codeflix.videos.infrastructure;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.utility.DockerImageName;
 
-// Um emissor de verdade para os testes, como no admin-codeflix: o token é pedido, assinado e
-// validado de ponta a ponta, em vez de forjado.
+// Um emissor de verdade para os testes, como na admin-api: o token é pedido, assinado e validado de
+// ponta a ponta, em vez de forjado.
 //
-// O realm aqui é próprio e mínimo, e não o do admin-codeflix: aquele arquivo vive no outro
-// repositório, e apontar para fora daqui faria a suíte depender de um clone vizinho. O preço é que
-// os dois podem divergir no nome dos papéis — por isso o nome CODEFLIX_SUBSCRIBER aparece em um
-// lugar só do código, na classe Roles, e é o que este realm concede.
+// O realm é o da raiz do monorepo, o mesmo que o docker compose importa — não há realm de teste
+// próprio. Enquanto os dois projetos eram repositórios separados havia um aqui, mínimo, porque
+// apontar para fora do repositório faria a suíte depender de um clone vizinho; o preço era os dois
+// poderem divergir no nome dos papéis. No monorepo o arquivo é um só, e a divergência deixa de ser
+// possível.
+//
+// O segredo dos clients vem com um marcador no arquivo versionado, do mesmo jeito que o compose
+// encontra; aqui a troca é por um valor fixo de teste.
 //
 // Estático e fora do ciclo de vida do Spring, como os outros containers: um Keycloak por contexto
 // não se paga.
@@ -28,6 +32,7 @@ public class KeycloakContainerConfiguration {
     private static final DockerImageName IMAGE = DockerImageName.parse("quay.io/keycloak/keycloak:26.8.0");
     private static final int HTTP_PORT = 8080;
     private static final String REALM = "codeflix";
+    private static final String SECRET_PLACEHOLDER = "__KEYCLOAK_CLIENT_SECRET__";
 
     private static final GenericContainer<?> CONTAINER = startedContainer();
 
@@ -58,12 +63,11 @@ public class KeycloakContainerConfiguration {
     }
 
     private static String realmDefinition() {
+        final var path = Path.of(System.getProperty("codeflix.rootDir"), "..", ".keycloak", "realm.json");
         try {
-            return new String(
-                    new ClassPathResource("keycloak/realm.json").getInputStream().readAllBytes(),
-                    StandardCharsets.UTF_8);
+            return Files.readString(path).replace(SECRET_PLACEHOLDER, KeycloakTestToken.SECRET);
         } catch (final IOException exception) {
-            throw new UncheckedIOException("could not read the test realm", exception);
+            throw new UncheckedIOException("could not read the realm at " + path, exception);
         }
     }
 }
