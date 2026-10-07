@@ -1,0 +1,21 @@
+-- Quem fez a mudança. O Envers já guardava o quê e o quando desde a V2; o quem não existia porque
+-- não havia autenticação no projeto — ela entrou depois, e é por isso que a coluna nasce aqui e
+-- não lá.
+--
+-- Guarda o `sub` do token, e não o nome de usuário. São duas razões, e a segunda pesa mais:
+--
+--   1. o sub é o identificador estável do emissor, e o preferred_username pode mudar sem que o
+--      histórico devesse mudar junto;
+--   2. o sub é opaco. Nome ou e-mail poriam dado pessoal direto numa tabela que, por ser
+--      histórico, não se reescreve — e aí atender a um pedido de eliminação pela LGPD exigiria
+--      mexer justamente no que a auditoria existe para manter intocado. Com o sub, apagar a
+--      pessoa no Keycloak rompe o vínculo e as revisões seguem legíveis como história, sem
+--      identificar ninguém. O sub continua sendo dado pessoal enquanto o vínculo existe; o que
+--      muda é que a eliminação passa a caber num lugar só, em vez de espalhada pelo histórico.
+--
+-- VARCHAR(255) e não CHAR(36) como os ids daqui: o Keycloak usa UUID hoje, mas este valor vem de
+-- fora e o que o OIDC garante é só o teto de 255 caracteres ASCII.
+--
+-- Nula onde não houve requisição autenticada: as revisões anteriores a esta migration, e as que
+-- nascem de trabalho de fundo, como o retorno do codificador e o relay da tabela de saída.
+ALTER TABLE revinfo ADD COLUMN user_id VARCHAR(255) NULL;
