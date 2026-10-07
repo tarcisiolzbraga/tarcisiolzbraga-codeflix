@@ -29,7 +29,7 @@ class GetVideoUseCaseTest {
 
     @Test
     void givenAKnownId_whenCallExecute_thenReturnTheVideo() {
-        when(videoGateway.findById(EXPECTED_ID)).thenReturn(Optional.of(aVideo("1", "Duna", true)));
+        when(videoGateway.findById(EXPECTED_ID)).thenReturn(Optional.of(aVideo("00000001-0000-0000-0000-000000000000", "Duna", true)));
 
         final var actualOutput = useCase.execute(EXPECTED_ID);
 

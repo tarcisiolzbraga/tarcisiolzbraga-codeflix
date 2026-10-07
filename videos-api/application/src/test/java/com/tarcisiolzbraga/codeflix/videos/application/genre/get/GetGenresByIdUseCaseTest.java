@@ -26,8 +26,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class GetGenresByIdUseCaseTest {
 
-    private static final GenreID FIRST_ID = GenreID.from("1");
-    private static final GenreID SECOND_ID = GenreID.from("2");
+    private static final GenreID FIRST_ID = GenreID.from("00000001-0000-0000-0000-000000000000");
+    private static final GenreID SECOND_ID = GenreID.from("00000002-0000-0000-0000-000000000000");
     private static final Instant CREATED_AT = Instant.parse("2026-09-30T12:00:00Z");
     private static final Instant UPDATED_AT = Instant.parse("2026-10-01T08:30:00Z");
 
@@ -46,7 +46,7 @@ class GetGenresByIdUseCaseTest {
         final var actualOutput = useCase.execute(ids);
 
         assertEquals(2, actualOutput.size());
-        assertEquals(List.of("1", "2"), actualOutput.stream().map(GenreOutput::id).toList());
+        assertEquals(List.of("00000001-0000-0000-0000-000000000000", "00000002-0000-0000-0000-000000000000"), actualOutput.stream().map(GenreOutput::id).toList());
     }
 
     @Test
@@ -65,7 +65,7 @@ class GetGenresByIdUseCaseTest {
         final var actualOutput = useCase.execute(ids);
 
         assertEquals(1, actualOutput.size());
-        assertEquals("1", actualOutput.getFirst().id());
+        assertEquals("00000001-0000-0000-0000-000000000000", actualOutput.getFirst().id());
     }
 
     @Test
@@ -88,6 +88,6 @@ class GetGenresByIdUseCaseTest {
     }
 
     private static Genre aGenre(final GenreID id, final String name) {
-        return Genre.with(id, name, true, Set.of(CategoryID.from("c1")), CREATED_AT, UPDATED_AT);
+        return Genre.with(id, name, true, Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000")), CREATED_AT, UPDATED_AT);
     }
 }

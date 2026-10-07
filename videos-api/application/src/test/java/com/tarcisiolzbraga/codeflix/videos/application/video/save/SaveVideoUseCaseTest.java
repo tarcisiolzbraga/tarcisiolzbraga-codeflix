@@ -61,9 +61,9 @@ class SaveVideoUseCaseTest {
         useCase.execute(aCommand(EXPECTED_ID, "Duna", "14"));
 
         final var actualReferences = captured().getReferences();
-        assertEquals(Set.of(CategoryID.from("c1")), actualReferences.categories());
-        assertEquals(Set.of(GenreID.from("g1")), actualReferences.genres());
-        assertEquals(Set.of(CastMemberID.from("m1")), actualReferences.castMembers());
+        assertEquals(Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000")), actualReferences.categories());
+        assertEquals(Set.of(GenreID.from("00000016-0000-0000-0000-000000000000")), actualReferences.genres());
+        assertEquals(Set.of(CastMemberID.from("00000021-0000-0000-0000-000000000000")), actualReferences.castMembers());
     }
 
     // Classificação desconhecida entra como nulo e o validador a reporta, em vez de a conversão

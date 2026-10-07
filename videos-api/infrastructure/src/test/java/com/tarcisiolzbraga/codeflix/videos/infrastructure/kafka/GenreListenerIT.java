@@ -54,7 +54,7 @@ class GenreListenerIT {
     @Test
     void givenACreateMessage_whenConsumed_thenFetchTheRecordAndStoreTheReplicaWithItsCategories() {
         final var id = "11111111-aaaa-4111-8111-111111111111";
-        when(genreClient.genreOfId(id)).thenReturn(Optional.of(aDto(id, "Ação", Set.of("c1", "c2"))));
+        when(genreClient.genreOfId(id)).thenReturn(Optional.of(aDto(id, "Ação", Set.of("00000009-0000-0000-0000-000000000000", "00000010-0000-0000-0000-000000000000"))));
 
         publish("cdc/genre-c.json", id);
 
@@ -63,7 +63,7 @@ class GenreListenerIT {
             assertTrue(stored.isPresent());
             assertEquals("Ação", stored.orElseThrow().getName());
             assertEquals(
-                    Set.of(CategoryID.from("c1"), CategoryID.from("c2")),
+                    Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000"), CategoryID.from("00000010-0000-0000-0000-000000000000")),
                     stored.orElseThrow().getCategories());
         });
     }
@@ -73,7 +73,7 @@ class GenreListenerIT {
     @Test
     void givenAnUpdateMessage_whenConsumed_thenReplaceTheCategoriesWithWhatTheAdminHasNow() {
         final var id = "22222222-aaaa-4222-8222-222222222222";
-        when(genreClient.genreOfId(id)).thenReturn(Optional.of(aDto(id, "Ação", Set.of("c1", "c2"))));
+        when(genreClient.genreOfId(id)).thenReturn(Optional.of(aDto(id, "Ação", Set.of("00000009-0000-0000-0000-000000000000", "00000010-0000-0000-0000-000000000000"))));
         publish("cdc/genre-c.json", id);
         await().atMost(TIMEOUT).untilAsserted(() -> {
             final var stored = genreGateway.findById(GenreID.from(id));
@@ -81,20 +81,20 @@ class GenreListenerIT {
             assertEquals(2, stored.orElseThrow().getCategories().size());
         });
 
-        when(genreClient.genreOfId(id)).thenReturn(Optional.of(aDto(id, "Ação", Set.of("c1"))));
+        when(genreClient.genreOfId(id)).thenReturn(Optional.of(aDto(id, "Ação", Set.of("00000009-0000-0000-0000-000000000000"))));
         publish("cdc/genre-u.json", id);
 
         await().atMost(TIMEOUT).untilAsserted(() -> {
             final var stored = genreGateway.findById(GenreID.from(id));
             assertTrue(stored.isPresent());
-            assertEquals(Set.of(CategoryID.from("c1")), stored.orElseThrow().getCategories());
+            assertEquals(Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000")), stored.orElseThrow().getCategories());
         });
     }
 
     @Test
     void givenADeleteMessage_whenConsumed_thenRemoveTheReplica() {
         final var id = "33333333-aaaa-4333-8333-333333333333";
-        when(genreClient.genreOfId(id)).thenReturn(Optional.of(aDto(id, "Vai ser apagado", Set.of("c1"))));
+        when(genreClient.genreOfId(id)).thenReturn(Optional.of(aDto(id, "Vai ser apagado", Set.of("00000009-0000-0000-0000-000000000000"))));
         publish("cdc/genre-c.json", id);
         await().atMost(TIMEOUT)
                 .untilAsserted(() -> assertTrue(genreGateway.findById(GenreID.from(id)).isPresent()));
@@ -108,7 +108,7 @@ class GenreListenerIT {
     @Test
     void givenATombstone_whenConsumed_thenIgnoreItAndKeepTheReplica() {
         final var id = "44444444-aaaa-4444-8444-444444444444";
-        when(genreClient.genreOfId(id)).thenReturn(Optional.of(aDto(id, "Sobrevive", Set.of("c1"))));
+        when(genreClient.genreOfId(id)).thenReturn(Optional.of(aDto(id, "Sobrevive", Set.of("00000009-0000-0000-0000-000000000000"))));
         publish("cdc/genre-c.json", id);
         await().atMost(TIMEOUT)
                 .untilAsserted(() -> assertTrue(genreGateway.findById(GenreID.from(id)).isPresent()));

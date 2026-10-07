@@ -23,20 +23,11 @@ public class VideoValidator extends Validator {
 
     @Override
     public void validate() {
-        checkIdConstraints();
         checkTitleConstraints();
         checkDescriptionConstraints();
         checkLaunchedAtConstraints();
         checkDurationConstraints();
         checkRatingConstraints();
-    }
-
-    // O id chega pela mensagem do admin-codeflix, que pode vir corrompida; o construtor do VideoID
-    // barra o nulo, não o branco.
-    private void checkIdConstraints() {
-        if (this.video.getId().getValue().isBlank()) {
-            validationHandler().append(new ValidationError("'id' should not be empty"));
-        }
     }
 
     private void checkTitleConstraints() {

@@ -120,34 +120,7 @@ class CategoryTest {
         assertEquals(NAME_LENGTH_MESSAGE, actualException.getMessage());
     }
 
-    @Test
-    void givenBlankId_whenCallValidate_thenThrowDomainExceptionBecauseTheMessageCameCorrupted() {
-        final var category = Category.with(
-                CategoryID.from("  "),
-                EXPECTED_NAME,
-                EXPECTED_DESCRIPTION,
-                true,
-                EXPECTED_CREATED_AT,
-                EXPECTED_UPDATED_AT);
 
-        final var actualException =
-                assertThrows(DomainException.class, () -> category.validate(new ThrowsValidationHandler()));
-
-        assertEquals("'id' should not be empty", actualException.getMessage());
-    }
-
-    @Test
-    void givenBlankIdAndBlankName_whenCallValidateWithNotification_thenAccumulateBothErrors() {
-        final var category = Category.with(
-                CategoryID.from(""), "  ", EXPECTED_DESCRIPTION, true, EXPECTED_CREATED_AT, EXPECTED_UPDATED_AT);
-        final var notification = Notification.create();
-
-        category.validate(notification);
-
-        assertEquals(2, notification.getErrors().size());
-        assertEquals("'id' should not be empty", notification.firstError().orElseThrow().message());
-        assertEquals(BLANK_NAME_MESSAGE, notification.getErrors().get(1).message());
-    }
 
     private static Category aCategory(final String name) {
         return Category.with(

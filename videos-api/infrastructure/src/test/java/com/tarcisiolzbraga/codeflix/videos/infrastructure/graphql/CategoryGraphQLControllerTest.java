@@ -76,7 +76,7 @@ class CategoryGraphQLControllerTest {
     @Test
     void givenAPageOfCategories_whenCallCategories_thenReturnEachItem() {
         when(listCategoriesUseCase.execute(any()))
-                .thenReturn(new Pagination<>(0, 10, 2L, List.of(anOutput("1", "Filmes"), anOutput("2", "Séries"))));
+                .thenReturn(new Pagination<>(0, 10, 2L, List.of(anOutput("00000001-0000-0000-0000-000000000000", "Filmes"), anOutput("00000002-0000-0000-0000-000000000000", "Séries"))));
 
         final var actualItems = graphql.document(ITEMS_QUERY)
                 .execute()
@@ -90,7 +90,7 @@ class CategoryGraphQLControllerTest {
     @Test
     void givenAPageOfCategories_whenCallCategories_thenReturnTheNumbersOfThePage() {
         when(listCategoriesUseCase.execute(any()))
-                .thenReturn(new Pagination<>(2, 5, 37L, List.of(anOutput("1", "Filmes"))));
+                .thenReturn(new Pagination<>(2, 5, 37L, List.of(anOutput("00000001-0000-0000-0000-000000000000", "Filmes"))));
 
         final var actualResult = graphql.document("{ categories { meta { currentPage perPage total } } }").execute();
 
@@ -125,14 +125,14 @@ class CategoryGraphQLControllerTest {
 
     @Test
     void givenAValidInput_whenCallSaveCategory_thenHandEveryValueToTheUseCase() {
-        when(saveCategoryUseCase.execute(any())).thenReturn(new SaveCategoryOutput("1"));
+        when(saveCategoryUseCase.execute(any())).thenReturn(new SaveCategoryOutput("00000001-0000-0000-0000-000000000000"));
 
         graphql.document(saveDocument("\"Filmes\"", "\"A mais assistida\"", "false")).execute();
 
         final var captor = ArgumentCaptor.forClass(SaveCategoryCommand.class);
         verify(saveCategoryUseCase).execute(captor.capture());
         final var actualCommand = captor.getValue();
-        assertEquals("1", actualCommand.id());
+        assertEquals("00000001-0000-0000-0000-000000000000", actualCommand.id());
         assertEquals("Filmes", actualCommand.name());
         assertEquals("A mais assistida", actualCommand.description());
         assertEquals(false, actualCommand.active());
@@ -142,22 +142,22 @@ class CategoryGraphQLControllerTest {
 
     @Test
     void givenAValidInput_whenCallSaveCategory_thenReturnWhatWasSaved() {
-        when(saveCategoryUseCase.execute(any())).thenReturn(new SaveCategoryOutput("1"));
+        when(saveCategoryUseCase.execute(any())).thenReturn(new SaveCategoryOutput("00000001-0000-0000-0000-000000000000"));
 
         final var actualResult =
                 graphql.document(saveDocument("\"Filmes\"", "\"A mais assistida\"", "true")).execute();
 
-        actualResult.path("saveCategory.id").entity(String.class).isEqualTo("1");
+        actualResult.path("saveCategory.id").entity(String.class).isEqualTo("00000001-0000-0000-0000-000000000000");
         actualResult.path("saveCategory.name").entity(String.class).isEqualTo("Filmes");
         actualResult.path("saveCategory.description").entity(String.class).isEqualTo("A mais assistida");
     }
 
     @Test
     void givenAnInputWithoutActive_whenCallSaveCategory_thenUseTheSchemaDefault() {
-        when(saveCategoryUseCase.execute(any())).thenReturn(new SaveCategoryOutput("1"));
+        when(saveCategoryUseCase.execute(any())).thenReturn(new SaveCategoryOutput("00000001-0000-0000-0000-000000000000"));
         final var document =
                 """
-                mutation { saveCategory(input: { id: "1", name: "Filmes",
+                mutation { saveCategory(input: { id: "00000001-0000-0000-0000-000000000000", name: "Filmes",
                   createdAt: "2026-09-30T12:00:00Z", updatedAt: "2026-10-01T08:30:00Z" })
                   { id } }""";
 
@@ -174,7 +174,7 @@ class CategoryGraphQLControllerTest {
     void givenADateThatDoesNotConvert_whenCallSaveCategory_thenBlameTheClientAndNameTheField() {
         final var document =
                 """
-                mutation { saveCategory(input: { id: "1", name: "Filmes",
+                mutation { saveCategory(input: { id: "00000001-0000-0000-0000-000000000000", name: "Filmes",
                   createdAt: "ontem", updatedAt: "2026-10-01T08:30:00Z" })
                   { id } }""";
 
@@ -189,7 +189,7 @@ class CategoryGraphQLControllerTest {
 
     private static String saveDocument(final String name, final String description, final String active) {
         return """
-                mutation { saveCategory(input: { id: "1", name: %s, description: %s, active: %s,
+                mutation { saveCategory(input: { id: "00000001-0000-0000-0000-000000000000", name: %s, description: %s, active: %s,
                   createdAt: "2026-09-30T12:00:00Z", updatedAt: "2026-10-01T08:30:00Z" })
                   { id name description } }"""
                 .formatted(name, description, active);

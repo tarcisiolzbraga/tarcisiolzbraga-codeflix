@@ -32,9 +32,9 @@ class VideoElasticsearchGatewayIT {
 
     private static final Instant CREATED_AT = Instant.parse("2026-09-30T12:00:00Z");
     private static final Instant UPDATED_AT = Instant.parse("2026-10-01T08:30:00Z");
-    private static final CategoryID FILMES = CategoryID.from("c-filmes");
-    private static final GenreID ACAO = GenreID.from("g-acao");
-    private static final CastMemberID DENIS = CastMemberID.from("m-denis");
+    private static final CategoryID FILMES = CategoryID.from("00000005-0000-0000-0000-000000000000");
+    private static final GenreID ACAO = GenreID.from("00000012-0000-0000-0000-000000000000");
+    private static final CastMemberID DENIS = CastMemberID.from("00000019-0000-0000-0000-000000000000");
 
     @Autowired
     private VideoElasticsearchGateway gateway;
@@ -49,11 +49,11 @@ class VideoElasticsearchGatewayIT {
     // e as três relações, ou algum fica nulo pelo caminho.
     @Test
     void givenAVideo_whenCallSave_thenReadItBackWholeIncludingTheThreeRelations() {
-        final var video = aVideo("1", "Duna", Rating.AGE_14, 2026, true, true, references());
+        final var video = aVideo("00000001-0000-0000-0000-000000000000", "Duna", Rating.AGE_14, 2026, true, true, references());
 
         gateway.save(video);
 
-        final var stored = gateway.findById(VideoID.from("1")).orElseThrow();
+        final var stored = gateway.findById(VideoID.from("00000001-0000-0000-0000-000000000000")).orElseThrow();
         assertEquals("Duna", stored.getDetails().title());
         assertEquals("Paul Atreides em Arrakis", stored.getDetails().description());
         assertEquals(Year.of(2026), stored.getDetails().launchedAt());
@@ -73,7 +73,7 @@ class VideoElasticsearchGatewayIT {
     @Test
     void givenAVideoWithoutMediaOrRelations_whenCallSave_thenReadItBackEmptyNotNull() {
         gateway.save(Video.with(
-                VideoID.from("1"),
+                VideoID.from("00000001-0000-0000-0000-000000000000"),
                 details("Duna", Rating.AGE_14, 2026),
                 new VideoFlags(false, true, true),
                 VideoMedias.none(),
@@ -81,7 +81,7 @@ class VideoElasticsearchGatewayIT {
                 CREATED_AT,
                 UPDATED_AT));
 
-        final var stored = gateway.findById(VideoID.from("1")).orElseThrow();
+        final var stored = gateway.findById(VideoID.from("00000001-0000-0000-0000-000000000000")).orElseThrow();
 
         assertTrue(stored.getReferences().categories().isEmpty());
         assertTrue(stored.getReferences().genres().isEmpty());
@@ -89,28 +89,28 @@ class VideoElasticsearchGatewayIT {
 
     @Test
     void givenAnInactiveVideo_whenCallFindById_thenReturnEmptyButKeepItStored() {
-        gateway.save(aVideo("1", "Duna", Rating.AGE_14, 2026, false, true, references()));
+        gateway.save(aVideo("00000001-0000-0000-0000-000000000000", "Duna", Rating.AGE_14, 2026, false, true, references()));
 
-        assertTrue(gateway.findById(VideoID.from("1")).isEmpty());
-        assertTrue(repository.findById("1").isPresent());
+        assertTrue(gateway.findById(VideoID.from("00000001-0000-0000-0000-000000000000")).isEmpty());
+        assertTrue(repository.findById("00000001-0000-0000-0000-000000000000").isPresent());
     }
 
     // A metade que o curso também filtra: não publicado não é servido.
     @Test
     void givenAnUnpublishedVideo_whenCallFindById_thenReturnEmptyButKeepItStored() {
-        gateway.save(aVideo("1", "Duna", Rating.AGE_14, 2026, true, false, references()));
+        gateway.save(aVideo("00000001-0000-0000-0000-000000000000", "Duna", Rating.AGE_14, 2026, true, false, references()));
 
-        assertTrue(gateway.findById(VideoID.from("1")).isEmpty());
-        assertTrue(repository.findById("1").isPresent());
+        assertTrue(gateway.findById(VideoID.from("00000001-0000-0000-0000-000000000000")).isEmpty());
+        assertTrue(repository.findById("00000001-0000-0000-0000-000000000000").isPresent());
     }
 
     @Test
     void givenAStoredVideo_whenCallDeleteById_thenRemoveIt() {
-        gateway.save(aVideo("1", "Duna", Rating.AGE_14, 2026, true, true, references()));
+        gateway.save(aVideo("00000001-0000-0000-0000-000000000000", "Duna", Rating.AGE_14, 2026, true, true, references()));
 
-        gateway.deleteById(VideoID.from("1"));
+        gateway.deleteById(VideoID.from("00000001-0000-0000-0000-000000000000"));
 
-        assertTrue(repository.findById("1").isEmpty());
+        assertTrue(repository.findById("00000001-0000-0000-0000-000000000000").isEmpty());
     }
 
     @Test
@@ -125,9 +125,9 @@ class VideoElasticsearchGatewayIT {
 
     @Test
     void givenAnInactiveOrUnpublishedVideo_whenCallFindAll_thenHideBoth() {
-        gateway.save(aVideo("1", "Duna", Rating.AGE_14, 2026, true, true, references()));
-        gateway.save(aVideo("2", "Inativo", Rating.AGE_14, 2026, false, true, references()));
-        gateway.save(aVideo("3", "Nao publicado", Rating.AGE_14, 2026, true, false, references()));
+        gateway.save(aVideo("00000001-0000-0000-0000-000000000000", "Duna", Rating.AGE_14, 2026, true, true, references()));
+        gateway.save(aVideo("00000002-0000-0000-0000-000000000000", "Inativo", Rating.AGE_14, 2026, false, true, references()));
+        gateway.save(aVideo("00000003-0000-0000-0000-000000000000", "Nao publicado", Rating.AGE_14, 2026, true, false, references()));
         refresh();
 
         final var actualPage = gateway.findAll(aQuery(null, null, null, Set.of(), Set.of(), Set.of(), 0, 10));
@@ -168,7 +168,7 @@ class VideoElasticsearchGatewayIT {
         seed();
 
         final var actualPage =
-                gateway.findAll(aQuery(null, null, null, Set.of(CategoryID.from("c-series")), Set.of(), Set.of(), 0, 10));
+                gateway.findAll(aQuery(null, null, null, Set.of(CategoryID.from("00000008-0000-0000-0000-000000000000")), Set.of(), Set.of(), 0, 10));
 
         assertEquals(List.of("Arrival"), titlesOf(actualPage));
     }
@@ -178,7 +178,7 @@ class VideoElasticsearchGatewayIT {
         seed();
 
         final var actualPage =
-                gateway.findAll(aQuery(null, null, null, Set.of(), Set.of(GenreID.from("g-drama")), Set.of(), 0, 10));
+                gateway.findAll(aQuery(null, null, null, Set.of(), Set.of(GenreID.from("00000014-0000-0000-0000-000000000000")), Set.of(), 0, 10));
 
         assertEquals(List.of("Sicario"), titlesOf(actualPage));
     }
@@ -247,23 +247,23 @@ class VideoElasticsearchGatewayIT {
     }
 
     private void seed() {
-        gateway.save(aVideo("1", "Duna", Rating.AGE_14, 2026, true, true, references()));
+        gateway.save(aVideo("00000001-0000-0000-0000-000000000000", "Duna", Rating.AGE_14, 2026, true, true, references()));
         gateway.save(aVideo(
-                "2",
+                "00000002-0000-0000-0000-000000000000",
                 "Arrival",
                 Rating.AGE_12,
                 2016,
                 true,
                 true,
-                VideoReferences.with(Set.of(CategoryID.from("c-series")), Set.of(ACAO), Set.of(DENIS))));
+                VideoReferences.with(Set.of(CategoryID.from("00000008-0000-0000-0000-000000000000")), Set.of(ACAO), Set.of(DENIS))));
         gateway.save(aVideo(
-                "3",
+                "00000003-0000-0000-0000-000000000000",
                 "Sicario",
                 Rating.AGE_16,
                 2015,
                 true,
                 true,
-                VideoReferences.with(Set.of(FILMES), Set.of(GenreID.from("g-drama")), Set.of(DENIS))));
+                VideoReferences.with(Set.of(FILMES), Set.of(GenreID.from("00000014-0000-0000-0000-000000000000")), Set.of(DENIS))));
         refresh();
     }
 

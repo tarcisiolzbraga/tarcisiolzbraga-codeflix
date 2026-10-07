@@ -80,14 +80,14 @@ class CastMemberE2ETest implements CastMemberE2EDsl {
 
     @Test
     void givenAChangeArrivingFromTheAdmin_whenAClientListsThem_thenSeeItOverHttp() {
-        givenAMemberPublishedByTheAdmin("a1", "Denis Villeneuve", "DIRECTOR");
+        givenAMemberPublishedByTheAdmin("00000003-6000-0000-0000-000000000000", "Denis Villeneuve", "DIRECTOR");
 
         await().atMost(VISIBLE).untilAsserted(() -> {
             final var actualPage = listCastMembers();
 
             assertEquals(1L, actualPage.meta().total());
             final var actualMember = actualPage.items().getFirst();
-            assertEquals("a1", actualMember.id());
+            assertEquals("00000003-6000-0000-0000-000000000000", actualMember.id());
             assertEquals("Denis Villeneuve", actualMember.name());
             assertEquals(CastMemberType.DIRECTOR, actualMember.type());
         });
@@ -95,8 +95,8 @@ class CastMemberE2ETest implements CastMemberE2EDsl {
 
     @Test
     void givenSeveralMembersFromTheAdmin_whenAClientListsThem_thenSeeThemSortedWithTheirPageNumbers() {
-        givenAMemberPublishedByTheAdmin("a1", "Denis Villeneuve", "DIRECTOR");
-        givenAMemberPublishedByTheAdmin("b2", "Rebecca Ferguson", "ACTOR");
+        givenAMemberPublishedByTheAdmin("00000003-6000-0000-0000-000000000000", "Denis Villeneuve", "DIRECTOR");
+        givenAMemberPublishedByTheAdmin("00000003-7000-0000-0000-000000000000", "Rebecca Ferguson", "ACTOR");
 
         await().atMost(VISIBLE).untilAsserted(() -> {
             final var actualPage = listCastMembers();
@@ -110,8 +110,8 @@ class CastMemberE2ETest implements CastMemberE2EDsl {
 
     @Test
     void givenMembersFromTheAdmin_whenSearchByName_thenSeeOnlyWhatMatches() {
-        givenAMemberPublishedByTheAdmin("a1", "Denis Villeneuve", "DIRECTOR");
-        givenAMemberPublishedByTheAdmin("b2", "Rebecca Ferguson", "ACTOR");
+        givenAMemberPublishedByTheAdmin("00000003-6000-0000-0000-000000000000", "Denis Villeneuve", "DIRECTOR");
+        givenAMemberPublishedByTheAdmin("00000003-7000-0000-0000-000000000000", "Rebecca Ferguson", "ACTOR");
 
         await().atMost(VISIBLE).untilAsserted(() -> {
             final var actualPage = listCastMembers("Rebecca");

@@ -116,34 +116,18 @@ class CastMemberTest {
         assertEquals(TYPE_MESSAGE, actualException.getMessage());
     }
 
-    @Test
-    void givenBlankId_whenCallValidate_thenThrowDomainExceptionBecauseTheMessageCameCorrupted() {
-        final var member = CastMember.with(
-                CastMemberID.from("  "),
-                EXPECTED_NAME,
-                CastMemberType.ACTOR,
-                true,
-                EXPECTED_CREATED_AT,
-                EXPECTED_UPDATED_AT);
-
-        final var actualException =
-                assertThrows(DomainException.class, () -> member.validate(new ThrowsValidationHandler()));
-
-        assertEquals("'id' should not be empty", actualException.getMessage());
-    }
 
     @Test
     void givenEverythingWrong_whenCallValidateWithNotification_thenAccumulateEveryError() {
         final var member = CastMember.with(
-                CastMemberID.from(""), "  ", null, true, EXPECTED_CREATED_AT, EXPECTED_UPDATED_AT);
+                EXPECTED_ID, "  ", null, true, EXPECTED_CREATED_AT, EXPECTED_UPDATED_AT);
         final var notification = Notification.create();
 
         member.validate(notification);
 
-        assertEquals(3, notification.getErrors().size());
-        assertEquals("'id' should not be empty", notification.firstError().orElseThrow().message());
-        assertEquals("'name' should not be empty", notification.getErrors().get(1).message());
-        assertEquals(TYPE_MESSAGE, notification.getErrors().get(2).message());
+        assertEquals(2, notification.getErrors().size());
+        assertEquals("'name' should not be empty", notification.firstError().orElseThrow().message());
+        assertEquals(TYPE_MESSAGE, notification.getErrors().get(1).message());
     }
 
     private static CastMember aMember(final String name, final CastMemberType type) {

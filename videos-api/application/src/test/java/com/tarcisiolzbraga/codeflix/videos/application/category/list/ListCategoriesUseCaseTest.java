@@ -35,7 +35,7 @@ class ListCategoriesUseCaseTest {
 
     @Test
     void givenValidQuery_whenCallExecute_thenReturnThePageWithItsMetadata() {
-        final var categories = List.of(aCategory("1", "Filmes"), aCategory("2", "Séries"));
+        final var categories = List.of(aCategory("00000001-0000-0000-0000-000000000000", "Filmes"), aCategory("00000002-0000-0000-0000-000000000000", "Séries"));
         when(categoryGateway.findAll(EXPECTED_QUERY)).thenReturn(new Pagination<>(0, 10, 2L, categories));
 
         final var actualOutput = useCase.execute(EXPECTED_QUERY);
@@ -48,13 +48,13 @@ class ListCategoriesUseCaseTest {
 
     @Test
     void givenValidQuery_whenCallExecute_thenMapEachCategoryToItsOutput() {
-        final var category = aCategory("1", "Filmes");
+        final var category = aCategory("00000001-0000-0000-0000-000000000000", "Filmes");
         when(categoryGateway.findAll(EXPECTED_QUERY)).thenReturn(new Pagination<>(0, 10, 1L, List.of(category)));
 
         final var actualOutput = useCase.execute(EXPECTED_QUERY);
 
         final var actualItem = actualOutput.items().getFirst();
-        assertEquals("1", actualItem.id());
+        assertEquals("00000001-0000-0000-0000-000000000000", actualItem.id());
         assertEquals("Filmes", actualItem.name());
         assertEquals("A categoria Filmes", actualItem.description());
         assertTrue(actualItem.active());

@@ -39,7 +39,7 @@ class SaveGenreUseCaseTest {
 
     @Test
     void givenValidCommand_whenCallExecute_thenStoreTheReplicaAndReturnItsId() {
-        final var command = aCommand(EXPECTED_NAME, Set.of("c1", "c2"));
+        final var command = aCommand(EXPECTED_NAME, Set.of("00000009-0000-0000-0000-000000000000", "00000010-0000-0000-0000-000000000000"));
         when(genreGateway.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         final var actualOutput = useCase.execute(command);
@@ -47,7 +47,7 @@ class SaveGenreUseCaseTest {
         assertEquals(EXPECTED_ID, actualOutput.id());
         final var actualGenre = captured();
         assertEquals(EXPECTED_NAME, actualGenre.getName());
-        assertEquals(Set.of(CategoryID.from("c1"), CategoryID.from("c2")), actualGenre.getCategories());
+        assertEquals(Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000"), CategoryID.from("00000010-0000-0000-0000-000000000000")), actualGenre.getCategories());
         assertEquals(CREATED_AT, actualGenre.getCreatedAt());
     }
 
@@ -66,14 +66,14 @@ class SaveGenreUseCaseTest {
     @Test
     void givenCategoriesWithANullInside_whenCallExecute_thenDropIt() {
         final var categories = new HashSet<String>();
-        categories.add("c1");
+        categories.add("00000009-0000-0000-0000-000000000000");
         categories.add(null);
         final var command = aCommand(EXPECTED_NAME, categories);
         when(genreGateway.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         useCase.execute(command);
 
-        assertEquals(Set.of(CategoryID.from("c1")), captured().getCategories());
+        assertEquals(Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000")), captured().getCategories());
     }
 
     @Test

@@ -58,16 +58,16 @@ class GenreGraphQLControllerTest {
     void givenCategoriesToFilterBy_whenCallGenres_thenHandThemToTheUseCaseAsTypedIds() {
         when(listGenresUseCase.execute(any())).thenReturn(emptyPage());
 
-        graphql.document("{ genres(categories: [\"c1\", \"c2\"]) { items { id } } }").execute();
+        graphql.document("{ genres(categories: [\"00000009-0000-0000-0000-000000000000\", \"00000010-0000-0000-0000-000000000000\"]) { items { id } } }").execute();
 
         assertEquals(
-                Set.of(CategoryID.from("c1"), CategoryID.from("c2")), capturedQuery().categories());
+                Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000"), CategoryID.from("00000010-0000-0000-0000-000000000000")), capturedQuery().categories());
     }
 
     @Test
     void givenAPageOfGenres_whenCallGenres_thenReturnTheItemsAndTheNumbers() {
         when(listGenresUseCase.execute(any()))
-                .thenReturn(new Pagination<>(1, 5, 9L, List.of(aGenre("1", "Ação", Set.of()))));
+                .thenReturn(new Pagination<>(1, 5, 9L, List.of(aGenre("00000001-0000-0000-0000-000000000000", "Ação", Set.of()))));
 
         final var actualResult = graphql.document("{ genres { meta { currentPage perPage total } items { name } } }")
                 .execute();
@@ -85,9 +85,9 @@ class GenreGraphQLControllerTest {
                         0,
                         10,
                         2L,
-                        List.of(aGenre("1", "Ação", Set.of("c1")), aGenre("2", "Comédia", Set.of("c1", "c2")))));
+                        List.of(aGenre("00000001-0000-0000-0000-000000000000", "Ação", Set.of("00000009-0000-0000-0000-000000000000")), aGenre("00000002-0000-0000-0000-000000000000", "Comédia", Set.of("00000009-0000-0000-0000-000000000000", "00000010-0000-0000-0000-000000000000")))));
         when(getCategoriesByIdUseCase.execute(any()))
-                .thenReturn(List.of(aCategory("c1", "Filmes"), aCategory("c2", "Séries")));
+                .thenReturn(List.of(aCategory("00000009-0000-0000-0000-000000000000", "Filmes"), aCategory("00000010-0000-0000-0000-000000000000", "Séries")));
 
         final var actualResult = graphql.document("{ genres { items { name categories { id name } } } }").execute();
 
@@ -105,7 +105,7 @@ class GenreGraphQLControllerTest {
                         0,
                         10,
                         2L,
-                        List.of(aGenre("1", "Ação", Set.of("c1")), aGenre("2", "Comédia", Set.of("c2")))));
+                        List.of(aGenre("00000001-0000-0000-0000-000000000000", "Ação", Set.of("00000009-0000-0000-0000-000000000000")), aGenre("00000002-0000-0000-0000-000000000000", "Comédia", Set.of("00000010-0000-0000-0000-000000000000")))));
         when(getCategoriesByIdUseCase.execute(any())).thenReturn(List.of());
 
         graphql.document("{ genres { items { categories { id } } } }").execute();
@@ -113,7 +113,7 @@ class GenreGraphQLControllerTest {
         // captor(), e não forClass(Set.class): o genérico é preservado, sem aviso de unchecked.
         final ArgumentCaptor<Set<CategoryID>> captor = ArgumentCaptor.captor();
         verify(getCategoriesByIdUseCase).execute(captor.capture());
-        assertEquals(Set.of(CategoryID.from("c1"), CategoryID.from("c2")), captor.getValue());
+        assertEquals(Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000"), CategoryID.from("00000010-0000-0000-0000-000000000000")), captor.getValue());
     }
 
     // A regra do catálogo cumprida sem código próprio: a categoria inativa não volta do caso de uso,
@@ -121,20 +121,20 @@ class GenreGraphQLControllerTest {
     @Test
     void givenACategoryThatTheUseCaseDoesNotReturn_whenAskForTheCategories_thenLeaveItOutOfTheGenre() {
         when(listGenresUseCase.execute(any()))
-                .thenReturn(new Pagination<>(0, 10, 1L, List.of(aGenre("1", "Ação", Set.of("c1", "c-inativa")))));
-        when(getCategoriesByIdUseCase.execute(any())).thenReturn(List.of(aCategory("c1", "Filmes")));
+                .thenReturn(new Pagination<>(0, 10, 1L, List.of(aGenre("00000001-0000-0000-0000-000000000000", "Ação", Set.of("00000009-0000-0000-0000-000000000000", "00000006-0000-0000-0000-000000000000")))));
+        when(getCategoriesByIdUseCase.execute(any())).thenReturn(List.of(aCategory("00000009-0000-0000-0000-000000000000", "Filmes")));
 
         final var actualResult = graphql.document("{ genres { items { categories { id } } } }").execute();
 
         assertEquals(
-                List.of("c1"),
+                List.of("00000009-0000-0000-0000-000000000000"),
                 actualResult.path("genres.items[*].categories[*].id").entityList(String.class).get());
     }
 
     @Test
     void givenAGenreWithoutCategories_whenAskForThem_thenReturnAnEmptyList() {
         when(listGenresUseCase.execute(any()))
-                .thenReturn(new Pagination<>(0, 10, 1L, List.of(aGenre("1", "Ação", Set.of()))));
+                .thenReturn(new Pagination<>(0, 10, 1L, List.of(aGenre("00000001-0000-0000-0000-000000000000", "Ação", Set.of()))));
         when(getCategoriesByIdUseCase.execute(any())).thenReturn(List.of());
 
         final var actualResult = graphql.document("{ genres { items { categories { id } } } }").execute();

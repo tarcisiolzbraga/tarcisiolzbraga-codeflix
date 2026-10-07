@@ -65,10 +65,10 @@ class VideoRelationsGraphQLControllerTest {
 
     @Test
     void givenAVideoWithTheThreeRelations_whenAskForThem_thenResolveAllOfThem() {
-        givenAPageWith(aVideo("1", Set.of("c1"), Set.of("g1"), Set.of("m1")));
-        when(getCategoriesByIdUseCase.execute(any())).thenReturn(List.of(aCategory("c1", "Filmes")));
-        when(getGenresByIdUseCase.execute(any())).thenReturn(List.of(aGenre("g1", "Ação")));
-        when(getCastMembersByIdUseCase.execute(any())).thenReturn(List.of(aMember("m1", "Denis")));
+        givenAPageWith(aVideo("00000001-0000-0000-0000-000000000000", Set.of("00000009-0000-0000-0000-000000000000"), Set.of("00000016-0000-0000-0000-000000000000"), Set.of("00000021-0000-0000-0000-000000000000")));
+        when(getCategoriesByIdUseCase.execute(any())).thenReturn(List.of(aCategory("00000009-0000-0000-0000-000000000000", "Filmes")));
+        when(getGenresByIdUseCase.execute(any())).thenReturn(List.of(aGenre("00000016-0000-0000-0000-000000000000", "Ação")));
+        when(getCastMembersByIdUseCase.execute(any())).thenReturn(List.of(aMember("00000021-0000-0000-0000-000000000000", "Denis")));
 
         final var actualResult = graphql.document(
                         "{ videos { items { categories { name } genres { name } castMembers { name } } } }")
@@ -83,8 +83,8 @@ class VideoRelationsGraphQLControllerTest {
     @Test
     void givenSeveralVideos_whenAskForTheRelations_thenCallEachUseCaseOnce() {
         givenAPageWith(
-                aVideo("1", Set.of("c1"), Set.of("g1"), Set.of("m1")),
-                aVideo("2", Set.of("c2"), Set.of("g2"), Set.of("m2")));
+                aVideo("00000001-0000-0000-0000-000000000000", Set.of("00000009-0000-0000-0000-000000000000"), Set.of("00000016-0000-0000-0000-000000000000"), Set.of("00000021-0000-0000-0000-000000000000")),
+                aVideo("00000002-0000-0000-0000-000000000000", Set.of("00000010-0000-0000-0000-000000000000"), Set.of("00000017-0000-0000-0000-000000000000"), Set.of("00000022-0000-0000-0000-000000000000")));
         when(getCategoriesByIdUseCase.execute(any())).thenReturn(List.of());
         when(getGenresByIdUseCase.execute(any())).thenReturn(List.of());
         when(getCastMembersByIdUseCase.execute(any())).thenReturn(List.of());
@@ -99,8 +99,8 @@ class VideoRelationsGraphQLControllerTest {
     @Test
     void givenSeveralVideos_whenAskForTheRelations_thenRequestEveryIdOfThePageAtOnce() {
         givenAPageWith(
-                aVideo("1", Set.of("c1"), Set.of("g1"), Set.of("m1")),
-                aVideo("2", Set.of("c2"), Set.of("g2"), Set.of("m2")));
+                aVideo("00000001-0000-0000-0000-000000000000", Set.of("00000009-0000-0000-0000-000000000000"), Set.of("00000016-0000-0000-0000-000000000000"), Set.of("00000021-0000-0000-0000-000000000000")),
+                aVideo("00000002-0000-0000-0000-000000000000", Set.of("00000010-0000-0000-0000-000000000000"), Set.of("00000017-0000-0000-0000-000000000000"), Set.of("00000022-0000-0000-0000-000000000000")));
         when(getCategoriesByIdUseCase.execute(any())).thenReturn(List.of());
         when(getGenresByIdUseCase.execute(any())).thenReturn(List.of());
         when(getCastMembersByIdUseCase.execute(any())).thenReturn(List.of());
@@ -109,35 +109,35 @@ class VideoRelationsGraphQLControllerTest {
 
         final ArgumentCaptor<Set<CategoryID>> captor = ArgumentCaptor.captor();
         verify(getCategoriesByIdUseCase).execute(captor.capture());
-        assertEquals(Set.of(CategoryID.from("c1"), CategoryID.from("c2")), captor.getValue());
+        assertEquals(Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000"), CategoryID.from("00000010-0000-0000-0000-000000000000")), captor.getValue());
     }
 
     // A regra do catálogo nas três relações de uma vez: o que o caso de uso não devolve — porque
     // está inativo — não aparece no vídeo.
     @Test
     void givenRelationsThatTheUseCasesDoNotReturn_whenAskForThem_thenLeaveThemOutOfTheVideo() {
-        givenAPageWith(aVideo("1", Set.of("c1", "c-inativa"), Set.of("g1", "g-inativo"), Set.of("m1", "m-inativo")));
-        when(getCategoriesByIdUseCase.execute(any())).thenReturn(List.of(aCategory("c1", "Filmes")));
-        when(getGenresByIdUseCase.execute(any())).thenReturn(List.of(aGenre("g1", "Ação")));
-        when(getCastMembersByIdUseCase.execute(any())).thenReturn(List.of(aMember("m1", "Denis")));
+        givenAPageWith(aVideo("00000001-0000-0000-0000-000000000000", Set.of("00000009-0000-0000-0000-000000000000", "00000006-0000-0000-0000-000000000000"), Set.of("00000016-0000-0000-0000-000000000000", "00000015-0000-0000-0000-000000000000"), Set.of("00000021-0000-0000-0000-000000000000", "00000020-0000-0000-0000-000000000000")));
+        when(getCategoriesByIdUseCase.execute(any())).thenReturn(List.of(aCategory("00000009-0000-0000-0000-000000000000", "Filmes")));
+        when(getGenresByIdUseCase.execute(any())).thenReturn(List.of(aGenre("00000016-0000-0000-0000-000000000000", "Ação")));
+        when(getCastMembersByIdUseCase.execute(any())).thenReturn(List.of(aMember("00000021-0000-0000-0000-000000000000", "Denis")));
 
         final var actualResult = graphql.document(
                         "{ videos { items { categories { id } genres { id } castMembers { id } } } }")
                 .execute();
 
         assertEquals(
-                List.of("c1"),
+                List.of("00000009-0000-0000-0000-000000000000"),
                 actualResult.path("videos.items[0].categories[*].id").entityList(String.class).get());
         assertEquals(
-                List.of("g1"), actualResult.path("videos.items[0].genres[*].id").entityList(String.class).get());
+                List.of("00000016-0000-0000-0000-000000000000"), actualResult.path("videos.items[0].genres[*].id").entityList(String.class).get());
         assertEquals(
-                List.of("m1"),
+                List.of("00000021-0000-0000-0000-000000000000"),
                 actualResult.path("videos.items[0].castMembers[*].id").entityList(String.class).get());
     }
 
     @Test
     void givenAVideoWithoutRelations_whenAskForThem_thenReturnThreeEmptyLists() {
-        givenAPageWith(aVideo("1", Set.of(), Set.of(), Set.of()));
+        givenAPageWith(aVideo("00000001-0000-0000-0000-000000000000", Set.of(), Set.of(), Set.of()));
         when(getCategoriesByIdUseCase.execute(any())).thenReturn(List.of());
         when(getGenresByIdUseCase.execute(any())).thenReturn(List.of());
         when(getCastMembersByIdUseCase.execute(any())).thenReturn(List.of());

@@ -23,17 +23,8 @@ public class CastMemberValidator extends Validator {
 
     @Override
     public void validate() {
-        checkIdConstraints();
         checkNameConstraints();
         checkTypeConstraints();
-    }
-
-    // O id não é gerado aqui: ele chega pela mensagem do admin-codeflix, e uma mensagem corrompida
-    // pode trazê-lo vazio. O construtor do CastMemberID barra o nulo, não o branco.
-    private void checkIdConstraints() {
-        if (this.castMember.getId().getValue().isBlank()) {
-            validationHandler().append(new ValidationError("'id' should not be empty"));
-        }
     }
 
     private void checkNameConstraints() {

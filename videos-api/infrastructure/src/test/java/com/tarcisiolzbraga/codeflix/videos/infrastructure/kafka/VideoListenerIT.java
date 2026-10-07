@@ -68,7 +68,7 @@ class VideoListenerIT {
             assertEquals("Duna", stored.orElseThrow().getDetails().title());
             assertEquals(Rating.AGE_14, stored.orElseThrow().getDetails().rating());
             assertEquals("encoded/duna.mp4", stored.orElseThrow().getMedias().video());
-            assertEquals(Set.of(CategoryID.from("c1")), stored.orElseThrow().getReferences().categories());
+            assertEquals(Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000")), stored.orElseThrow().getReferences().categories());
         });
     }
 
@@ -197,9 +197,9 @@ class VideoListenerIT {
                 false,
                 published,
                 active,
-                Set.of("c1"),
-                Set.of("g1"),
-                Set.of("m1"),
+                Set.of("00000009-0000-0000-0000-000000000000"),
+                Set.of("00000016-0000-0000-0000-000000000000"),
+                Set.of("00000021-0000-0000-0000-000000000000"),
                 new VideoMediaDTO("raw/duna.mp4", "encoded/duna.mp4", "COMPLETED"),
                 new VideoMediaDTO("raw/t.mp4", "encoded/t.mp4", "COMPLETED"),
                 new ImageMediaDTO("b.jpg"),

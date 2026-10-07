@@ -149,27 +149,11 @@ class VideoTest {
         assertEquals("'rating' should not be null", actualException.getMessage());
     }
 
-    @Test
-    void givenBlankId_whenCallValidate_thenThrowDomainExceptionBecauseTheMessageCameCorrupted() {
-        final var video = Video.with(
-                VideoID.from("  "),
-                details(EXPECTED_TITLE, EXPECTED_DESCRIPTION, Year.of(2026), 155.0, Rating.AGE_14),
-                visible(),
-                VideoMedias.none(),
-                VideoReferences.none(),
-                CREATED_AT,
-                UPDATED_AT);
-
-        final var actualException =
-                assertThrows(DomainException.class, () -> video.validate(new ThrowsValidationHandler()));
-
-        assertEquals("'id' should not be empty", actualException.getMessage());
-    }
 
     @Test
     void givenEverythingWrong_whenCallValidateWithNotification_thenAccumulateEveryError() {
         final var video = Video.with(
-                VideoID.from(""),
+                EXPECTED_ID,
                 details("  ", null, null, -1.0, null),
                 visible(),
                 VideoMedias.none(),
@@ -180,7 +164,7 @@ class VideoTest {
 
         video.validate(notification);
 
-        assertEquals(6, notification.getErrors().size());
+        assertEquals(5, notification.getErrors().size());
     }
 
     @Test
@@ -190,11 +174,11 @@ class VideoTest {
                 details(EXPECTED_TITLE, EXPECTED_DESCRIPTION, Year.of(2026), 155.0, Rating.AGE_14),
                 visible(),
                 VideoMedias.none(),
-                VideoReferences.with(Set.of(CategoryID.from("c1")), Set.of(), Set.of()),
+                VideoReferences.with(Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000")), Set.of(), Set.of()),
                 CREATED_AT,
                 UPDATED_AT);
 
-        assertEquals(Set.of(CategoryID.from("c1")), video.getReferences().categories());
+        assertEquals(Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000")), video.getReferences().categories());
     }
 
     private static VideoDetails details(

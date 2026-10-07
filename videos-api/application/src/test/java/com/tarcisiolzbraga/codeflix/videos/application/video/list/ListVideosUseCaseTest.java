@@ -24,7 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class ListVideosUseCaseTest {
 
     private static final VideoSearchQuery EXPECTED_QUERY = new VideoSearchQuery(
-            0, 10, "duna", "title", "asc", Rating.AGE_14, 2026, Set.of(CategoryID.from("c1")), null, null);
+            0, 10, "duna", "title", "asc", Rating.AGE_14, 2026, Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000")), null, null);
 
     @Mock
     private VideoGateway videoGateway;
@@ -35,7 +35,7 @@ class ListVideosUseCaseTest {
     @Test
     void givenValidQuery_whenCallExecute_thenReturnThePageWithItsMetadata() {
         when(videoGateway.findAll(EXPECTED_QUERY))
-                .thenReturn(new Pagination<>(0, 10, 2L, List.of(aVideo("1", "Duna", true), aVideo("2", "Arrival", true))));
+                .thenReturn(new Pagination<>(0, 10, 2L, List.of(aVideo("00000001-0000-0000-0000-000000000000", "Duna", true), aVideo("00000002-0000-0000-0000-000000000000", "Arrival", true))));
 
         final var actualOutput = useCase.execute(EXPECTED_QUERY);
 
@@ -48,11 +48,11 @@ class ListVideosUseCaseTest {
     @Test
     void givenValidQuery_whenCallExecute_thenCarryTheValueObjectsOfEachVideo() {
         when(videoGateway.findAll(EXPECTED_QUERY))
-                .thenReturn(new Pagination<>(0, 10, 1L, List.of(aVideo("1", "Duna", true))));
+                .thenReturn(new Pagination<>(0, 10, 1L, List.of(aVideo("00000001-0000-0000-0000-000000000000", "Duna", true))));
 
         final var actualItem = useCase.execute(EXPECTED_QUERY).items().getFirst();
 
-        assertEquals("1", actualItem.id());
+        assertEquals("00000001-0000-0000-0000-000000000000", actualItem.id());
         assertEquals(Rating.AGE_14, actualItem.details().rating());
         assertTrue(actualItem.flags().isVisibleInTheCatalog());
         assertEquals("v.mp4", actualItem.medias().video());

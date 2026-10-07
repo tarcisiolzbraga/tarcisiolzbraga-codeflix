@@ -25,7 +25,7 @@ class SecurityE2ETest {
     private static final String CLASSIFICATION = "classification";
     private static final String MUTATION =
             """
-            mutation { saveCategory(input: { id: "seguranca", name: "Filmes",
+            mutation { saveCategory(input: { id: "00000024-0000-0000-0000-000000000000", name: "Filmes",
               createdAt: "2026-09-30T12:00:00Z", updatedAt: "2026-10-01T08:30:00Z" })
               { id } }""";
 

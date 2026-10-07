@@ -66,7 +66,7 @@ class VideoGraphQLControllerTest {
         final var document =
                 """
                 { videos(search: "duna", rating: "14", yearLaunched: 2026,
-                         categories: ["c1"], genres: ["g1"], castMembers: ["m1"])
+                         categories: ["00000009-0000-0000-0000-000000000000"], genres: ["00000016-0000-0000-0000-000000000000"], castMembers: ["00000021-0000-0000-0000-000000000000"])
                   { items { id } } }""";
 
         graphql.document(document).execute();
@@ -75,7 +75,7 @@ class VideoGraphQLControllerTest {
         assertEquals("duna", actualQuery.terms());
         assertEquals(Rating.AGE_14, actualQuery.rating());
         assertEquals(2026, actualQuery.launchedAt());
-        assertEquals(Set.of(CategoryID.from("c1")), actualQuery.categories());
+        assertEquals(Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000")), actualQuery.categories());
     }
 
     // Rótulo desconhecido é recusado, não ignorado: tratá-lo como "sem filtro" devolveria o acervo
@@ -96,7 +96,7 @@ class VideoGraphQLControllerTest {
     @Test
     void givenAPageOfVideos_whenCallVideos_thenReturnTheItemsAndTheNumbers() {
         when(listVideosUseCase.execute(any()))
-                .thenReturn(new Pagination<>(1, 5, 9L, List.of(anOutput("1", "Duna"))));
+                .thenReturn(new Pagination<>(1, 5, 9L, List.of(anOutput("00000001-0000-0000-0000-000000000000", "Duna"))));
 
         final var actualResult =
                 graphql.document("{ videos { meta { currentPage total } items { title rating duration } } }").execute();
@@ -109,9 +109,9 @@ class VideoGraphQLControllerTest {
 
     @Test
     void givenAKnownId_whenCallVideo_thenReturnIt() {
-        when(getVideoUseCase.execute(VideoID.from("1"))).thenReturn(Optional.of(anOutput("1", "Duna")));
+        when(getVideoUseCase.execute(VideoID.from("00000001-0000-0000-0000-000000000000"))).thenReturn(Optional.of(anOutput("00000001-0000-0000-0000-000000000000", "Duna")));
 
-        final var actualResult = graphql.document("{ video(id: \"1\") { id title } }").execute();
+        final var actualResult = graphql.document("{ video(id: \"00000001-0000-0000-0000-000000000000\") { id title } }").execute();
 
         actualResult.path("video.title").entity(String.class).isEqualTo("Duna");
     }
@@ -119,9 +119,9 @@ class VideoGraphQLControllerTest {
     // Nulo quando o catálogo não serve o vídeo, o que inclui inativo e não publicado.
     @Test
     void givenAnIdTheCatalogDoesNotServe_whenCallVideo_thenReturnNull() {
-        when(getVideoUseCase.execute(VideoID.from("1"))).thenReturn(Optional.empty());
+        when(getVideoUseCase.execute(VideoID.from("00000001-0000-0000-0000-000000000000"))).thenReturn(Optional.empty());
 
-        final var actualResult = graphql.document("{ video(id: \"1\") { id } }").execute();
+        final var actualResult = graphql.document("{ video(id: \"00000001-0000-0000-0000-000000000000\") { id } }").execute();
 
         actualResult.path("video").valueIsNull();
     }

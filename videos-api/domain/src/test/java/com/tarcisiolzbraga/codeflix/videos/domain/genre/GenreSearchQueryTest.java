@@ -14,7 +14,7 @@ class GenreSearchQueryTest {
 
     @Test
     void givenCategories_whenInstantiate_thenHoldThem() {
-        final var categories = Set.of(CategoryID.from("1"), CategoryID.from("2"));
+        final var categories = Set.of(CategoryID.from("00000001-0000-0000-0000-000000000000"), CategoryID.from("00000002-0000-0000-0000-000000000000"));
 
         final var actualQuery = new GenreSearchQuery(0, 10, "aç", "name", "asc", categories);
 
@@ -31,21 +31,21 @@ class GenreSearchQueryTest {
     @Test
     void givenAMutableSet_whenInstantiate_thenCopyItSoLaterChangesDoNotLeakIn() {
         final var categories = new HashSet<CategoryID>();
-        categories.add(CategoryID.from("1"));
+        categories.add(CategoryID.from("00000001-0000-0000-0000-000000000000"));
         final var actualQuery = new GenreSearchQuery(0, 10, null, "name", "asc", categories);
 
-        categories.add(CategoryID.from("2"));
+        categories.add(CategoryID.from("00000002-0000-0000-0000-000000000000"));
 
         assertEquals(1, actualQuery.categories().size());
     }
 
     @Test
     void givenAQuery_whenChangeTheReturnedCategories_thenRefuseTheChange() {
-        final var actualQuery = new GenreSearchQuery(0, 10, null, "name", "asc", Set.of(CategoryID.from("1")));
+        final var actualQuery = new GenreSearchQuery(0, 10, null, "name", "asc", Set.of(CategoryID.from("00000001-0000-0000-0000-000000000000")));
 
         final var actualCategories = actualQuery.categories();
 
-        assertThrows(UnsupportedOperationException.class, () -> actualCategories.add(CategoryID.from("2")));
+        assertThrows(UnsupportedOperationException.class, () -> actualCategories.add(CategoryID.from("00000002-0000-0000-0000-000000000000")));
     }
 
     // O teto vale também para as queries com filtro próprio: a regra é do tamanho da página, não da

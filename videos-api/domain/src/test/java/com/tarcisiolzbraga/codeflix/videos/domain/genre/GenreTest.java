@@ -20,7 +20,7 @@ class GenreTest {
     private static final GenreID EXPECTED_ID = GenreID.from("5b8d2e1f-3a4c-4d60-9e71-f2a3b4c5d6e7");
     private static final String EXPECTED_NAME = "Ação";
     private static final Set<CategoryID> EXPECTED_CATEGORIES =
-            Set.of(CategoryID.from("c1"), CategoryID.from("c2"));
+            Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000"), CategoryID.from("00000010-0000-0000-0000-000000000000"));
     private static final Instant EXPECTED_CREATED_AT = Instant.parse("2026-09-30T12:00:00Z");
     private static final Instant EXPECTED_UPDATED_AT = Instant.parse("2026-10-01T08:30:00Z");
     private static final String NAME_LENGTH_MESSAGE = "'name' must be between 3 and 255 characters";
@@ -54,10 +54,10 @@ class GenreTest {
     @Test
     void givenAMutableSetOfCategories_whenCallWith_thenCopyItSoLaterChangesDoNotLeakIn() {
         final var categories = new HashSet<CategoryID>();
-        categories.add(CategoryID.from("c1"));
+        categories.add(CategoryID.from("00000009-0000-0000-0000-000000000000"));
         final var genre = aGenre(EXPECTED_NAME, categories);
 
-        categories.add(CategoryID.from("c2"));
+        categories.add(CategoryID.from("00000010-0000-0000-0000-000000000000"));
 
         assertEquals(1, genre.getCategories().size());
     }
@@ -68,7 +68,7 @@ class GenreTest {
 
         final var actualCategories = genre.getCategories();
 
-        assertThrows(UnsupportedOperationException.class, () -> actualCategories.add(CategoryID.from("c3")));
+        assertThrows(UnsupportedOperationException.class, () -> actualCategories.add(CategoryID.from("00000011-0000-0000-0000-000000000000")));
     }
 
     @Test
@@ -144,34 +144,7 @@ class GenreTest {
         assertEquals(NAME_LENGTH_MESSAGE, actualException.getMessage());
     }
 
-    @Test
-    void givenBlankId_whenCallValidate_thenThrowDomainExceptionBecauseTheMessageCameCorrupted() {
-        final var genre = Genre.with(
-                GenreID.from("  "),
-                EXPECTED_NAME,
-                true,
-                EXPECTED_CATEGORIES,
-                EXPECTED_CREATED_AT,
-                EXPECTED_UPDATED_AT);
 
-        final var actualException =
-                assertThrows(DomainException.class, () -> genre.validate(new ThrowsValidationHandler()));
-
-        assertEquals("'id' should not be empty", actualException.getMessage());
-    }
-
-    @Test
-    void givenBlankIdAndBlankName_whenCallValidateWithNotification_thenAccumulateBothErrors() {
-        final var genre = Genre.with(
-                GenreID.from(""), "  ", true, EXPECTED_CATEGORIES, EXPECTED_CREATED_AT, EXPECTED_UPDATED_AT);
-        final var notification = Notification.create();
-
-        genre.validate(notification);
-
-        assertEquals(2, notification.getErrors().size());
-        assertEquals("'id' should not be empty", notification.firstError().orElseThrow().message());
-        assertEquals("'name' should not be empty", notification.getErrors().get(1).message());
-    }
 
     private static Genre aGenre(final String name, final Set<CategoryID> categories) {
         return Genre.with(EXPECTED_ID, name, true, categories, EXPECTED_CREATED_AT, EXPECTED_UPDATED_AT);

@@ -25,8 +25,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class GetCategoriesByIdUseCaseTest {
 
-    private static final CategoryID FIRST_ID = CategoryID.from("1");
-    private static final CategoryID SECOND_ID = CategoryID.from("2");
+    private static final CategoryID FIRST_ID = CategoryID.from("00000001-0000-0000-0000-000000000000");
+    private static final CategoryID SECOND_ID = CategoryID.from("00000002-0000-0000-0000-000000000000");
     private static final Instant EXPECTED_CREATED_AT = Instant.parse("2026-09-30T12:00:00Z");
     private static final Instant EXPECTED_UPDATED_AT = Instant.parse("2026-10-01T08:30:00Z");
 
@@ -46,7 +46,7 @@ class GetCategoriesByIdUseCaseTest {
 
         assertEquals(2, actualOutput.size());
         assertEquals(List.of("Filmes", "Séries"), actualOutput.stream().map(CategoryOutput::name).toList());
-        assertEquals(List.of("1", "2"), actualOutput.stream().map(CategoryOutput::id).toList());
+        assertEquals(List.of("00000001-0000-0000-0000-000000000000", "00000002-0000-0000-0000-000000000000"), actualOutput.stream().map(CategoryOutput::id).toList());
     }
 
     @Test
@@ -65,7 +65,7 @@ class GetCategoriesByIdUseCaseTest {
         final var actualOutput = useCase.execute(ids);
 
         assertEquals(1, actualOutput.size());
-        assertEquals("1", actualOutput.getFirst().id());
+        assertEquals("00000001-0000-0000-0000-000000000000", actualOutput.getFirst().id());
     }
 
     @Test

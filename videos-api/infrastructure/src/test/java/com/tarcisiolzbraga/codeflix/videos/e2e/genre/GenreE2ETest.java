@@ -89,9 +89,9 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
 
     @Test
     void givenAGenreWithAnActiveAndAnInactiveCategory_whenAClientReadsIt_thenSeeOnlyTheActiveOne() {
-        givenACategory("c-ativa", "Filmes", "A mais assistida");
-        givenAnInactiveCategory("c-inativa", "Desativada", "Fora do catálogo");
-        givenAGenrePublishedByTheAdmin("g1", "Ação", Set.of("c-ativa", "c-inativa"));
+        givenACategory("00000004-0000-0000-0000-000000000000", "Filmes", "A mais assistida");
+        givenAnInactiveCategory("00000006-0000-0000-0000-000000000000", "Desativada", "Fora do catálogo");
+        givenAGenrePublishedByTheAdmin("00000016-0000-0000-0000-000000000000", "Ação", Set.of("00000004-0000-0000-0000-000000000000", "00000006-0000-0000-0000-000000000000"));
 
         await().atMost(VISIBLE).untilAsserted(() -> {
             final var actualPage = listGenres();
@@ -105,9 +105,9 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
 
     @Test
     void givenAGenreFromTheAdmin_whenAClientReadsIt_thenSeeItWithItsCategoriesResolved() {
-        givenACategory("c1", "Filmes", "A mais assistida");
-        givenACategory("c2", "Séries", "A segunda mais assistida");
-        givenAGenrePublishedByTheAdmin("g1", "Ação", Set.of("c1", "c2"));
+        givenACategory("00000009-0000-0000-0000-000000000000", "Filmes", "A mais assistida");
+        givenACategory("00000010-0000-0000-0000-000000000000", "Séries", "A segunda mais assistida");
+        givenAGenrePublishedByTheAdmin("00000016-0000-0000-0000-000000000000", "Ação", Set.of("00000009-0000-0000-0000-000000000000", "00000010-0000-0000-0000-000000000000"));
 
         await().atMost(VISIBLE).untilAsserted(() -> {
             final var actualItems = listGenres().items();
@@ -121,13 +121,13 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
 
     @Test
     void givenGenresInDifferentCategories_whenFilterByOne_thenSeeOnlyTheGenresOfThatCategory() {
-        givenACategory("c1", "Filmes", "A mais assistida");
-        givenACategory("c2", "Séries", "A segunda mais assistida");
-        givenAGenrePublishedByTheAdmin("g1", "Ação", Set.of("c1"));
-        givenAGenrePublishedByTheAdmin("g2", "Comédia", Set.of("c2"));
+        givenACategory("00000009-0000-0000-0000-000000000000", "Filmes", "A mais assistida");
+        givenACategory("00000010-0000-0000-0000-000000000000", "Séries", "A segunda mais assistida");
+        givenAGenrePublishedByTheAdmin("00000016-0000-0000-0000-000000000000", "Ação", Set.of("00000009-0000-0000-0000-000000000000"));
+        givenAGenrePublishedByTheAdmin("00000017-0000-0000-0000-000000000000", "Comédia", Set.of("00000010-0000-0000-0000-000000000000"));
         await().atMost(VISIBLE).untilAsserted(() -> assertEquals(2L, listGenres().meta().total()));
 
-        final var actualPage = listGenres(Set.of("c2"));
+        final var actualPage = listGenres(Set.of("00000010-0000-0000-0000-000000000000"));
 
         assertEquals(1L, actualPage.meta().total());
         assertEquals("Comédia", actualPage.items().getFirst().name());
@@ -135,7 +135,7 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
 
     @Test
     void givenAGenreWithoutCategories_whenAClientReadsIt_thenSeeAnEmptyList() {
-        givenAGenrePublishedByTheAdmin("g1", "Sem categoria", Set.of());
+        givenAGenrePublishedByTheAdmin("00000016-0000-0000-0000-000000000000", "Sem categoria", Set.of());
 
         await().atMost(VISIBLE).untilAsserted(() -> {
             final var actualItems = listGenres().items();

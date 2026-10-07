@@ -24,13 +24,13 @@ class VideoSearchQueryTest {
                 "asc",
                 Rating.AGE_14,
                 2026,
-                Set.of(CategoryID.from("c1")),
-                Set.of(GenreID.from("g1")),
-                Set.of(CastMemberID.from("m1")));
+                Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000")),
+                Set.of(GenreID.from("00000016-0000-0000-0000-000000000000")),
+                Set.of(CastMemberID.from("00000021-0000-0000-0000-000000000000")));
 
         assertEquals(Rating.AGE_14, actualQuery.rating());
         assertEquals(2026, actualQuery.launchedAt());
-        assertEquals(Set.of(CategoryID.from("c1")), actualQuery.categories());
+        assertEquals(Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000")), actualQuery.categories());
     }
 
     // Filtro ausente não é erro: a query sem relação alguma é a listagem simples.
@@ -46,10 +46,10 @@ class VideoSearchQueryTest {
     @Test
     void givenAMutableSet_whenInstantiate_thenCopyItSoLaterChangesDoNotLeakIn() {
         final var genres = new HashSet<GenreID>();
-        genres.add(GenreID.from("g1"));
+        genres.add(GenreID.from("00000016-0000-0000-0000-000000000000"));
         final var actualQuery = new VideoSearchQuery(0, 10, null, "title", "asc", null, null, null, genres, null);
 
-        genres.add(GenreID.from("g2"));
+        genres.add(GenreID.from("00000017-0000-0000-0000-000000000000"));
 
         assertEquals(1, actualQuery.genres().size());
     }
@@ -57,11 +57,11 @@ class VideoSearchQueryTest {
     @Test
     void givenAQuery_whenChangeTheReturnedSets_thenRefuseTheChange() {
         final var actualQuery = new VideoSearchQuery(
-                0, 10, null, "title", "asc", null, null, Set.of(CategoryID.from("c1")), null, null);
+                0, 10, null, "title", "asc", null, null, Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000")), null, null);
 
         final var actualCategories = actualQuery.categories();
 
-        assertThrows(UnsupportedOperationException.class, () -> actualCategories.add(CategoryID.from("c2")));
+        assertThrows(UnsupportedOperationException.class, () -> actualCategories.add(CategoryID.from("00000010-0000-0000-0000-000000000000")));
     }
 
     // O teto vale também para as queries com filtro próprio: a regra é do tamanho da página, não da

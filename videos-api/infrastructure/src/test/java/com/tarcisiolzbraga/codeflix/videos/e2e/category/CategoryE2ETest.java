@@ -63,8 +63,8 @@ class CategoryE2ETest implements CategoryE2EDsl {
 
     @Test
     void givenCategoriesStoredThroughTheApi_whenListThem_thenSeeThemWithTheNumbersOfThePage() {
-        givenACategory("a1", "Filmes", "A mais assistida");
-        givenACategory("b2", "Séries", "A segunda mais assistida");
+        givenACategory("00000003-6000-0000-0000-000000000000", "Filmes", "A mais assistida");
+        givenACategory("00000003-7000-0000-0000-000000000000", "Séries", "A segunda mais assistida");
 
         await().atMost(VISIBLE).untilAsserted(() -> {
             final var actualPage = listCategories();
@@ -78,8 +78,8 @@ class CategoryE2ETest implements CategoryE2EDsl {
 
     @Test
     void givenACategoryStored_whenSearchByATermOnlyInItsDescription_thenFindIt() {
-        givenACategory("a1", "Filmes", "A mais assistida");
-        givenACategory("b2", "Séries", "A segunda mais assistida");
+        givenACategory("00000003-6000-0000-0000-000000000000", "Filmes", "A mais assistida");
+        givenACategory("00000003-7000-0000-0000-000000000000", "Séries", "A segunda mais assistida");
 
         await().atMost(VISIBLE).untilAsserted(() -> {
             final var actualPage = listCategories("segunda");
@@ -91,9 +91,9 @@ class CategoryE2ETest implements CategoryE2EDsl {
 
     @Test
     void givenMoreCategoriesThanThePageHolds_whenAskForTheSecondPage_thenSeeTheRestAndTheFullTotal() {
-        givenACategory("a1", "Aulas", "Conteúdo didático");
-        givenACategory("b2", "Documentários", "Catálogo de documentários");
-        givenACategory("c3", "Filmes", "A mais assistida");
+        givenACategory("00000003-6000-0000-0000-000000000000", "Aulas", "Conteúdo didático");
+        givenACategory("00000003-7000-0000-0000-000000000000", "Documentários", "Catálogo de documentários");
+        givenACategory("00000011-0000-0000-0000-000000000000", "Filmes", "A mais assistida");
 
         await().atMost(VISIBLE).untilAsserted(() -> {
             final var actualPage = listCategories("", 1, 2);
@@ -106,9 +106,9 @@ class CategoryE2ETest implements CategoryE2EDsl {
 
     @Test
     void givenTheSameIdStoredTwice_whenListThem_thenSeeOnlyTheLastVersion() {
-        givenACategory("a1", "Filmes", "A mais assistida");
+        givenACategory("00000003-6000-0000-0000-000000000000", "Filmes", "A mais assistida");
 
-        givenACategory("a1", "Filmes e séries", "texto novo");
+        givenACategory("00000003-6000-0000-0000-000000000000", "Filmes e séries", "texto novo");
 
         await().atMost(VISIBLE).untilAsserted(() -> {
             final var actualPage = listCategories();

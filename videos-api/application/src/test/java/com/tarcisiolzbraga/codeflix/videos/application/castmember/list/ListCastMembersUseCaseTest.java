@@ -37,8 +37,8 @@ class ListCastMembersUseCaseTest {
     @Test
     void givenValidQuery_whenCallExecute_thenReturnThePageWithItsMetadata() {
         final var members = List.of(
-                aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR),
-                aMember("2", "Timothée Chalamet", CastMemberType.ACTOR));
+                aMember("00000001-0000-0000-0000-000000000000", "Denis Villeneuve", CastMemberType.DIRECTOR),
+                aMember("00000002-0000-0000-0000-000000000000", "Timothée Chalamet", CastMemberType.ACTOR));
         when(castMemberGateway.findAll(EXPECTED_QUERY)).thenReturn(new Pagination<>(0, 10, 2L, members));
 
         final var actualOutput = useCase.execute(EXPECTED_QUERY);
@@ -51,13 +51,13 @@ class ListCastMembersUseCaseTest {
 
     @Test
     void givenValidQuery_whenCallExecute_thenMapEachMemberToItsOutput() {
-        final var member = aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR);
+        final var member = aMember("00000001-0000-0000-0000-000000000000", "Denis Villeneuve", CastMemberType.DIRECTOR);
         when(castMemberGateway.findAll(EXPECTED_QUERY)).thenReturn(new Pagination<>(0, 10, 1L, List.of(member)));
 
         final var actualOutput = useCase.execute(EXPECTED_QUERY);
 
         final var actualItem = actualOutput.items().getFirst();
-        assertEquals("1", actualItem.id());
+        assertEquals("00000001-0000-0000-0000-000000000000", actualItem.id());
         assertEquals(CastMemberType.DIRECTOR, actualItem.type());
         assertTrue(actualItem.active());
         assertEquals(CREATED_AT, actualItem.createdAt());

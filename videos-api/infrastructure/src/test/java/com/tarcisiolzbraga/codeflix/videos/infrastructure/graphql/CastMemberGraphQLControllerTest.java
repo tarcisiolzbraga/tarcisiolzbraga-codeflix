@@ -74,8 +74,8 @@ class CastMemberGraphQLControllerTest {
                         10,
                         2L,
                         List.of(
-                                anOutput("1", "Denis Villeneuve", CastMemberType.DIRECTOR),
-                                anOutput("2", "Timothée Chalamet", CastMemberType.ACTOR))));
+                                anOutput("00000001-0000-0000-0000-000000000000", "Denis Villeneuve", CastMemberType.DIRECTOR),
+                                anOutput("00000002-0000-0000-0000-000000000000", "Timothée Chalamet", CastMemberType.ACTOR))));
 
         final var actualResult = graphql.document(ITEMS_QUERY).execute();
 
@@ -90,7 +90,7 @@ class CastMemberGraphQLControllerTest {
     @Test
     void givenAPageOfMembers_whenCallCastMembers_thenReturnTheNumbersOfThePage() {
         when(listCastMembersUseCase.execute(any()))
-                .thenReturn(new Pagination<>(2, 5, 37L, List.of(anOutput("1", "Denis", CastMemberType.DIRECTOR))));
+                .thenReturn(new Pagination<>(2, 5, 37L, List.of(anOutput("00000001-0000-0000-0000-000000000000", "Denis", CastMemberType.DIRECTOR))));
 
         final var actualResult = graphql.document("{ castMembers { meta { currentPage perPage total } } }").execute();
 

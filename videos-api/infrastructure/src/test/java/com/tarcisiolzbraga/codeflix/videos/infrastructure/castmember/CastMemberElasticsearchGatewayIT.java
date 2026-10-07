@@ -38,12 +38,12 @@ class CastMemberElasticsearchGatewayIT {
 
     @Test
     void givenAMember_whenCallSave_thenStoreItAndReadItBackWhole() {
-        final var member = aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR, true);
+        final var member = aMember("00000001-0000-0000-0000-000000000000", "Denis Villeneuve", CastMemberType.DIRECTOR, true);
 
         final var actualMember = gateway.save(member);
 
         assertEquals(member, actualMember);
-        final var stored = gateway.findById(CastMemberID.from("1")).orElseThrow();
+        final var stored = gateway.findById(CastMemberID.from("00000001-0000-0000-0000-000000000000")).orElseThrow();
         assertEquals("Denis Villeneuve", stored.getName());
         assertEquals(CastMemberType.DIRECTOR, stored.getType());
         assertTrue(stored.isActive());
@@ -54,58 +54,58 @@ class CastMemberElasticsearchGatewayIT {
     // O filtro é na leitura, não na gravação: reativar no admin faz reaparecer na hora, sem recarga.
     @Test
     void givenAnInactiveMember_whenCallSave_thenStillStoreItButHideItFromEveryRead() {
-        gateway.save(aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR, false));
+        gateway.save(aMember("00000001-0000-0000-0000-000000000000", "Denis Villeneuve", CastMemberType.DIRECTOR, false));
 
-        final var stored = repository.findById("1");
+        final var stored = repository.findById("00000001-0000-0000-0000-000000000000");
 
         assertTrue(stored.isPresent());
         assertFalse(stored.orElseThrow().isActive());
-        assertTrue(gateway.findById(CastMemberID.from("1")).isEmpty());
+        assertTrue(gateway.findById(CastMemberID.from("00000001-0000-0000-0000-000000000000")).isEmpty());
     }
 
     @Test
     void givenAMemberAlreadyStored_whenCallSaveAgain_thenReplaceIt() {
-        gateway.save(aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR, true));
+        gateway.save(aMember("00000001-0000-0000-0000-000000000000", "Denis Villeneuve", CastMemberType.DIRECTOR, true));
 
-        gateway.save(aMember("1", "Denis Villeneuve", CastMemberType.ACTOR, true));
+        gateway.save(aMember("00000001-0000-0000-0000-000000000000", "Denis Villeneuve", CastMemberType.ACTOR, true));
 
-        final var stored = gateway.findById(CastMemberID.from("1")).orElseThrow();
+        final var stored = gateway.findById(CastMemberID.from("00000001-0000-0000-0000-000000000000")).orElseThrow();
         assertEquals(CastMemberType.ACTOR, stored.getType());
         assertEquals(1L, countListed());
     }
 
     @Test
     void givenAnUnknownId_whenCallFindById_thenReturnEmpty() {
-        final var actualMember = gateway.findById(CastMemberID.from("nao-existe"));
+        final var actualMember = gateway.findById(CastMemberID.from("00000023-0000-0000-0000-000000000000"));
 
         assertTrue(actualMember.isEmpty());
     }
 
     @Test
     void givenAStoredMember_whenCallDeleteById_thenRemoveIt() {
-        gateway.save(aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR, true));
+        gateway.save(aMember("00000001-0000-0000-0000-000000000000", "Denis Villeneuve", CastMemberType.DIRECTOR, true));
 
-        gateway.deleteById(CastMemberID.from("1"));
+        gateway.deleteById(CastMemberID.from("00000001-0000-0000-0000-000000000000"));
 
-        assertTrue(gateway.findById(CastMemberID.from("1")).isEmpty());
+        assertTrue(gateway.findById(CastMemberID.from("00000001-0000-0000-0000-000000000000")).isEmpty());
     }
 
     @Test
     void givenAnUnknownId_whenCallDeleteById_thenDoNotComplain() {
-        gateway.deleteById(CastMemberID.from("nao-existe"));
+        gateway.deleteById(CastMemberID.from("00000023-0000-0000-0000-000000000000"));
 
         assertEquals(0L, countListed());
     }
 
     @Test
     void givenKnownIds_whenCallFindAllById_thenReturnOnlyThoseFound() {
-        gateway.save(aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR, true));
-        gateway.save(aMember("2", "Timothée Chalamet", CastMemberType.ACTOR, true));
+        gateway.save(aMember("00000001-0000-0000-0000-000000000000", "Denis Villeneuve", CastMemberType.DIRECTOR, true));
+        gateway.save(aMember("00000002-0000-0000-0000-000000000000", "Timothée Chalamet", CastMemberType.ACTOR, true));
 
-        final var actualMembers = gateway.findAllById(Set.of(CastMemberID.from("1"), CastMemberID.from("3")));
+        final var actualMembers = gateway.findAllById(Set.of(CastMemberID.from("00000001-0000-0000-0000-000000000000"), CastMemberID.from("00000003-0000-0000-0000-000000000000")));
 
         assertEquals(1, actualMembers.size());
-        assertEquals("1", actualMembers.getFirst().getId().getValue());
+        assertEquals("00000001-0000-0000-0000-000000000000", actualMembers.getFirst().getId().getValue());
     }
 
     @Test
@@ -167,8 +167,8 @@ class CastMemberElasticsearchGatewayIT {
 
     @Test
     void givenAnInactiveMember_whenCallFindAll_thenHideIt() {
-        gateway.save(aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR, true));
-        gateway.save(aMember("2", "Rebecca Ferguson", CastMemberType.ACTOR, false));
+        gateway.save(aMember("00000001-0000-0000-0000-000000000000", "Denis Villeneuve", CastMemberType.DIRECTOR, true));
+        gateway.save(aMember("00000002-0000-0000-0000-000000000000", "Rebecca Ferguson", CastMemberType.ACTOR, false));
         refresh();
 
         final var actualPage = gateway.findAll(new SearchQuery(0, 10, null, "name", "asc"));
@@ -180,18 +180,18 @@ class CastMemberElasticsearchGatewayIT {
     // É daqui que sai a resolução de relação: um vídeo ativo com membros inativos vem sem eles.
     @Test
     void givenAMixOfActiveAndInactiveIds_whenCallFindAllById_thenLeaveTheInactiveOnesOut() {
-        gateway.save(aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR, true));
-        gateway.save(aMember("2", "Rebecca Ferguson", CastMemberType.ACTOR, false));
+        gateway.save(aMember("00000001-0000-0000-0000-000000000000", "Denis Villeneuve", CastMemberType.DIRECTOR, true));
+        gateway.save(aMember("00000002-0000-0000-0000-000000000000", "Rebecca Ferguson", CastMemberType.ACTOR, false));
 
-        final var actualMembers = gateway.findAllById(Set.of(CastMemberID.from("1"), CastMemberID.from("2")));
+        final var actualMembers = gateway.findAllById(Set.of(CastMemberID.from("00000001-0000-0000-0000-000000000000"), CastMemberID.from("00000002-0000-0000-0000-000000000000")));
 
         assertEquals(1, actualMembers.size());
-        assertEquals("1", actualMembers.getFirst().getId().getValue());
+        assertEquals("00000001-0000-0000-0000-000000000000", actualMembers.getFirst().getId().getValue());
     }
 
     @Test
     void givenAnInactiveMemberWhoseNameMatches_whenSearchByTerms_thenStillHideIt() {
-        gateway.save(aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR, false));
+        gateway.save(aMember("00000001-0000-0000-0000-000000000000", "Denis Villeneuve", CastMemberType.DIRECTOR, false));
         refresh();
 
         final var actualPage = gateway.findAll(new SearchQuery(0, 10, "Denis", "name", "asc"));
@@ -219,9 +219,9 @@ class CastMemberElasticsearchGatewayIT {
     }
 
     private void seed() {
-        gateway.save(aMember("1", "Denis Villeneuve", CastMemberType.DIRECTOR, true));
-        gateway.save(aMember("2", "Timothée Chalamet", CastMemberType.ACTOR, true));
-        gateway.save(aMember("3", "Rebecca Ferguson", CastMemberType.ACTOR, true));
+        gateway.save(aMember("00000001-0000-0000-0000-000000000000", "Denis Villeneuve", CastMemberType.DIRECTOR, true));
+        gateway.save(aMember("00000002-0000-0000-0000-000000000000", "Timothée Chalamet", CastMemberType.ACTOR, true));
+        gateway.save(aMember("00000003-0000-0000-0000-000000000000", "Rebecca Ferguson", CastMemberType.ACTOR, true));
         refresh();
     }
 

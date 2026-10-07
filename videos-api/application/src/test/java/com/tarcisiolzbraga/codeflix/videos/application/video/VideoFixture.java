@@ -43,7 +43,7 @@ public final class VideoFixture {
                 new VideoDetailsCommand(title, "Paul Atreides em Arrakis", 2026, 155.0, rating),
                 new VideoFlagsCommand(false, true, true),
                 new VideoMediasCommand("v.mp4", "t.mp4", "b.jpg", "th.jpg", "thh.jpg"),
-                new VideoReferencesCommand(Set.of("c1"), Set.of("g1"), Set.of("m1")),
+                new VideoReferencesCommand(Set.of("00000009-0000-0000-0000-000000000000"), Set.of("00000016-0000-0000-0000-000000000000"), Set.of("00000021-0000-0000-0000-000000000000")),
                 CREATED_AT,
                 UPDATED_AT);
     }

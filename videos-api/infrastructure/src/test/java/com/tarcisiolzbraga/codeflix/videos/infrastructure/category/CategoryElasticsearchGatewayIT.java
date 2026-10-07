@@ -36,12 +36,12 @@ class CategoryElasticsearchGatewayIT {
 
     @Test
     void givenACategory_whenCallSave_thenStoreItAndReadItBackWhole() {
-        final var category = aCategory("1", "Filmes", "A mais assistida", true);
+        final var category = aCategory("00000001-0000-0000-0000-000000000000", "Filmes", "A mais assistida", true);
 
         final var actualCategory = gateway.save(category);
 
         assertEquals(category, actualCategory);
-        final var stored = gateway.findById(CategoryID.from("1")).orElseThrow();
+        final var stored = gateway.findById(CategoryID.from("00000001-0000-0000-0000-000000000000")).orElseThrow();
         assertEquals("Filmes", stored.getName());
         assertEquals("A mais assistida", stored.getDescription());
         assertTrue(stored.isActive());
@@ -51,11 +51,11 @@ class CategoryElasticsearchGatewayIT {
 
     @Test
     void givenACategoryAlreadyStored_whenCallSaveAgain_thenReplaceIt() {
-        gateway.save(aCategory("1", "Filmes", "A mais assistida", true));
+        gateway.save(aCategory("00000001-0000-0000-0000-000000000000", "Filmes", "A mais assistida", true));
 
-        gateway.save(aCategory("1", "Filmes e séries", "texto novo", true));
+        gateway.save(aCategory("00000001-0000-0000-0000-000000000000", "Filmes e séries", "texto novo", true));
 
-        final var stored = gateway.findById(CategoryID.from("1")).orElseThrow();
+        final var stored = gateway.findById(CategoryID.from("00000001-0000-0000-0000-000000000000")).orElseThrow();
         assertEquals("Filmes e séries", stored.getName());
         assertEquals("texto novo", stored.getDescription());
         assertEquals(1L, countListed());
@@ -63,37 +63,37 @@ class CategoryElasticsearchGatewayIT {
 
     @Test
     void givenAnUnknownId_whenCallFindById_thenReturnEmpty() {
-        final var actualCategory = gateway.findById(CategoryID.from("nao-existe"));
+        final var actualCategory = gateway.findById(CategoryID.from("00000023-0000-0000-0000-000000000000"));
 
         assertTrue(actualCategory.isEmpty());
     }
 
     @Test
     void givenAStoredCategory_whenCallDeleteById_thenRemoveIt() {
-        gateway.save(aCategory("1", "Filmes", "A mais assistida", true));
+        gateway.save(aCategory("00000001-0000-0000-0000-000000000000", "Filmes", "A mais assistida", true));
 
-        gateway.deleteById(CategoryID.from("1"));
+        gateway.deleteById(CategoryID.from("00000001-0000-0000-0000-000000000000"));
 
-        assertTrue(gateway.findById(CategoryID.from("1")).isEmpty());
+        assertTrue(gateway.findById(CategoryID.from("00000001-0000-0000-0000-000000000000")).isEmpty());
     }
 
     @Test
     void givenAnUnknownId_whenCallDeleteById_thenDoNotComplain() {
-        gateway.deleteById(CategoryID.from("nao-existe"));
+        gateway.deleteById(CategoryID.from("00000023-0000-0000-0000-000000000000"));
 
         assertEquals(0L, countListed());
     }
 
     @Test
     void givenKnownIds_whenCallFindAllById_thenReturnOnlyThoseFound() {
-        gateway.save(aCategory("1", "Filmes", "A mais assistida", true));
-        gateway.save(aCategory("2", "Séries", "A segunda", true));
+        gateway.save(aCategory("00000001-0000-0000-0000-000000000000", "Filmes", "A mais assistida", true));
+        gateway.save(aCategory("00000002-0000-0000-0000-000000000000", "Séries", "A segunda", true));
 
         final var actualCategories =
-                gateway.findAllById(Set.of(CategoryID.from("1"), CategoryID.from("3")));
+                gateway.findAllById(Set.of(CategoryID.from("00000001-0000-0000-0000-000000000000"), CategoryID.from("00000003-0000-0000-0000-000000000000")));
 
         assertEquals(1, actualCategories.size());
-        assertEquals("1", actualCategories.getFirst().getId().getValue());
+        assertEquals("00000001-0000-0000-0000-000000000000", actualCategories.getFirst().getId().getValue());
     }
 
     @Test
@@ -167,8 +167,8 @@ class CategoryElasticsearchGatewayIT {
 
     @Test
     void givenAnInactiveCategory_whenCallFindAll_thenHideIt() {
-        gateway.save(aCategory("1", "Filmes", "A mais assistida", true));
-        gateway.save(aCategory("2", "Séries", "Desativada no admin", false));
+        gateway.save(aCategory("00000001-0000-0000-0000-000000000000", "Filmes", "A mais assistida", true));
+        gateway.save(aCategory("00000002-0000-0000-0000-000000000000", "Séries", "Desativada no admin", false));
         refresh();
 
         final var actualPage = gateway.findAll(new SearchQuery(0, 10, null, "name", "asc"));
@@ -179,9 +179,9 @@ class CategoryElasticsearchGatewayIT {
 
     @Test
     void givenAnInactiveCategory_whenCallFindById_thenReturnEmptyAsIfItWereNotThere() {
-        gateway.save(aCategory("1", "Filmes", "Desativada no admin", false));
+        gateway.save(aCategory("00000001-0000-0000-0000-000000000000", "Filmes", "Desativada no admin", false));
 
-        final var actualCategory = gateway.findById(CategoryID.from("1"));
+        final var actualCategory = gateway.findById(CategoryID.from("00000001-0000-0000-0000-000000000000"));
 
         assertTrue(actualCategory.isEmpty());
     }
@@ -189,9 +189,9 @@ class CategoryElasticsearchGatewayIT {
     // O filtro é na leitura, não na gravação: reativar no admin faz reaparecer na hora, sem recarga.
     @Test
     void givenAnInactiveCategory_whenCallSave_thenStillStoreIt() {
-        gateway.save(aCategory("1", "Filmes", "Desativada no admin", false));
+        gateway.save(aCategory("00000001-0000-0000-0000-000000000000", "Filmes", "Desativada no admin", false));
 
-        final var stored = repository.findById("1");
+        final var stored = repository.findById("00000001-0000-0000-0000-000000000000");
 
         assertTrue(stored.isPresent());
         assertFalse(stored.orElseThrow().isActive());
@@ -200,19 +200,19 @@ class CategoryElasticsearchGatewayIT {
     // É daqui que sai a resolução de relação: um vídeo ativo com categorias inativas vem sem elas.
     @Test
     void givenAMixOfActiveAndInactiveIds_whenCallFindAllById_thenLeaveTheInactiveOnesOut() {
-        gateway.save(aCategory("1", "Filmes", "A mais assistida", true));
-        gateway.save(aCategory("2", "Séries", "Desativada no admin", false));
+        gateway.save(aCategory("00000001-0000-0000-0000-000000000000", "Filmes", "A mais assistida", true));
+        gateway.save(aCategory("00000002-0000-0000-0000-000000000000", "Séries", "Desativada no admin", false));
 
         final var actualCategories =
-                gateway.findAllById(Set.of(CategoryID.from("1"), CategoryID.from("2")));
+                gateway.findAllById(Set.of(CategoryID.from("00000001-0000-0000-0000-000000000000"), CategoryID.from("00000002-0000-0000-0000-000000000000")));
 
         assertEquals(1, actualCategories.size());
-        assertEquals("1", actualCategories.getFirst().getId().getValue());
+        assertEquals("00000001-0000-0000-0000-000000000000", actualCategories.getFirst().getId().getValue());
     }
 
     @Test
     void givenAnInactiveCategoryWhoseNameMatches_whenSearchByTerms_thenStillHideIt() {
-        gateway.save(aCategory("1", "Filmes", "Desativada no admin", false));
+        gateway.save(aCategory("00000001-0000-0000-0000-000000000000", "Filmes", "Desativada no admin", false));
         refresh();
 
         final var actualPage = gateway.findAll(new SearchQuery(0, 10, "Filmes", "name", "asc"));
@@ -253,9 +253,9 @@ class CategoryElasticsearchGatewayIT {
     }
 
     private void seed() {
-        gateway.save(aCategory("1", "Filmes", "A mais assistida", true));
-        gateway.save(aCategory("2", "Séries", "A segunda mais assistida", true));
-        gateway.save(aCategory("3", "Documentários", "Catálogo de documentários", true));
+        gateway.save(aCategory("00000001-0000-0000-0000-000000000000", "Filmes", "A mais assistida", true));
+        gateway.save(aCategory("00000002-0000-0000-0000-000000000000", "Séries", "A segunda mais assistida", true));
+        gateway.save(aCategory("00000003-0000-0000-0000-000000000000", "Documentários", "Catálogo de documentários", true));
         refresh();
     }
 

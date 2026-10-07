@@ -24,8 +24,8 @@ class GenreElasticsearchGatewayIT {
 
     private static final Instant CREATED_AT = Instant.parse("2026-09-30T12:00:00Z");
     private static final Instant UPDATED_AT = Instant.parse("2026-10-01T08:30:00Z");
-    private static final CategoryID FILMES = CategoryID.from("c-filmes");
-    private static final CategoryID SERIES = CategoryID.from("c-series");
+    private static final CategoryID FILMES = CategoryID.from("00000005-0000-0000-0000-000000000000");
+    private static final CategoryID SERIES = CategoryID.from("00000008-0000-0000-0000-000000000000");
 
     @Autowired
     private GenreElasticsearchGateway gateway;
@@ -38,12 +38,12 @@ class GenreElasticsearchGatewayIT {
 
     @Test
     void givenAGenre_whenCallSave_thenStoreItAndReadItBackWithItsCategories() {
-        final var genre = aGenre("1", "Ação", true, Set.of(FILMES, SERIES));
+        final var genre = aGenre("00000001-0000-0000-0000-000000000000", "Ação", true, Set.of(FILMES, SERIES));
 
         final var actualGenre = gateway.save(genre);
 
         assertEquals(genre, actualGenre);
-        final var stored = gateway.findById(GenreID.from("1")).orElseThrow();
+        final var stored = gateway.findById(GenreID.from("00000001-0000-0000-0000-000000000000")).orElseThrow();
         assertEquals("Ação", stored.getName());
         assertEquals(Set.of(FILMES, SERIES), stored.getCategories());
         assertTrue(stored.isActive());
@@ -52,59 +52,59 @@ class GenreElasticsearchGatewayIT {
 
     @Test
     void givenAGenreWithoutCategories_whenCallSave_thenReadItBackWithAnEmptySet() {
-        gateway.save(aGenre("1", "Ação", true, Set.of()));
+        gateway.save(aGenre("00000001-0000-0000-0000-000000000000", "Ação", true, Set.of()));
 
-        final var stored = gateway.findById(GenreID.from("1")).orElseThrow();
+        final var stored = gateway.findById(GenreID.from("00000001-0000-0000-0000-000000000000")).orElseThrow();
 
         assertTrue(stored.getCategories().isEmpty());
     }
 
     @Test
     void givenAGenreAlreadyStored_whenCallSaveAgain_thenReplaceItIncludingTheCategories() {
-        gateway.save(aGenre("1", "Ação", true, Set.of(FILMES, SERIES)));
+        gateway.save(aGenre("00000001-0000-0000-0000-000000000000", "Ação", true, Set.of(FILMES, SERIES)));
 
-        gateway.save(aGenre("1", "Ação e aventura", true, Set.of(FILMES)));
+        gateway.save(aGenre("00000001-0000-0000-0000-000000000000", "Ação e aventura", true, Set.of(FILMES)));
 
-        final var stored = gateway.findById(GenreID.from("1")).orElseThrow();
+        final var stored = gateway.findById(GenreID.from("00000001-0000-0000-0000-000000000000")).orElseThrow();
         assertEquals("Ação e aventura", stored.getName());
         assertEquals(Set.of(FILMES), stored.getCategories());
     }
 
     @Test
     void givenAnUnknownId_whenCallFindById_thenReturnEmpty() {
-        assertTrue(gateway.findById(GenreID.from("nao-existe")).isEmpty());
+        assertTrue(gateway.findById(GenreID.from("00000023-0000-0000-0000-000000000000")).isEmpty());
     }
 
     @Test
     void givenAnInactiveGenre_whenCallFindById_thenReturnEmptyButKeepItStored() {
-        gateway.save(aGenre("1", "Ação", false, Set.of(FILMES)));
+        gateway.save(aGenre("00000001-0000-0000-0000-000000000000", "Ação", false, Set.of(FILMES)));
 
-        final var actualGenre = gateway.findById(GenreID.from("1"));
+        final var actualGenre = gateway.findById(GenreID.from("00000001-0000-0000-0000-000000000000"));
 
         assertTrue(actualGenre.isEmpty());
-        assertTrue(repository.findById("1").isPresent());
-        assertFalse(repository.findById("1").orElseThrow().isActive());
+        assertTrue(repository.findById("00000001-0000-0000-0000-000000000000").isPresent());
+        assertFalse(repository.findById("00000001-0000-0000-0000-000000000000").orElseThrow().isActive());
     }
 
     @Test
     void givenAStoredGenre_whenCallDeleteById_thenRemoveIt() {
-        gateway.save(aGenre("1", "Ação", true, Set.of(FILMES)));
+        gateway.save(aGenre("00000001-0000-0000-0000-000000000000", "Ação", true, Set.of(FILMES)));
 
-        gateway.deleteById(GenreID.from("1"));
+        gateway.deleteById(GenreID.from("00000001-0000-0000-0000-000000000000"));
 
-        assertTrue(gateway.findById(GenreID.from("1")).isEmpty());
-        assertTrue(repository.findById("1").isEmpty());
+        assertTrue(gateway.findById(GenreID.from("00000001-0000-0000-0000-000000000000")).isEmpty());
+        assertTrue(repository.findById("00000001-0000-0000-0000-000000000000").isEmpty());
     }
 
     @Test
     void givenAMixOfActiveAndInactiveIds_whenCallFindAllById_thenLeaveTheInactiveOnesOut() {
-        gateway.save(aGenre("1", "Ação", true, Set.of(FILMES)));
-        gateway.save(aGenre("2", "Comédia", false, Set.of(FILMES)));
+        gateway.save(aGenre("00000001-0000-0000-0000-000000000000", "Ação", true, Set.of(FILMES)));
+        gateway.save(aGenre("00000002-0000-0000-0000-000000000000", "Comédia", false, Set.of(FILMES)));
 
-        final var actualGenres = gateway.findAllById(Set.of(GenreID.from("1"), GenreID.from("2")));
+        final var actualGenres = gateway.findAllById(Set.of(GenreID.from("00000001-0000-0000-0000-000000000000"), GenreID.from("00000002-0000-0000-0000-000000000000")));
 
         assertEquals(1, actualGenres.size());
-        assertEquals("1", actualGenres.getFirst().getId().getValue());
+        assertEquals("00000001-0000-0000-0000-000000000000", actualGenres.getFirst().getId().getValue());
     }
 
     @Test
@@ -124,8 +124,8 @@ class GenreElasticsearchGatewayIT {
 
     @Test
     void givenAnInactiveGenre_whenCallFindAll_thenHideIt() {
-        gateway.save(aGenre("1", "Ação", true, Set.of(FILMES)));
-        gateway.save(aGenre("2", "Comédia", false, Set.of(FILMES)));
+        gateway.save(aGenre("00000001-0000-0000-0000-000000000000", "Ação", true, Set.of(FILMES)));
+        gateway.save(aGenre("00000002-0000-0000-0000-000000000000", "Comédia", false, Set.of(FILMES)));
         refresh();
 
         final var actualPage = gateway.findAll(aQuery(null, Set.of(), 0, 10));
@@ -178,7 +178,7 @@ class GenreElasticsearchGatewayIT {
     void givenACategoryNoGenreIsLinkedTo_whenCallFindAll_thenReturnAnEmptyPage() {
         seed();
 
-        final var actualPage = gateway.findAll(aQuery(null, Set.of(CategoryID.from("c-nenhuma")), 0, 10));
+        final var actualPage = gateway.findAll(aQuery(null, Set.of(CategoryID.from("00000007-0000-0000-0000-000000000000")), 0, 10));
 
         assertEquals(0L, actualPage.total());
         assertTrue(actualPage.items().isEmpty());
@@ -186,7 +186,7 @@ class GenreElasticsearchGatewayIT {
 
     @Test
     void givenAnInactiveGenreLinkedToTheCategory_whenFilterByIt_thenStillHideIt() {
-        gateway.save(aGenre("1", "Ação", false, Set.of(FILMES)));
+        gateway.save(aGenre("00000001-0000-0000-0000-000000000000", "Ação", false, Set.of(FILMES)));
         refresh();
 
         final var actualPage = gateway.findAll(aQuery(null, Set.of(FILMES), 0, 10));
@@ -218,7 +218,7 @@ class GenreElasticsearchGatewayIT {
     @Test
     void givenTermsWithSeveralWords_whenCallFindAll_thenRequireAllOfThem() {
         seed();
-        gateway.save(aGenre("4", "Ficção científica", true, Set.of(FILMES)));
+        gateway.save(aGenre("00000003-5000-0000-0000-000000000000", "Ficção científica", true, Set.of(FILMES)));
         refresh();
 
         final var actualPage = gateway.findAll(aQuery("Ficção científica", Set.of(), 0, 10));
@@ -236,9 +236,9 @@ class GenreElasticsearchGatewayIT {
     }
 
     private void seed() {
-        gateway.save(aGenre("1", "Ação", true, Set.of(FILMES)));
-        gateway.save(aGenre("2", "Comédia", true, Set.of(FILMES)));
-        gateway.save(aGenre("3", "Drama", true, Set.of(FILMES, SERIES)));
+        gateway.save(aGenre("00000001-0000-0000-0000-000000000000", "Ação", true, Set.of(FILMES)));
+        gateway.save(aGenre("00000002-0000-0000-0000-000000000000", "Comédia", true, Set.of(FILMES)));
+        gateway.save(aGenre("00000003-0000-0000-0000-000000000000", "Drama", true, Set.of(FILMES, SERIES)));
         refresh();
     }
 

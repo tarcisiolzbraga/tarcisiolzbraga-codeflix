@@ -26,8 +26,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class GetCastMembersByIdUseCaseTest {
 
-    private static final CastMemberID FIRST_ID = CastMemberID.from("1");
-    private static final CastMemberID SECOND_ID = CastMemberID.from("2");
+    private static final CastMemberID FIRST_ID = CastMemberID.from("00000001-0000-0000-0000-000000000000");
+    private static final CastMemberID SECOND_ID = CastMemberID.from("00000002-0000-0000-0000-000000000000");
     private static final Instant CREATED_AT = Instant.parse("2026-09-30T12:00:00Z");
     private static final Instant UPDATED_AT = Instant.parse("2026-10-01T08:30:00Z");
 
@@ -48,7 +48,7 @@ class GetCastMembersByIdUseCaseTest {
         final var actualOutput = useCase.execute(ids);
 
         assertEquals(2, actualOutput.size());
-        assertEquals(List.of("1", "2"), actualOutput.stream().map(CastMemberOutput::id).toList());
+        assertEquals(List.of("00000001-0000-0000-0000-000000000000", "00000002-0000-0000-0000-000000000000"), actualOutput.stream().map(CastMemberOutput::id).toList());
         assertEquals(
                 List.of(CastMemberType.DIRECTOR, CastMemberType.ACTOR),
                 actualOutput.stream().map(CastMemberOutput::type).toList());
@@ -71,7 +71,7 @@ class GetCastMembersByIdUseCaseTest {
         final var actualOutput = useCase.execute(ids);
 
         assertEquals(1, actualOutput.size());
-        assertEquals("1", actualOutput.getFirst().id());
+        assertEquals("00000001-0000-0000-0000-000000000000", actualOutput.getFirst().id());
     }
 
     @Test

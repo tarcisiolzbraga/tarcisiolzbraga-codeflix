@@ -112,16 +112,16 @@ class VideoE2ETest implements VideoE2EDsl, CategoryE2EDsl {
 
     @Test
     void givenAVideoWithActiveAndInactiveRelations_whenAClientReadsIt_thenSeeOnlyTheActiveOnes() {
-        givenACategory("c-ativa", "Filmes", "A mais assistida");
-        givenAnInactiveCategory("c-inativa", "Desativada", "Fora do catálogo");
-        givenAGenre("g-ativo", "Ação", true);
-        givenAGenre("g-inativo", "Desativado", false);
-        givenACastMember("m-ativo", "Denis Villeneuve", true);
-        givenACastMember("m-inativo", "Desativado", false);
-        givenAVideo("v1", "Duna", true, Set.of("c-ativa", "c-inativa"), Set.of("g-ativo", "g-inativo"), Set.of("m-ativo", "m-inativo"));
+        givenACategory("00000004-0000-0000-0000-000000000000", "Filmes", "A mais assistida");
+        givenAnInactiveCategory("00000006-0000-0000-0000-000000000000", "Desativada", "Fora do catálogo");
+        givenAGenre("00000013-0000-0000-0000-000000000000", "Ação", true);
+        givenAGenre("00000015-0000-0000-0000-000000000000", "Desativado", false);
+        givenACastMember("00000018-0000-0000-0000-000000000000", "Denis Villeneuve", true);
+        givenACastMember("00000020-0000-0000-0000-000000000000", "Desativado", false);
+        givenAVideo("00000025-0000-0000-0000-000000000000", "Duna", true, Set.of("00000004-0000-0000-0000-000000000000", "00000006-0000-0000-0000-000000000000"), Set.of("00000013-0000-0000-0000-000000000000", "00000015-0000-0000-0000-000000000000"), Set.of("00000018-0000-0000-0000-000000000000", "00000020-0000-0000-0000-000000000000"));
 
         await().atMost(VISIBLE).untilAsserted(() -> {
-            final var actualVideo = video("v1");
+            final var actualVideo = video("00000025-0000-0000-0000-000000000000");
 
             assertNotNull(actualVideo, "o vídeo ainda não chegou ao catálogo");
             assertEquals(List.of("Filmes"), actualVideo.categories().stream().map(RelationView::name).toList());
@@ -134,7 +134,7 @@ class VideoE2ETest implements VideoE2EDsl, CategoryE2EDsl {
 
     @Test
     void givenAVideoFromTheAdmin_whenAClientListsThem_thenSeeItWithItsFields() {
-        givenAVideo("v1", "Duna", true, Set.of(), Set.of(), Set.of());
+        givenAVideo("00000025-0000-0000-0000-000000000000", "Duna", true, Set.of(), Set.of(), Set.of());
 
         await().atMost(VISIBLE).untilAsserted(() -> {
             final var actualPage = listVideos();
@@ -151,17 +151,17 @@ class VideoE2ETest implements VideoE2EDsl, CategoryE2EDsl {
     // A regra que você aprovou: não publicado não é servido, mesmo estando replicado.
     @Test
     void givenAnUnpublishedVideo_whenAClientReadsIt_thenSeeNothing() {
-        givenAVideo("v1", "Nao publicado", false, Set.of(), Set.of(), Set.of());
+        givenAVideo("00000025-0000-0000-0000-000000000000", "Nao publicado", false, Set.of(), Set.of(), Set.of());
 
         await().during(Duration.ofSeconds(5)).atMost(VISIBLE).untilAsserted(() -> {
-            assertNull(video("v1"));
+            assertNull(video("00000025-0000-0000-0000-000000000000"));
             assertEquals(0L, listVideos().meta().total());
         });
     }
 
     @Test
     void givenVideosWithDifferentRatings_whenFilterByOne_thenSeeOnlyThatOne() {
-        givenAVideo("v1", "Duna", true, Set.of(), Set.of(), Set.of());
+        givenAVideo("00000025-0000-0000-0000-000000000000", "Duna", true, Set.of(), Set.of(), Set.of());
         await().atMost(VISIBLE).untilAsserted(() -> assertEquals(1L, listVideos().meta().total()));
 
         final var actualPage = listVideos("rating: \"16\"");
@@ -171,7 +171,7 @@ class VideoE2ETest implements VideoE2EDsl, CategoryE2EDsl {
 
     @Test
     void givenAnIdTheCatalogDoesNotHave_whenAClientReadsIt_thenSeeNull() {
-        final var actualVideo = video("nao-existe");
+        final var actualVideo = video("00000023-0000-0000-0000-000000000000");
 
         assertNull(actualVideo);
     }

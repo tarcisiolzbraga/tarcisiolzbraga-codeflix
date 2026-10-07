@@ -16,11 +16,11 @@ class VideoReferencesTest {
     @Test
     void givenTheThreeSets_whenCallWith_thenHoldThem() {
         final var actualReferences = VideoReferences.with(
-                Set.of(CategoryID.from("c1")), Set.of(GenreID.from("g1")), Set.of(CastMemberID.from("m1")));
+                Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000")), Set.of(GenreID.from("00000016-0000-0000-0000-000000000000")), Set.of(CastMemberID.from("00000021-0000-0000-0000-000000000000")));
 
-        assertEquals(Set.of(CategoryID.from("c1")), actualReferences.categories());
-        assertEquals(Set.of(GenreID.from("g1")), actualReferences.genres());
-        assertEquals(Set.of(CastMemberID.from("m1")), actualReferences.castMembers());
+        assertEquals(Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000")), actualReferences.categories());
+        assertEquals(Set.of(GenreID.from("00000016-0000-0000-0000-000000000000")), actualReferences.genres());
+        assertEquals(Set.of(CastMemberID.from("00000021-0000-0000-0000-000000000000")), actualReferences.castMembers());
     }
 
     @Test
@@ -60,20 +60,20 @@ class VideoReferencesTest {
     @Test
     void givenMutableSets_whenCallWith_thenCopyThemSoLaterChangesDoNotLeakIn() {
         final var categories = new HashSet<CategoryID>();
-        categories.add(CategoryID.from("c1"));
+        categories.add(CategoryID.from("00000009-0000-0000-0000-000000000000"));
         final var references = VideoReferences.with(categories, Set.of(), Set.of());
 
-        categories.add(CategoryID.from("c2"));
+        categories.add(CategoryID.from("00000010-0000-0000-0000-000000000000"));
 
         assertEquals(1, references.categories().size());
     }
 
     @Test
     void givenReferences_whenChangeTheReturnedSets_thenRefuseTheChange() {
-        final var references = VideoReferences.with(Set.of(CategoryID.from("c1")), Set.of(), Set.of());
+        final var references = VideoReferences.with(Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000")), Set.of(), Set.of());
 
         final var actualCategories = references.categories();
 
-        assertThrows(UnsupportedOperationException.class, () -> actualCategories.add(CategoryID.from("c2")));
+        assertThrows(UnsupportedOperationException.class, () -> actualCategories.add(CategoryID.from("00000010-0000-0000-0000-000000000000")));
     }
 }

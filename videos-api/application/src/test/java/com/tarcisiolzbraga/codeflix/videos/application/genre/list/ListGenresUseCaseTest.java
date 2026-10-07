@@ -26,7 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class ListGenresUseCaseTest {
 
     private static final GenreSearchQuery EXPECTED_QUERY =
-            new GenreSearchQuery(0, 10, "aç", "name", "asc", Set.of(CategoryID.from("c1")));
+            new GenreSearchQuery(0, 10, "aç", "name", "asc", Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000")));
     private static final Instant CREATED_AT = Instant.parse("2026-09-30T12:00:00Z");
     private static final Instant UPDATED_AT = Instant.parse("2026-10-01T08:30:00Z");
 
@@ -39,7 +39,7 @@ class ListGenresUseCaseTest {
     @Test
     void givenValidQuery_whenCallExecute_thenReturnThePageWithItsMetadata() {
         when(genreGateway.findAll(EXPECTED_QUERY))
-                .thenReturn(new Pagination<>(0, 10, 2L, List.of(aGenre("1", "Ação"), aGenre("2", "Comédia"))));
+                .thenReturn(new Pagination<>(0, 10, 2L, List.of(aGenre("00000001-0000-0000-0000-000000000000", "Ação"), aGenre("00000002-0000-0000-0000-000000000000", "Comédia"))));
 
         final var actualOutput = useCase.execute(EXPECTED_QUERY);
 
@@ -52,12 +52,12 @@ class ListGenresUseCaseTest {
     @Test
     void givenValidQuery_whenCallExecute_thenCarryTheCategoriesOfEachGenre() {
         when(genreGateway.findAll(EXPECTED_QUERY))
-                .thenReturn(new Pagination<>(0, 10, 1L, List.of(aGenre("1", "Ação"))));
+                .thenReturn(new Pagination<>(0, 10, 1L, List.of(aGenre("00000001-0000-0000-0000-000000000000", "Ação"))));
 
         final var actualOutput = useCase.execute(EXPECTED_QUERY);
 
         assertEquals(
-                Set.of(CategoryID.from("c1"), CategoryID.from("c2")),
+                Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000"), CategoryID.from("00000010-0000-0000-0000-000000000000")),
                 actualOutput.items().getFirst().categories());
     }
 
@@ -93,7 +93,7 @@ class ListGenresUseCaseTest {
                 GenreID.from(id),
                 name,
                 true,
-                Set.of(CategoryID.from("c1"), CategoryID.from("c2")),
+                Set.of(CategoryID.from("00000009-0000-0000-0000-000000000000"), CategoryID.from("00000010-0000-0000-0000-000000000000")),
                 CREATED_AT,
                 UPDATED_AT);
     }

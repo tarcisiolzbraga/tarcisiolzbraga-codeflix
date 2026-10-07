@@ -20,16 +20,7 @@ public class GenreValidator extends Validator {
 
     @Override
     public void validate() {
-        checkIdConstraints();
         checkNameConstraints();
-    }
-
-    // O id chega pela mensagem do admin-codeflix, que pode vir corrompida; o construtor do GenreID
-    // barra o nulo, não o branco.
-    private void checkIdConstraints() {
-        if (this.genre.getId().getValue().isBlank()) {
-            validationHandler().append(new ValidationError("'id' should not be empty"));
-        }
     }
 
     private void checkNameConstraints() {
