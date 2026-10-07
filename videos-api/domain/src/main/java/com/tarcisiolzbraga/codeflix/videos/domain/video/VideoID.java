@@ -16,6 +16,12 @@ public record VideoID(UUID value) implements Identifier {
         return new VideoID(Identifier.uuidOf(value, VideoID.class));
     }
 
+    // Para quem já tem o valor tipado e não precisa passar pelo texto: o documento do
+    // Elasticsearch, que guarda os ids das relações como UUID.
+    public static VideoID from(final UUID value) {
+        return new VideoID(value);
+    }
+
     @Override
     public String getValue() {
         return this.value.toString();

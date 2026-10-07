@@ -17,6 +17,12 @@ public record CastMemberID(UUID value) implements Identifier {
         return new CastMemberID(Identifier.uuidOf(value, CastMemberID.class));
     }
 
+    // Para quem já tem o valor tipado e não precisa passar pelo texto: o documento do
+    // Elasticsearch, que guarda os ids das relações como UUID.
+    public static CastMemberID from(final UUID value) {
+        return new CastMemberID(value);
+    }
+
     @Override
     public String getValue() {
         return this.value.toString();

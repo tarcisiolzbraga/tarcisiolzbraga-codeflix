@@ -93,7 +93,7 @@ public class GenreElasticsearchGateway implements GenreGateway {
             criteria = criteria.subCriteria(SearchTerms.across(terms, NAME));
         }
         if (!query.categories().isEmpty()) {
-            final var values = query.categories().stream().map(CategoryID::getValue).toList();
+            final var values = query.categories().stream().map(CategoryID::value).toList();
             criteria = criteria.subCriteria(new Criteria(CATEGORIES).in(values));
         }
         return new CriteriaQuery(criteria, page);

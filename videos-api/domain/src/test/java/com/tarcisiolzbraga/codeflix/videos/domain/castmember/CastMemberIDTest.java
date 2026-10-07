@@ -21,7 +21,9 @@ class CastMemberIDTest {
 
     @Test
     void givenNullValue_whenCallFrom_thenThrowNullPointerException() {
-        final var actualException = assertThrows(NullPointerException.class, () -> CastMemberID.from(null));
+        final String value = null;
+
+        final var actualException = assertThrows(NullPointerException.class, () -> CastMemberID.from(value));
 
         assertEquals("'value' should not be null", actualException.getMessage());
     }

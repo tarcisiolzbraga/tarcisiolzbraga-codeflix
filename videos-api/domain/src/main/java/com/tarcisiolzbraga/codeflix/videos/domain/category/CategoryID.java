@@ -19,6 +19,12 @@ public record CategoryID(UUID value) implements Identifier {
         return new CategoryID(Identifier.uuidOf(value, CategoryID.class));
     }
 
+    // Para quem já tem o valor tipado e não precisa passar pelo texto: o documento do
+    // Elasticsearch, que guarda os ids das relações como UUID.
+    public static CategoryID from(final UUID value) {
+        return new CategoryID(value);
+    }
+
     @Override
     public String getValue() {
         return this.value.toString();

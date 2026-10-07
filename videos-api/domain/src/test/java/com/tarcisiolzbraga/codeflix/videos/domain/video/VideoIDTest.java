@@ -21,7 +21,9 @@ class VideoIDTest {
 
     @Test
     void givenNullValue_whenCallFrom_thenThrowNullPointerException() {
-        final var actualException = assertThrows(NullPointerException.class, () -> VideoID.from(null));
+        final String value = null;
+
+        final var actualException = assertThrows(NullPointerException.class, () -> VideoID.from(value));
 
         assertEquals("'value' should not be null", actualException.getMessage());
     }

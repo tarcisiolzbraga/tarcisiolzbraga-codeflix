@@ -5,6 +5,7 @@ import com.tarcisiolzbraga.codeflix.videos.domain.genre.Genre;
 import com.tarcisiolzbraga.codeflix.videos.domain.genre.GenreID;
 import java.time.Instant;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.Document;
@@ -31,9 +32,10 @@ public class GenreDocument {
     @Field(type = FieldType.Boolean, name = "active")
     private boolean active;
 
-    // Keyword: são ids, para casar exato e filtrar, nunca para analisar como texto.
+    // Keyword: são ids, para casar exato e filtrar, nunca para analisar como texto. UUID e não
+    // texto, como no resto: o campo guarda id, e o tipo diz isso.
     @Field(type = FieldType.Keyword, name = "categories")
-    private Set<String> categories;
+    private Set<UUID> categories;
 
     @Field(type = FieldType.Date, name = "created_at")
     private Instant createdAt;
@@ -48,7 +50,7 @@ public class GenreDocument {
             final String id,
             final String name,
             final boolean active,
-            final Set<String> categories,
+            final Set<UUID> categories,
             final Instant createdAt,
             final Instant updatedAt) {
         this.id = id;
@@ -64,7 +66,7 @@ public class GenreDocument {
                 genre.getId().getValue(),
                 genre.getName(),
                 genre.isActive(),
-                genre.getCategories().stream().map(CategoryID::getValue).collect(Collectors.toSet()),
+                genre.getCategories().stream().map(CategoryID::value).collect(Collectors.toSet()),
                 genre.getCreatedAt(),
                 genre.getUpdatedAt());
     }
@@ -105,11 +107,11 @@ public class GenreDocument {
         this.active = active;
     }
 
-    public Set<String> getCategories() {
+    public Set<UUID> getCategories() {
         return this.categories;
     }
 
-    public void setCategories(final Set<String> categories) {
+    public void setCategories(final Set<UUID> categories) {
         this.categories = categories;
     }
 

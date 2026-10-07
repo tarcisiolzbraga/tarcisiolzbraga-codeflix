@@ -21,7 +21,9 @@ class GenreIDTest {
 
     @Test
     void givenNullValue_whenCallFrom_thenThrowNullPointerException() {
-        final var actualException = assertThrows(NullPointerException.class, () -> GenreID.from(null));
+        final String value = null;
+
+        final var actualException = assertThrows(NullPointerException.class, () -> GenreID.from(value));
 
         assertEquals("'value' should not be null", actualException.getMessage());
     }

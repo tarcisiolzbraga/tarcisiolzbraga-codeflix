@@ -13,6 +13,7 @@ import com.tarcisiolzbraga.codeflix.videos.domain.video.VideoReferences;
 import java.time.Instant;
 import java.time.Year;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.data.annotation.Id;
@@ -80,13 +81,13 @@ public class VideoDocument {
     private String thumbnailHalf;
 
     @Field(type = FieldType.Keyword, name = "categories")
-    private Set<String> categories;
+    private Set<UUID> categories;
 
     @Field(type = FieldType.Keyword, name = "genres")
-    private Set<String> genres;
+    private Set<UUID> genres;
 
     @Field(type = FieldType.Keyword, name = "cast_members")
-    private Set<String> castMembers;
+    private Set<UUID> castMembers;
 
     @Field(type = FieldType.Date, name = "created_at")
     private Instant createdAt;
@@ -114,10 +115,10 @@ public class VideoDocument {
         document.thumbnail = medias.thumbnail();
         document.thumbnailHalf = medias.thumbnailHalf();
         final var references = source.getReferences();
-        document.categories = references.categories().stream().map(CategoryID::getValue).collect(Collectors.toSet());
-        document.genres = references.genres().stream().map(GenreID::getValue).collect(Collectors.toSet());
+        document.categories = references.categories().stream().map(CategoryID::value).collect(Collectors.toSet());
+        document.genres = references.genres().stream().map(GenreID::value).collect(Collectors.toSet());
         document.castMembers =
-                references.castMembers().stream().map(CastMemberID::getValue).collect(Collectors.toSet());
+                references.castMembers().stream().map(CastMemberID::value).collect(Collectors.toSet());
         document.createdAt = source.getCreatedAt();
         document.updatedAt = source.getUpdatedAt();
         return document;
@@ -144,7 +145,7 @@ public class VideoDocument {
                 this.updatedAt);
     }
 
-    private static <T> Set<T> idsOf(final Set<String> values, final Function<String, T> factory) {
+    private static <T> Set<T> idsOf(final Set<UUID> values, final Function<UUID, T> factory) {
         if (values == null) {
             return Set.of();
         }

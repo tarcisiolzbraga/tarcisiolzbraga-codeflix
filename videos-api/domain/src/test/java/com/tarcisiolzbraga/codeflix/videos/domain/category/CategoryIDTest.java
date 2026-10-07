@@ -21,7 +21,9 @@ class CategoryIDTest {
 
     @Test
     void givenNullValue_whenCallFrom_thenThrowNullPointerException() {
-        final var actualException = assertThrows(NullPointerException.class, () -> CategoryID.from(null));
+        final String value = null;
+
+        final var actualException = assertThrows(NullPointerException.class, () -> CategoryID.from(value));
 
         assertEquals("'value' should not be null", actualException.getMessage());
     }
