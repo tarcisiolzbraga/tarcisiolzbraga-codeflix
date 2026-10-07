@@ -1,5 +1,5 @@
-// O que todo módulo tem em comum. Cada módulo aplica este plugin e declara só as próprias
-// dependências.
+// O que todo módulo de todo serviço tem em comum. Cada módulo aplica este plugin e declara só as
+// próprias dependências.
 //
 // Isto fica aqui, e não num subprojects do build.gradle raiz, porque a documentação do Gradle
 // desaconselha a configuração entre projetos: ela injeta comportamento que não aparece no script do
@@ -44,8 +44,9 @@ tasks.withType(Test).configureEach {
     // passariam verdes sem rodar nada.
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
-    // A raiz do repositório, para o teste achar os arquivos de provisionamento dos containers sem
-    // depender de caminho relativo ao módulo.
+    // A raiz do build do serviço, para o teste achar os arquivos de provisionamento dos containers
+    // (como o realm do Keycloak, que fica na raiz do monorepo) sem depender de caminho relativo ao
+    // módulo.
     systemProperty 'codeflix.rootDir', rootDir.absolutePath
 }
 

@@ -1,0 +1,4 @@
+// Este é um build próprio, incluído pelos serviços — e não um buildSrc deles. A diferença é que um
+// buildSrc pertence a um build só, e aqui a configuração é a mesma para todos: o que mudava num
+// lado tinha de ser copiado no outro, e os dois já tinham divergido em comentários.
+rootProject.name = 'build-logic'

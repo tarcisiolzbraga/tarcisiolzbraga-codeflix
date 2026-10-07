@@ -1,3 +1,9 @@
+// O plugin de convenção dos módulos vem de ../build-logic, um build incluído: a configuração de
+// build é a mesma nos dois serviços e vive num lugar só, fora daqui.
+pluginManagement {
+    includeBuild '../build-logic'
+}
+
 rootProject.name = 'admin-codeflix'
 
 include 'domain', 'application', 'infrastructure'

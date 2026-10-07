@@ -1,0 +1,11 @@
+// Compilado antes dos serviços que o incluem, e dá origem aos plugins de convenção que os módulos
+// deles aplicam.
+plugins {
+    id 'groovy-gradle-plugin'
+}
+
+group = 'com.tarcisiolzbraga.codeflix'
+
+repositories {
+    mavenCentral()
+}

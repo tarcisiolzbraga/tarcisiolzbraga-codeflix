@@ -8,6 +8,7 @@ Os serviços de back-end do Codeflix, num repositório só. Cada serviço tem o 
 | [`admin-api/`](admin-api/) | administra o catálogo: cria, edita e publica. É a fonte do dado. | 8080 |
 | [`videos-api/`](videos-api/) | serve o catálogo ao usuário final, replicando o que a `admin-api` publica. | 8082 |
 | `encoder-api/` | 🚧 ainda não existe: converte as mídias enviadas. | — |
+| [`build-logic/`](build-logic/) | não é serviço: a configuração de build que os serviços Java dividem. | — |
 
 A leitura de cada um está no README da própria pasta. Comece pelo
 [`admin-api/README.md`](admin-api/README.md) se quer entender de onde o dado vem, ou pelo
@@ -25,6 +26,9 @@ Os serviços não são independentes, e tratá-los como tal custava caro:
   real da `admin-api`. Renomear uma tabela de um lado quebra o outro, e agora um push só roda as
   duas suítes.
 - **A infraestrutura é compartilhada.** MySQL, Keycloak, Kafka e RabbitMQ servem aos dois.
+- **O build é o mesmo.** Mesma toolchain, mesmo JUnit, mesmas tasks de teste. Eram dois `buildSrc`
+  iguais que já tinham começado a divergir; hoje são um [`build-logic/`](build-logic/) só, que cada
+  serviço inclui pelo `settings.gradle`.
 
 ## Como rodar
 
@@ -41,6 +45,9 @@ Cada serviço compila e roda a partir da própria pasta, e é de lá que o Gradl
 ```bash
 cd admin-api && ./gradlew bootRun    # ou videos-api
 ```
+
+O serviço continua sendo o build de entrada; `build-logic/` entra como build incluído, compilado
+antes dele. Não há wrapper na raiz, e não se roda Gradle de lá.
 
 Para subir as aplicações em container, empacote o jar antes e depois use o compose:
 
