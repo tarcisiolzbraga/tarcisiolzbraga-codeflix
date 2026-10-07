@@ -1,10 +1,12 @@
 # Máquina do desenvolvedor: credenciais do .env (o mesmo do docker compose), o Elasticsearch daqui
 # e o Kafka que o compose do admin-codeflix sobe com --profile cdc.
 spring:
-  # O .env da raiz traz os valores de quem roda no host; é por isso que o bootRun usa workingDir
-  # na raiz do projeto.
+  # O .env da raiz do monorepo, que é o mesmo do docker compose e o mesmo da admin-api: com um
+  # arquivo só, KEYCLOAK_HOST não pode divergir entre os dois lados, e era a divergência dele que
+  # fazia o admin recusar o token pelo `iss`. O caminho é relativo porque o bootRun roda com
+  # workingDir na pasta do serviço.
   config:
-    import: optional:file:.env[.properties]
+    import: optional:file:../.env[.properties]
   elasticsearch:
     uris: ${ELASTIC_URIS:http://localhost:9201}
   graphql:

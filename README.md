@@ -28,15 +28,34 @@ Os serviços não são independentes, e tratá-los como tal custava caro:
 
 ## Como rodar
 
-Cada serviço sobe a partir da própria pasta, e é de lá que o Gradle roda:
+A infraestrutura é um [`docker-compose.yml`](docker-compose.yml) só, na raiz, com um `.env` só:
 
 ```bash
-cd admin-api  && ./gradlew build     # ou videos-api
+cp .env.example .env                 # primeira vez: preencher os segredos
+docker compose up -d mysql rabbitmq garage keycloak catalog-elasticsearch
+docker compose --profile cdc up -d   # Kafka e Kafka Connect, para a replicação
 ```
 
-A infraestrutura ainda está em dois `docker-compose.yml`, um por serviço — unificá-los na raiz é o
-próximo passo. Até lá, siga o README de cada um: o da `videos-api` depende do Kafka e do Keycloak que
-o compose da `admin-api` sobe.
+Cada serviço compila e roda a partir da própria pasta, e é de lá que o Gradle roda:
+
+```bash
+cd admin-api && ./gradlew bootRun    # ou videos-api
+```
+
+Para subir as aplicações em container, empacote o jar antes e depois use o compose:
+
+```bash
+cd admin-api && ./gradlew bootJar && cd ..
+docker compose up -d --build admin-api
+```
+
+O `.env` único é mais do que arrumação: `KEYCLOAK_HOST` agora **não pode** divergir entre os dois
+lados, e era a divergência dele que fazia o admin recusar o token do catálogo pelo `iss`.
+
+> **Migração, uma vez só.** Quem tinha os dois composes antigos em pé precisa derrubar o projeto
+> antigo do catálogo (`docker compose -p videos-api-codeflix down`) antes do primeiro `up` daqui: o
+> container do Elasticsearch tem o mesmo nome nos dois. O índice replicado nasce vazio no volume
+> novo, e o Debezium refaz o snapshot — é réplica, não fonte.
 
 ## Integração contínua
 

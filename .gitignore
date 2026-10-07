@@ -1,3 +1,8 @@
+# Vale para o monorepo inteiro: os padrões não são ancorados, então casam em qualquer serviço.
+# Antes havia um arquivo igual a este dentro de cada um.
+#
+# O .env é um só, na raiz, e é onde estão os segredos de desenvolvimento.
+
 HELP.md
 .gradle
 build/

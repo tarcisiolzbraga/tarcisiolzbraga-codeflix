@@ -2,7 +2,7 @@
 # Sem perfil ativo (bootRun, testes), vale o development; nos outros ambientes o perfil vem de
 # SPRING_PROFILES_ACTIVE.
 server:
-  port: ${APP_PORT:8082}
+  port: ${CATALOG_APP_PORT:8082}
   # Mesmo prefixo da referência, e é por isso que o GraphiQL fica em /api/graphiql.
   servlet:
     context-path: /api

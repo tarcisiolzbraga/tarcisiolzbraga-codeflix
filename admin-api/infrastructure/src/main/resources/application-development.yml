@@ -1,7 +1,8 @@
-# Máquina do desenvolvedor: credenciais do .env (o mesmo do docker compose) e banco local.
+# Máquina do desenvolvedor: credenciais do .env da raiz do monorepo (o mesmo do docker compose e o
+# mesmo da videos-api) e banco local.
 spring:
   config:
-    import: optional:file:.env[.properties]
+    import: optional:file:../.env[.properties]
   rabbitmq:
     host: ${AMQP_HOST:localhost}
     port: ${AMQP_PORT:5672}

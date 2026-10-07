@@ -1,3 +1,16 @@
+# A infraestrutura dos serviços do monorepo, num compose só. Antes eram dois, um por repositório, e
+# o preço aparecia aqui: o Kafka precisava anunciar dois endereços para ser alcançado de dentro e de
+# fora da rede, e o catálogo só achava o broker e o Keycloak pelo host.
+#
+# Os profiles mantêm o `docker compose up -d` do dia a dia enxuto:
+#   (sem profile)            MySQL, RabbitMQ, Garage, Keycloak, o Elasticsearch do catálogo e as
+#                            duas aplicações
+#   --profile cdc            Kafka e Kafka Connect, que alimentam o catálogo
+#   --profile observability  Elasticsearch de log, Kibana, Logstash e Filebeat
+#
+# As duas aplicações empacotam o jar no host, então antes de subi-las rode o bootJar da pasta de
+# cada uma. Para subir só a infraestrutura, nomeie os serviços:
+#   docker compose up -d mysql rabbitmq garage keycloak catalog-elasticsearch
 services:
   mysql:
     image: mysql:8.4
@@ -15,7 +28,7 @@ services:
     volumes:
       # Scripts executados uma única vez, na criação do volume: é de onde sai o usuário do Debezium.
       # Em volume que já existe eles não rodam — veja a nota de CDC no README.
-      - ./.mysql/init:/docker-entrypoint-initdb.d:ro
+      - ./admin-api/.mysql/init:/docker-entrypoint-initdb.d:ro
       - mysql_data:/var/lib/mysql
 
   # Armazenamento das mídias, compatível com S3. --single-node monta o layout sozinho e
@@ -34,7 +47,7 @@ services:
     ports:
       - "${STORAGE_PORT}:3900"
     volumes:
-      - ./garage.toml:/etc/garage.toml:ro
+      - ./admin-api/garage.toml:/etc/garage.toml:ro
       - garage_meta:/var/lib/garage/meta
       - garage_data:/var/lib/garage/data
 
@@ -64,11 +77,11 @@ services:
       - "${AMQP_PORT}:5672"
       - "${AMQP_MANAGEMENT_PORT}:15672"
     volumes:
-      - ./.rabbitmq/definitions.json:/definitions-template.json:ro
-      - ./.rabbitmq/rabbitmq.conf:/etc/rabbitmq/conf.d/20-definitions.conf:ro
+      - ./admin-api/.rabbitmq/definitions.json:/definitions-template.json:ro
+      - ./admin-api/.rabbitmq/rabbitmq.conf:/etc/rabbitmq/conf.d/20-definitions.conf:ro
       - rabbitmq_data:/var/lib/rabbitmq
 
-  # Autenticação. O realm, as roles e o client vêm de ../.keycloak/realm.json, na raiz do
+  # Autenticação. O realm, as roles e o client vêm de ./.keycloak/realm.json, na raiz do
   # então o compose entrega um servidor pronto para emitir token.
   #
   # Sem volume de propósito: o realm é inteiramente descrito pelo arquivo versionado, então o
@@ -99,13 +112,13 @@ services:
       # host seria recusado pela aplicação dentro da rede, e vice-versa.
       - "${KEYCLOAK_PORT}:${KEYCLOAK_PORT}"
     volumes:
-      - ../.keycloak/realm.json:/realm-template.json:ro
+      - ./.keycloak/realm.json:/realm-template.json:ro
 
-  # A aplicação. O jar vem do host: rodar `./gradlew bootJar` antes de `docker compose up -d --build`.
-  # Fica no mesmo compose dos outros para `depends_on` e nomes de serviço valerem.
-  app:
+  # A administração do catálogo. O jar vem do host: rodar `cd admin-api && ./gradlew bootJar` antes
+  # de `docker compose up -d --build admin-api`.
+  admin-api:
     build:
-      context: .
+      context: ./admin-api
       dockerfile: Dockerfile
     container_name: adm_videos_app
     env_file:
@@ -201,6 +214,57 @@ services:
       - kafka
       - mysql
 
+  # --- Catálogo (videos-api) -------------------------------------------------------------------
+
+  # O armazenamento de leitura do catálogo. É um Elasticsearch separado do que a observabilidade
+  # sobe: aquele guarda log, este guarda catálogo, e juntá-los faria uma recarga de índice de um
+  # apagar o do outro. Por isso o nome: `elasticsearch`, sem prefixo, é o da observabilidade.
+  catalog-elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.4
+    container_name: videos_api_elasticsearch
+    environment:
+      discovery.type: single-node
+      # Desenvolvimento: sem TLS nem senha, para a aplicação falar direto.
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "${CATALOG_ELASTIC_PORT}:9200"
+    volumes:
+      # Com volume porque aqui mora o catálogo replicado: sem ele, cada subida exige que o Debezium
+      # refaça o snapshot do banco do admin para o índice voltar a existir.
+      - catalog_elasticsearch_data:/usr/share/elasticsearch/data
+
+  # O catálogo servido ao usuário final. O jar vem do host: rodar `cd videos-api && ./gradlew
+  # bootJar` antes de `docker compose up -d --build videos-api`.
+  videos-api:
+    build:
+      context: ./videos-api
+      dockerfile: Dockerfile
+    container_name: videos_api_app
+    env_file:
+      - .env
+    environment:
+      # Dentro da rede do compose os serviços se acham pelo nome; o .env traz os valores de quem roda
+      # no host, e estas linhas os substituem. O Keycloak não está aqui de propósito: ele é o único
+      # endereçado pelo mesmo nome nos dois casos, porque o `iss` do token tem de bater.
+      ELASTIC_URIS: http://catalog-elasticsearch:9200
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ADMIN_API_BASE_URL: http://admin-api:8080
+      # Em container o log estruturado sai no stdout, que é de onde o Filebeat o colhe pela label
+      # abaixo. O arquivo vai para /tmp só porque o perfil development o declara.
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+      LOGGING_FILE_NAME: /tmp/videos-api.json
+    ports:
+      - "${CATALOG_APP_PORT}:8082"
+    # Sem o kafka na lista de propósito, e não por esquecimento: ele está atrás do profile cdc, e
+    # depender de serviço fora do profile ativo o compose recusa. Também não faria sentido — o
+    # catálogo sobe e serve sem o broker, só não recebe mudança nova até o cdc subir.
+    depends_on:
+      - catalog-elasticsearch
+      - keycloak
+    labels:
+      filebeat_collector: "true"
+
   # --- Observabilidade -------------------------------------------------------------------------
   # Os quatro serviços abaixo ficam atrás do profile "observability": o `docker compose up -d` do
   # dia a dia segue subindo só os quatro de cima, e a pilha entra sob demanda com
@@ -243,7 +307,7 @@ services:
       LS_JAVA_OPTS: -Xms256m -Xmx256m
       xpack.monitoring.enabled: "false"
     volumes:
-      - ./.observability/logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./admin-api/.observability/logstash/pipeline:/usr/share/logstash/pipeline:ro
     depends_on:
       - elasticsearch
 
@@ -257,12 +321,12 @@ services:
     # root para alcançar o socket do Docker e os arquivos de log dos containers.
     user: root
     volumes:
-      - ./.observability/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./admin-api/.observability/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
       # Para descobrir containers pela label e ler o log deles.
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       # O arquivo que o bootRun escreve, que roda com workingDir na raiz do projeto.
-      - ./build/logs:/logs:ro
+      - ./admin-api/build/logs:/logs:ro
       # Onde o Filebeat guarda até onde já leu. Sem este volume o registro morre com o container, e
       # um down/up relê o arquivo inteiro: medido, 154 documentos viraram 308.
       - filebeat_data:/usr/share/filebeat/data
@@ -276,4 +340,5 @@ volumes:
   garage_data:
   rabbitmq_data:
   elasticsearch_data:
+  catalog_elasticsearch_data:
   filebeat_data:
