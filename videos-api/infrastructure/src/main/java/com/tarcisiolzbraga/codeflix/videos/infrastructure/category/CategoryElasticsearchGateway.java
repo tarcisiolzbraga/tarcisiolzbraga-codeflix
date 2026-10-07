@@ -47,7 +47,7 @@ public class CategoryElasticsearchGateway implements CategoryGateway {
 
     @Override
     public void deleteById(final CategoryID id) {
-        this.categoryRepository.deleteById(id.getValue());
+        this.categoryRepository.deleteById(id.value());
     }
 
     // Vazio para o inativo, como se não estivesse lá: nada inativo é devolvido em leitura alguma.
@@ -55,7 +55,7 @@ public class CategoryElasticsearchGateway implements CategoryGateway {
     @Override
     public Optional<Category> findById(final CategoryID id) {
         return this.categoryRepository
-                .findById(id.getValue())
+                .findById(id.value())
                 .filter(CategoryDocument::isActive)
                 .map(CategoryDocument::toCategory);
     }
@@ -65,7 +65,7 @@ public class CategoryElasticsearchGateway implements CategoryGateway {
         if (ids == null || ids.isEmpty()) {
             return List.of();
         }
-        final var values = ids.stream().map(CategoryID::getValue).toList();
+        final var values = ids.stream().map(CategoryID::value).toList();
         // É daqui que sai a resolução de relação: um vídeo ativo com categorias inativas vem sem
         // essas categorias, porque elas simplesmente não entram nesta lista.
         return StreamSupport.stream(this.categoryRepository.findAllById(values).spliterator(), false)

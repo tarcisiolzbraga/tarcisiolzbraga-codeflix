@@ -34,8 +34,10 @@ import org.springframework.data.elasticsearch.annotations.MultiField;
 @Document(indexName = "video")
 public class VideoDocument {
 
+    // UUID e não texto: o _id do Elasticsearch é string no protocolo, mas o que guardamos nele é
+    // um UUID, e o tipo passa a dizer. A conversão é do Spring Data, na borda do cliente.
     @Id
-    private String id;
+    private UUID id;
 
     @MultiField(
             mainField = @Field(type = FieldType.Text, name = "title"),
@@ -97,7 +99,7 @@ public class VideoDocument {
 
     public static VideoDocument from(final Video source) {
         final var document = new VideoDocument();
-        document.id = source.getId().getValue();
+        document.id = source.getId().value();
         final var details = source.getDetails();
         document.title = details.title();
         document.description = details.description();
@@ -152,11 +154,11 @@ public class VideoDocument {
         return values.stream().map(factory).collect(Collectors.toUnmodifiableSet());
     }
 
-    public String getId() {
+    public UUID getId() {
         return this.id;
     }
 
-    public void setId(final String id) {
+    public void setId(final UUID id) {
         this.id = id;
     }
 

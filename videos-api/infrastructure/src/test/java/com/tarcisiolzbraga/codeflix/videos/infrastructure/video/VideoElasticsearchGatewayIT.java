@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.time.Year;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
@@ -92,7 +93,7 @@ class VideoElasticsearchGatewayIT {
         gateway.save(aVideo("00000001-0000-0000-0000-000000000000", "Duna", Rating.AGE_14, 2026, false, true, references()));
 
         assertTrue(gateway.findById(VideoID.from("00000001-0000-0000-0000-000000000000")).isEmpty());
-        assertTrue(repository.findById("00000001-0000-0000-0000-000000000000").isPresent());
+        assertTrue(repository.findById(UUID.fromString("00000001-0000-0000-0000-000000000000")).isPresent());
     }
 
     // A metade que o curso também filtra: não publicado não é servido.
@@ -101,7 +102,7 @@ class VideoElasticsearchGatewayIT {
         gateway.save(aVideo("00000001-0000-0000-0000-000000000000", "Duna", Rating.AGE_14, 2026, true, false, references()));
 
         assertTrue(gateway.findById(VideoID.from("00000001-0000-0000-0000-000000000000")).isEmpty());
-        assertTrue(repository.findById("00000001-0000-0000-0000-000000000000").isPresent());
+        assertTrue(repository.findById(UUID.fromString("00000001-0000-0000-0000-000000000000")).isPresent());
     }
 
     @Test
@@ -110,7 +111,7 @@ class VideoElasticsearchGatewayIT {
 
         gateway.deleteById(VideoID.from("00000001-0000-0000-0000-000000000000"));
 
-        assertTrue(repository.findById("00000001-0000-0000-0000-000000000000").isEmpty());
+        assertTrue(repository.findById(UUID.fromString("00000001-0000-0000-0000-000000000000")).isEmpty());
     }
 
     @Test

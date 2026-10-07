@@ -47,14 +47,14 @@ public class CastMemberElasticsearchGateway implements CastMemberGateway {
 
     @Override
     public void deleteById(final CastMemberID id) {
-        this.castMemberRepository.deleteById(id.getValue());
+        this.castMemberRepository.deleteById(id.value());
     }
 
     // Vazio para o inativo, como no gateway da categoria: nada inativo é devolvido em leitura alguma.
     @Override
     public Optional<CastMember> findById(final CastMemberID id) {
         return this.castMemberRepository
-                .findById(id.getValue())
+                .findById(id.value())
                 .filter(CastMemberDocument::isActive)
                 .map(CastMemberDocument::toCastMember);
     }
@@ -64,7 +64,7 @@ public class CastMemberElasticsearchGateway implements CastMemberGateway {
         if (ids == null || ids.isEmpty()) {
             return List.of();
         }
-        final var values = ids.stream().map(CastMemberID::getValue).toList();
+        final var values = ids.stream().map(CastMemberID::value).toList();
         // Resolução de relação: um vídeo ativo com membros de elenco inativos vem sem eles.
         return StreamSupport.stream(this.castMemberRepository.findAllById(values).spliterator(), false)
                 .filter(CastMemberDocument::isActive)

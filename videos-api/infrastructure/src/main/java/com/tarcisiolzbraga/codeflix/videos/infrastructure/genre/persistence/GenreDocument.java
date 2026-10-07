@@ -21,8 +21,10 @@ import org.springframework.data.elasticsearch.annotations.MultiField;
 @Document(indexName = "genre")
 public class GenreDocument {
 
+    // UUID e não texto: o _id do Elasticsearch é string no protocolo, mas o que guardamos nele é
+    // um UUID, e o tipo passa a dizer. A conversão é do Spring Data, na borda do cliente.
     @Id
-    private String id;
+    private UUID id;
 
     @MultiField(
             mainField = @Field(type = FieldType.Text, name = "name"),
@@ -47,7 +49,7 @@ public class GenreDocument {
     }
 
     public GenreDocument(
-            final String id,
+            final UUID id,
             final String name,
             final boolean active,
             final Set<UUID> categories,
@@ -63,7 +65,7 @@ public class GenreDocument {
 
     public static GenreDocument from(final Genre genre) {
         return new GenreDocument(
-                genre.getId().getValue(),
+                genre.getId().value(),
                 genre.getName(),
                 genre.isActive(),
                 genre.getCategories().stream().map(CategoryID::value).collect(Collectors.toSet()),
@@ -83,11 +85,11 @@ public class GenreDocument {
                 this.updatedAt);
     }
 
-    public String getId() {
+    public UUID getId() {
         return this.id;
     }
 
-    public void setId(final String id) {
+    public void setId(final UUID id) {
         this.id = id;
     }
 

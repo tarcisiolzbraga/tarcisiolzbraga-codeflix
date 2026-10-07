@@ -13,6 +13,7 @@ import com.tarcisiolzbraga.codeflix.videos.infrastructure.category.persistence.C
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
@@ -191,7 +192,7 @@ class CategoryElasticsearchGatewayIT {
     void givenAnInactiveCategory_whenCallSave_thenStillStoreIt() {
         gateway.save(aCategory("00000001-0000-0000-0000-000000000000", "Filmes", "Desativada no admin", false));
 
-        final var stored = repository.findById("00000001-0000-0000-0000-000000000000");
+        final var stored = repository.findById(UUID.fromString("00000001-0000-0000-0000-000000000000"));
 
         assertTrue(stored.isPresent());
         assertFalse(stored.orElseThrow().isActive());

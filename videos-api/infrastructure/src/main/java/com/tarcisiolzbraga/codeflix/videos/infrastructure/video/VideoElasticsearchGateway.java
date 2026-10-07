@@ -55,7 +55,7 @@ public class VideoElasticsearchGateway implements VideoGateway {
 
     @Override
     public void deleteById(final VideoID id) {
-        this.videoRepository.deleteById(id.getValue());
+        this.videoRepository.deleteById(id.value());
     }
 
     // Vazio para o que o catálogo não serve: inativo ou não publicado. O documento continua gravado,
@@ -63,7 +63,7 @@ public class VideoElasticsearchGateway implements VideoGateway {
     @Override
     public Optional<Video> findById(final VideoID id) {
         return this.videoRepository
-                .findById(id.getValue())
+                .findById(id.value())
                 .filter(VideoDocument::isVisibleInTheCatalog)
                 .map(VideoDocument::toVideo);
     }

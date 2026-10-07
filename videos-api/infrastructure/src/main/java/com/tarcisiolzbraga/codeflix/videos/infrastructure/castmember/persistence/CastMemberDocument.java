@@ -4,6 +4,7 @@ import com.tarcisiolzbraga.codeflix.videos.domain.castmember.CastMember;
 import com.tarcisiolzbraga.codeflix.videos.domain.castmember.CastMemberID;
 import com.tarcisiolzbraga.codeflix.videos.domain.castmember.CastMemberType;
 import java.time.Instant;
+import java.util.UUID;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
@@ -15,8 +16,10 @@ import org.springframework.data.elasticsearch.annotations.MultiField;
 @Document(indexName = "cast_member")
 public class CastMemberDocument {
 
+    // UUID e não texto: o _id do Elasticsearch é string no protocolo, mas o que guardamos nele é
+    // um UUID, e o tipo passa a dizer. A conversão é do Spring Data, na borda do cliente.
     @Id
-    private String id;
+    private UUID id;
 
     // O nome serve a busca por palavra e a ordenação, que querem coisas incompatíveis: o subcampo
     // keyword guarda o valor inteiro, para ordenar.
@@ -42,7 +45,7 @@ public class CastMemberDocument {
     }
 
     public CastMemberDocument(
-            final String id,
+            final UUID id,
             final String name,
             final String type,
             final boolean active,
@@ -58,7 +61,7 @@ public class CastMemberDocument {
 
     public static CastMemberDocument from(final CastMember castMember) {
         return new CastMemberDocument(
-                castMember.getId().getValue(),
+                castMember.getId().value(),
                 castMember.getName(),
                 castMember.getType().name(),
                 castMember.isActive(),
@@ -78,11 +81,11 @@ public class CastMemberDocument {
                 this.updatedAt);
     }
 
-    public String getId() {
+    public UUID getId() {
         return this.id;
     }
 
-    public void setId(final String id) {
+    public void setId(final UUID id) {
         this.id = id;
     }
 

@@ -48,14 +48,14 @@ public class GenreElasticsearchGateway implements GenreGateway {
 
     @Override
     public void deleteById(final GenreID id) {
-        this.genreRepository.deleteById(id.getValue());
+        this.genreRepository.deleteById(id.value());
     }
 
     // Vazio para o inativo: nada inativo é devolvido em leitura alguma.
     @Override
     public Optional<Genre> findById(final GenreID id) {
         return this.genreRepository
-                .findById(id.getValue())
+                .findById(id.value())
                 .filter(GenreDocument::isActive)
                 .map(GenreDocument::toGenre);
     }
@@ -65,7 +65,7 @@ public class GenreElasticsearchGateway implements GenreGateway {
         if (ids == null || ids.isEmpty()) {
             return List.of();
         }
-        final var values = ids.stream().map(GenreID::getValue).toList();
+        final var values = ids.stream().map(GenreID::value).toList();
         // Resolução de relação: um vídeo ativo com gêneros inativos vem sem eles.
         return StreamSupport.stream(this.genreRepository.findAllById(values).spliterator(), false)
                 .filter(GenreDocument::isActive)

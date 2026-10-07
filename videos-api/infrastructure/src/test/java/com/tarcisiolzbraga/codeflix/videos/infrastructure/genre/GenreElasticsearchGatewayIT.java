@@ -15,6 +15,7 @@ import com.tarcisiolzbraga.codeflix.videos.infrastructure.genre.persistence.Genr
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
@@ -82,8 +83,8 @@ class GenreElasticsearchGatewayIT {
         final var actualGenre = gateway.findById(GenreID.from("00000001-0000-0000-0000-000000000000"));
 
         assertTrue(actualGenre.isEmpty());
-        assertTrue(repository.findById("00000001-0000-0000-0000-000000000000").isPresent());
-        assertFalse(repository.findById("00000001-0000-0000-0000-000000000000").orElseThrow().isActive());
+        assertTrue(repository.findById(UUID.fromString("00000001-0000-0000-0000-000000000000")).isPresent());
+        assertFalse(repository.findById(UUID.fromString("00000001-0000-0000-0000-000000000000")).orElseThrow().isActive());
     }
 
     @Test
@@ -93,7 +94,7 @@ class GenreElasticsearchGatewayIT {
         gateway.deleteById(GenreID.from("00000001-0000-0000-0000-000000000000"));
 
         assertTrue(gateway.findById(GenreID.from("00000001-0000-0000-0000-000000000000")).isEmpty());
-        assertTrue(repository.findById("00000001-0000-0000-0000-000000000000").isEmpty());
+        assertTrue(repository.findById(UUID.fromString("00000001-0000-0000-0000-000000000000")).isEmpty());
     }
 
     @Test

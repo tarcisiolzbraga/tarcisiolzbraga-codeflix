@@ -3,6 +3,7 @@ package com.tarcisiolzbraga.codeflix.videos.infrastructure.category.persistence;
 import com.tarcisiolzbraga.codeflix.videos.domain.category.Category;
 import com.tarcisiolzbraga.codeflix.videos.domain.category.CategoryID;
 import java.time.Instant;
+import java.util.UUID;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
@@ -17,8 +18,10 @@ import org.springframework.data.elasticsearch.annotations.MultiField;
 @Document(indexName = "category")
 public class CategoryDocument {
 
+    // UUID e não texto: o _id do Elasticsearch é string no protocolo, mas o que guardamos nele é
+    // um UUID, e o tipo passa a dizer. A conversão é do Spring Data, na borda do cliente.
     @Id
-    private String id;
+    private UUID id;
 
     // O nome serve a duas coisas incompatíveis: busca por palavra, que precisa de análise, e
     // ordenação, que precisa do valor inteiro. O subcampo keyword atende a segunda.
@@ -44,7 +47,7 @@ public class CategoryDocument {
     }
 
     public CategoryDocument(
-            final String id,
+            final UUID id,
             final String name,
             final String description,
             final boolean active,
@@ -60,7 +63,7 @@ public class CategoryDocument {
 
     public static CategoryDocument from(final Category category) {
         return new CategoryDocument(
-                category.getId().getValue(),
+                category.getId().value(),
                 category.getName(),
                 category.getDescription(),
                 category.isActive(),
@@ -73,11 +76,11 @@ public class CategoryDocument {
                 CategoryID.from(this.id), this.name, this.description, this.active, this.createdAt, this.updatedAt);
     }
 
-    public String getId() {
+    public UUID getId() {
         return this.id;
     }
 
-    public void setId(final String id) {
+    public void setId(final UUID id) {
         this.id = id;
     }
 

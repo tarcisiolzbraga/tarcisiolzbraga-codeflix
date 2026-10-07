@@ -15,6 +15,7 @@ import com.tarcisiolzbraga.codeflix.videos.infrastructure.castmember.persistence
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
@@ -56,7 +57,7 @@ class CastMemberElasticsearchGatewayIT {
     void givenAnInactiveMember_whenCallSave_thenStillStoreItButHideItFromEveryRead() {
         gateway.save(aMember("00000001-0000-0000-0000-000000000000", "Denis Villeneuve", CastMemberType.DIRECTOR, false));
 
-        final var stored = repository.findById("00000001-0000-0000-0000-000000000000");
+        final var stored = repository.findById(UUID.fromString("00000001-0000-0000-0000-000000000000"));
 
         assertTrue(stored.isPresent());
         assertFalse(stored.orElseThrow().isActive());
