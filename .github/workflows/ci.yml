@@ -1,0 +1,119 @@
+# Integração contínua do monorepo. Três etapas em ordem, da mais rápida para a mais cara, para o
+# retorno de um erro bobo não esperar os containers subirem.
+#
+# Os dois serviços Java entram numa matriz, e não em jobs copiados: eles têm o mesmo build, e a
+# diferença é só a pasta. O encoder, quando entrar, ganha job próprio — ele é Go, outra cadeia de
+# ferramentas.
+#
+# Sem filtro por caminho de propósito. Filtrar teste pelo que mudou dá push verde com contrato
+# quebrado: mexer só no admin-api — uma coluna renomeada, um payload diferente — quebra a videos-api,
+# que replica o dado dele e captura as mensagens de CDC da saída dele. Com as suítes em minutos, sai
+# mais barato rodar as duas sempre. O filtro entra no dia em que houver deploy, e aí no deploy.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+# Um push novo na mesma referência cancela a execução anterior: ninguém espera resultado de código
+# que já foi substituído.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Testes sem container (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [admin-api, videos-api]
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Confere que o jar do wrapper é um artefato oficial do Gradle, e não algo trocado no caminho.
+      - uses: gradle/actions/wrapper-validation@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # unitTests é definida por exclusão de tags, então dispensa Docker e responde em segundos.
+      - name: Testes unitários
+        run: ./gradlew unitTests
+
+  build:
+    name: Build completo (${{ matrix.service }})
+    needs: unit
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [admin-api, videos-api]
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # O build roda os três módulos do serviço, incluindo integração e E2E, que sobem a
+      # infraestrutura em Testcontainers. O runner tem Docker; o custo é o download das imagens.
+      # Os testes não precisam do .env: quem fornece credencial são os containers.
+      - name: Build e todos os testes
+        run: ./gradlew build
+
+      - name: Guarda o relatório dos testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorios-de-teste-${{ matrix.service }}
+          path: '${{ matrix.service }}/*/build/reports/tests/**'
+          retention-days: 7
+
+  image:
+    name: Imagem Docker (${{ matrix.service }})
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [admin-api, videos-api]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # O Dockerfile de cada serviço empacota o jar já construído, por isso o bootJar antes.
+      - name: Gera o jar
+        working-directory: ${{ matrix.service }}
+        run: ./gradlew bootJar -x test
+
+      # Constrói sem publicar: não exige credencial nenhuma, e passa a verificar os Dockerfiles, que
+      # hoje não são exercitados por nada. A publicação entra quando houver registro definido.
+      - name: Constrói a imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.service }}
+          push: false
+          tags: ${{ matrix.service }}:${{ github.sha }}
