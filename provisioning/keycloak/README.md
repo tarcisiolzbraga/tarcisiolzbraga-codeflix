@@ -1,9 +1,10 @@
 # Realm de desenvolvimento
 
-Este arquivo fica na **raiz do monorepo**, e não dentro de um serviço, porque o realm é um só e os
+Este arquivo fica em `provisioning/`, e não dentro de um serviço, porque o realm é um só e os
 dois lados o usam: a `admin-api` valida token nele e a `videos-api` também, com papéis diferentes.
 
-`realm.json` é importado pelo Keycloak na subida do `docker compose`, então o container entrega o realm
+`realm.json` é importado pelo Keycloak na subida do `docker compose` — o serviço está no
+`docker-compose.yml` ao lado —, então o container entrega o realm
 `codeflix` pronto: as seis roles e quatro clients de credenciais de cliente.
 
 **Não é possível comentar dentro do arquivo.** Diferente do import de definitions do RabbitMQ, o Keycloak recusa

@@ -1,0 +1,70 @@
+# A pilha de log. Os quatro serviços ficam atrás do profile "observability": o `docker compose up -d`
+# do dia a dia segue subindo só a infraestrutura de sempre, e a pilha entra sob demanda com
+# `docker compose --profile observability up -d`. O Elasticsearch sozinho quer meio giga de heap.
+#
+# Uma rede à parte não é necessária: a rede padrão do projeto já liga todos pelo nome do serviço.
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.4
+    container_name: adm_videos_elasticsearch
+    profiles: ["observability"]
+    environment:
+      discovery.type: single-node
+      # Desenvolvimento: sem TLS nem senha, para o Kibana e o Logstash falarem direto.
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "${ELASTIC_PORT}:9200"
+    volumes:
+      # Com volume porque os objetos salvos do Kibana, inclusive a data view, moram aqui: sem ele
+      # você os recria a cada subida.
+      - elasticsearch_data:/usr/share/elasticsearch/data
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.5.4
+    container_name: adm_videos_kibana
+    profiles: ["observability"]
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "${KIBANA_PORT}:5601"
+    depends_on:
+      - elasticsearch
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:9.5.4
+    container_name: adm_videos_logstash
+    profiles: ["observability"]
+    environment:
+      LS_JAVA_OPTS: -Xms256m -Xmx256m
+      xpack.monitoring.enabled: "false"
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+    depends_on:
+      - elasticsearch
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:9.5.4
+    container_name: adm_videos_filebeat
+    profiles: ["observability"]
+    # strict.perms desligado porque o arquivo de configuração vem montado do repositório, e o
+    # Filebeat recusa configuração que não seja dele.
+    command: ["--strict.perms=false"]
+    # root para alcançar o socket do Docker e os arquivos de log dos containers.
+    user: root
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      # Para descobrir containers pela label e ler o log deles.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      # O arquivo que o bootRun escreve, que roda com workingDir na raiz do projeto.
+      - ../../admin-api/build/logs:/logs:ro
+      # Onde o Filebeat guarda até onde já leu. Sem este volume o registro morre com o container, e
+      # um down/up relê o arquivo inteiro: medido, 154 documentos viraram 308.
+      - filebeat_data:/usr/share/filebeat/data
+    depends_on:
+      - logstash
+
+volumes:
+  elasticsearch_data:
+  filebeat_data:

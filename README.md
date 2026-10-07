@@ -9,6 +9,7 @@ Os serviços de back-end do Codeflix, num repositório só. Cada serviço tem o 
 | [`videos-api/`](videos-api/) | serve o catálogo ao usuário final, replicando o que a `admin-api` publica. | 8082 |
 | `encoder-api/` | 🚧 ainda não existe: converte as mídias enviadas. | — |
 | [`build-logic/`](build-logic/) | não é serviço: a configuração de build que os serviços Java dividem. | — |
+| [`provisioning/`](provisioning/) | não é serviço: os containers de apoio, um compose por parte. | — |
 
 A leitura de cada um está no README da própria pasta. Comece pelo
 [`admin-api/README.md`](admin-api/README.md) se quer entender de onde o dado vem, ou pelo
@@ -20,7 +21,8 @@ Os serviços não são independentes, e tratá-los como tal custava caro:
 
 - **O realm é um só.** Dar um papel ao assinante do catálogo era mudança em dois repositórios, e a
   `videos-api` mantinha uma cópia mínima do realm só para os testes dela, que podia divergir da de
-  verdade. Hoje [`.keycloak/realm.json`](.keycloak/) é o único, e os testes dos dois leem dele.
+  verdade. Hoje [`provisioning/keycloak/realm.json`](provisioning/keycloak/) é o único, e os
+  testes dos dois leem dele.
 - **O contrato do CDC atravessa os dois.** O nome do tópico está na configuração da `videos-api`, o
   conector está na `admin-api`, e as mensagens de teste da `videos-api` foram capturadas da saída
   real da `admin-api`. Renomear uma tabela de um lado quebra o outro, e agora um push só roda as
@@ -32,12 +34,28 @@ Os serviços não são independentes, e tratá-los como tal custava caro:
 
 ## Como rodar
 
-A infraestrutura é um [`docker-compose.yml`](docker-compose.yml) só, na raiz, com um `.env` só:
+A infraestrutura é um projeto só, com um `.env` só. O [`docker-compose.yml`](docker-compose.yml) da
+raiz não declara serviço nenhum: ele inclui o compose de cada parte, e cada container mora na
+própria pasta, junto dos arquivos que monta.
 
 ```bash
 cp .env.example .env                 # primeira vez: preencher os segredos
 docker compose up -d mysql rabbitmq garage keycloak catalog-elasticsearch
 docker compose --profile cdc up -d   # Kafka e Kafka Connect, para a replicação
+```
+
+Os comandos são os de sempre, rodados da raiz: a inclusão é montagem de arquivo, não projeto
+separado, então `up`, `down`, `logs` e os profiles enxergam tudo junto.
+
+```
+provisioning/
+├── mysql/                  banco da admin-api, e a origem do binlog
+├── garage/                 armazenamento das mídias, compatível com S3
+├── rabbitmq/               fila da conversa com o codificador
+├── keycloak/               autenticação dos dois, com um realm só
+├── catalog-elasticsearch/  índice de leitura do catálogo
+├── cdc/                    Kafka e Kafka Connect, mais o conector do Debezium
+└── observability/          Elasticsearch de log, Kibana, Logstash e Filebeat
 ```
 
 Cada serviço compila e roda a partir da própria pasta, e é de lá que o Gradle roda:

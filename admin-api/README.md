@@ -36,7 +36,7 @@ subida. A permissão é por chave e por bucket: a chave da aplicação só enxer
 
 ### Autenticação
 
-O Keycloak sobe com o realm `codeflix` já importado de `../.keycloak/realm.json`, na raiz do
+O Keycloak sobe com o realm `codeflix` já importado de `../provisioning/keycloak/realm.json`, na raiz do
 monorepo: as seis roles
 (`CODEFLIX_ADMIN`, `CODEFLIX_CATEGORIES`, `CODEFLIX_GENRES`, `CODEFLIX_CAST_MEMBERS` e `CODEFLIX_VIDEOS`) e o
 client `admin-codeflix`, que usa o fluxo de credenciais de cliente e já vem com a role de administrador. O
@@ -74,7 +74,7 @@ categorias — este serve justamente para ver o 403 nas rotas dos outros agregad
 as quatro roles de leitura, que é a credencial da API de catálogo e nunca escreve nada aqui; e
 `subscriber-codeflix`, com a role de assinante, que **não** serve para nada aqui — ela existe para ler o
 catálogo do outro lado, e está neste realm porque o realm é um só. As notas do realm estão em
-`../.keycloak/README.md`, porque o Keycloak recusa comentário dentro do arquivo de import.
+`../provisioning/keycloak/README.md`, porque o Keycloak recusa comentário dentro do arquivo de import.
 
 **A entrada no `/etc/hosts` não é opcional.** O `iss` do token é a URL que o cliente usou para pedi-lo, e a
 aplicação só aceita token cujo `iss` bate com o emissor configurado. Com a aplicação em container, ela fala com
@@ -99,7 +99,7 @@ O arquivo enviado é lido inteiro em memória antes de ir para o armazenamento, 
 
 O arquivo de áudio e vídeo nasce com status `PENDING` e é o codificador que o move. A conversa acontece por uma
 fila do RabbitMQ, também no `docker compose`, com um exchange direto (`video.events`) e uma fila para cada
-sentido. O broker sobe com essa topologia já criada, vinda de `.rabbitmq/definitions.json`: o exchange, as duas filas, os
+sentido. O broker sobe com essa topologia já criada, vinda de `../provisioning/rabbitmq/definitions.json`: o exchange, as duas filas, os
 dois bindings e o usuário. A aplicação também as declara na subida, de forma idempotente, então ela continua
 funcionando contra um broker vazio — por exemplo o de Testcontainers, nos testes.
 
@@ -172,13 +172,13 @@ tem de ser alcançável por quem conecta.
 
 O Kafka Connect é a casa onde o conector roda, com API REST na `${KAFKA_CONNECT_PORT}`. O conector não mora em
 arquivo da aplicação: ele é registrado nessa API, com a configuração versionada em
-`.debezium/admin-mysql-cdc.json`, cujos marcadores de usuário e senha são trocados na hora pelos valores do `.env`:
+`../provisioning/cdc/admin-mysql-cdc.json`, cujos marcadores de usuário e senha são trocados na hora pelos valores do `.env`:
 
 ```bash
 CU=$(grep '^CDC_USER=' .env | cut -d= -f2-); CP=$(grep '^CDC_PASSWORD=' .env | cut -d= -f2-)
 python3 -c "
 import json
-cfg = json.load(open('.debezium/admin-mysql-cdc.json'))
+cfg = json.load(open('provisioning/cdc/admin-mysql-cdc.json'))
 cfg['database.user'] = '$CU'; cfg['database.password'] = '$CP'
 print(json.dumps(cfg))" \
   | curl -sS -X PUT http://localhost:8083/connectors/admin-mysql-cdc/config \
@@ -188,7 +188,7 @@ curl -sS http://localhost:8083/connectors/admin-mysql-cdc/status   # deve dizer 
 ```
 
 O usuário que lê o binlog tem permissões de **replicação**, não de leitura comum, e nasce do script
-`.mysql/init/10-cdc-user.sh`. Esse script roda uma única vez, **na criação do volume** `mysql_data`: num banco que
+`../provisioning/mysql/init/10-cdc-user.sh`. Esse script roda uma única vez, **na criação do volume** `mysql_data`: num banco que
 já existe ele não roda, e o usuário se cria à mão uma vez:
 
 ```sql
@@ -279,7 +279,7 @@ no classpath.
 ### Os pares chave:valor
 
 As mensagens da aplicação carregam pares no formato `[chave:valor]`, e o filtro `kv` do Logstash
-(`.observability/logstash/pipeline/logstash.conf`) os transforma em campos de verdade, com o prefixo `evento_`.
+(`../provisioning/observability/logstash/pipeline/logstash.conf`) os transforma em campos de verdade, com o prefixo `evento_`.
 Uma mensagem assim:
 
 ```

@@ -1,0 +1,34 @@
+# Autenticação. O realm, as roles e os clients vêm do realm.json ao lado, então o compose entrega
+# um servidor pronto para emitir token. O realm é um só para os dois serviços — o porquê está no
+# README desta pasta.
+#
+# Sem volume de propósito: o realm é inteiramente descrito pelo arquivo versionado, então o
+# container é descartável e sempre reflete o que está no git. O que for criado à mão no console
+# se perde ao recriar, o que é o comportamento desejado para uma peça de desenvolvimento.
+#
+# O segredo do client não fica no arquivo versionado: o Keycloak não substitui variável de
+# ambiente dentro do import, então a troca é feita aqui, antes de ele ler o arquivo. A
+# substituição é a do bash, que trata o valor como texto literal e não interpreta nada dele.
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.0
+    container_name: adm_videos_keycloak
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        mkdir -p /opt/keycloak/data/import
+        template=$$(cat /realm-template.json)
+        printf '%s' "$${template//__KEYCLOAK_CLIENT_SECRET__/$$KEYCLOAK_CLIENT_SECRET}" \
+          > /opt/keycloak/data/import/realm.json
+        exec /opt/keycloak/bin/kc.sh start-dev --import-realm --http-port=${KEYCLOAK_PORT}
+    ports:
+      # A mesma porta dentro e fora de propósito: o `iss` do token é a URL que o cliente usou, então
+      # http://keycloak:8081 tem de valer nos dois lados. Com portas diferentes, um token pedido do
+      # host seria recusado pela aplicação dentro da rede, e vice-versa.
+      - "${KEYCLOAK_PORT}:${KEYCLOAK_PORT}"
+    volumes:
+      - ./realm.json:/realm-template.json:ro

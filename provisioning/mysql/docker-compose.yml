@@ -1,0 +1,22 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: adm_videos_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      # Lidas pelo script de init que cria o usuário de leitura do binlog.
+      CDC_USER: ${CDC_USER}
+      CDC_PASSWORD: ${CDC_PASSWORD}
+    ports:
+      - "${DB_PORT}:3306"
+    volumes:
+      # Scripts executados uma única vez, na criação do volume: é de onde sai o usuário do Debezium.
+      # Em volume que já existe eles não rodam — veja a nota de CDC no README.
+      - ./init:/docker-entrypoint-initdb.d:ro
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:

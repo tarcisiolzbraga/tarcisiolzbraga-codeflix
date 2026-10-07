@@ -1,0 +1,27 @@
+# Os containers de apoio dos dois serviços. Cada um mora na própria pasta, junto dos arquivos que
+# monta — o realm do Keycloak, o definitions do RabbitMQ, o garage.toml — para que mexer num
+# container seja abrir uma pasta só.
+#
+# O agrupamento é por função, não um arquivo por container: `cdc` sobe Kafka e Kafka Connect, que
+# só existem juntos, e `observability` sobe os quatro da pilha de log.
+include:
+  # banco da admin-api, e a origem do binlog que alimenta o catálogo
+  - path: mysql/docker-compose.yml
+
+  # armazenamento das mídias, compatível com S3
+  - path: garage/docker-compose.yml
+
+  # fila da conversa com o codificador
+  - path: rabbitmq/docker-compose.yml
+
+  # autenticação dos dois serviços, com um realm só
+  - path: keycloak/docker-compose.yml
+
+  # índice de leitura do catálogo
+  - path: catalog-elasticsearch/docker-compose.yml
+
+  # replicação da admin-api para o catálogo (profile cdc)
+  - path: cdc/docker-compose.yml
+
+  # pilha de log (profile observability)
+  - path: observability/docker-compose.yml

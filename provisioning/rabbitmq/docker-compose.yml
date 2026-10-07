@@ -1,0 +1,33 @@
+# Fila entre a aplicação e o codificador de vídeo. A imagem -management traz o painel em
+# http://localhost:15672, útil para ver mensagem parada durante o desenvolvimento.
+#
+# O nó sobe com o exchange, as duas filas, os dois bindings e o usuário já criados, vindos do
+# definitions.json ao lado. Havendo definitions, o RabbitMQ não cria o usuário de
+# RABBITMQ_DEFAULT_USER, então o usuário também vem do arquivo — e por isso o nome e a senha são
+# trocados aqui, antes da subida, com os valores do .env. A substituição é a do bash, que trata
+# os valores como texto literal.
+services:
+  rabbitmq:
+    image: rabbitmq:4.2-management
+    container_name: adm_videos_rabbitmq
+    environment:
+      AMQP_USER: ${AMQP_USER}
+      AMQP_PASSWORD: ${AMQP_PASSWORD}
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        template=$$(cat /definitions-template.json)
+        template=$${template//__AMQP_USER__/$$AMQP_USER}
+        printf '%s' "$${template//__AMQP_PASSWORD__/$$AMQP_PASSWORD}" \
+          > /etc/rabbitmq/definitions.json
+        exec /usr/local/bin/docker-entrypoint.sh rabbitmq-server
+    ports:
+      - "${AMQP_PORT}:5672"
+      - "${AMQP_MANAGEMENT_PORT}:15672"
+    volumes:
+      - ./definitions.json:/definitions-template.json:ro
+      - ./rabbitmq.conf:/etc/rabbitmq/conf.d/20-definitions.conf:ro
+      - rabbitmq_data:/var/lib/rabbitmq
+
+volumes:
+  rabbitmq_data:

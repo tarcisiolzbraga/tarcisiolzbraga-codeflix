@@ -1,0 +1,24 @@
+# Armazenamento das mídias, compatível com S3. --single-node monta o layout sozinho e
+# --default-bucket cria o bucket e a chave com as credenciais abaixo; sem isso o Garage
+# sobe sem layout e recusa toda requisição. A permissão é por chave e por bucket.
+services:
+  garage:
+    image: dxflrs/garage:v2.3.0
+    container_name: adm_videos_garage
+    entrypoint: ["/garage"]
+    command: ["server", "--single-node", "--default-bucket"]
+    environment:
+      GARAGE_RPC_SECRET: ${STORAGE_RPC_SECRET}
+      GARAGE_DEFAULT_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
+      GARAGE_DEFAULT_SECRET_KEY: ${STORAGE_SECRET_KEY}
+      GARAGE_DEFAULT_BUCKET: ${STORAGE_BUCKET}
+    ports:
+      - "${STORAGE_PORT}:3900"
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+      - garage_meta:/var/lib/garage/meta
+      - garage_data:/var/lib/garage/data
+
+volumes:
+  garage_meta:
+  garage_data:

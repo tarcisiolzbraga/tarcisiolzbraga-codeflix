@@ -1,0 +1,36 @@
+# A administração do catálogo. O jar vem do host: rodar `./gradlew bootJar` nesta pasta antes de
+# `docker compose up -d --build admin-api`, da raiz do monorepo.
+services:
+  admin-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: adm_videos_app
+    env_file:
+      - ../.env
+    environment:
+      # Dentro da rede do compose os serviços se acham pelo nome; o .env traz os valores de quem roda
+      # no host, e estas linhas os substituem. O Keycloak não está aqui de propósito: ele é o único
+      # endereçado pelo mesmo nome nos dois casos, porque o `iss` do token tem de bater — veja o
+      # KEYCLOAK_HOST no .env.example.
+      DB_HOST: mysql
+      DB_PORT: 3306
+      AMQP_HOST: rabbitmq
+      AMQP_PORT: 5672
+      STORAGE_HOST: garage
+      # Em container o log estruturado sai no stdout, que é de onde o Filebeat o colhe pela label
+      # abaixo. O arquivo vai para /tmp só porque o perfil development o declara.
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+      LOGGING_FILE_NAME: /tmp/admin-codeflix.json
+      # suspend=n para a aplicação subir sem esperar o depurador.
+      JAVA_TOOL_OPTIONS: -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+    ports:
+      - "${APP_PORT}:8080"
+      - "${APP_DEBUG_PORT}:5005"
+    depends_on:
+      - mysql
+      - rabbitmq
+      - garage
+      - keycloak
+    labels:
+      filebeat_collector: "true"

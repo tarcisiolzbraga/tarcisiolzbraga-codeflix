@@ -1,0 +1,31 @@
+# O catálogo servido ao usuário final. O jar vem do host: rodar `./gradlew bootJar` nesta pasta
+# antes de `docker compose up -d --build videos-api`, da raiz do monorepo.
+services:
+  videos-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: videos_api_app
+    env_file:
+      - ../.env
+    environment:
+      # Dentro da rede do compose os serviços se acham pelo nome; o .env traz os valores de quem roda
+      # no host, e estas linhas os substituem. O Keycloak não está aqui de propósito: ele é o único
+      # endereçado pelo mesmo nome nos dois casos, porque o `iss` do token tem de bater.
+      ELASTIC_URIS: http://catalog-elasticsearch:9200
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ADMIN_API_BASE_URL: http://admin-api:8080
+      # Em container o log estruturado sai no stdout, que é de onde o Filebeat o colhe pela label
+      # abaixo. O arquivo vai para /tmp só porque o perfil development o declara.
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+      LOGGING_FILE_NAME: /tmp/videos-api.json
+    ports:
+      - "${CATALOG_APP_PORT}:8082"
+    # Sem o kafka na lista de propósito, e não por esquecimento: ele está atrás do profile cdc, e
+    # depender de serviço fora do profile ativo o compose recusa. Também não faria sentido — o
+    # catálogo sobe e serve sem o broker, só não recebe mudança nova até o cdc subir.
+    depends_on:
+      - catalog-elasticsearch
+      - keycloak
+    labels:
+      filebeat_collector: "true"

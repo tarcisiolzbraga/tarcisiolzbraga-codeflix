@@ -86,7 +86,7 @@ curl -s -X POST http://localhost:8081/realms/codeflix/protocol/openid-connect/to
 ```
 
 O client `subscriber-codeflix` é o do assinante; para a mutation de exemplo, use o `admin-codeflix`.
-Os dois vivem no realm da raiz do monorepo, que é um só — veja `../.keycloak/README.md`.
+Os dois vivem no realm da raiz do monorepo, que é um só — veja `../provisioning/keycloak/README.md`.
 
 ### Perfis
 

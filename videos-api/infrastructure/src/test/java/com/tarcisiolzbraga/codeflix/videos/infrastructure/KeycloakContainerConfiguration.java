@@ -63,7 +63,7 @@ public class KeycloakContainerConfiguration {
     }
 
     private static String realmDefinition() {
-        final var path = Path.of(System.getProperty("codeflix.rootDir"), "..", ".keycloak", "realm.json");
+        final var path = Path.of(System.getProperty("codeflix.rootDir"), "..", "provisioning", "keycloak", "realm.json");
         try {
             return Files.readString(path).replace(SECRET_PLACEHOLDER, KeycloakTestToken.SECRET);
         } catch (final IOException exception) {
