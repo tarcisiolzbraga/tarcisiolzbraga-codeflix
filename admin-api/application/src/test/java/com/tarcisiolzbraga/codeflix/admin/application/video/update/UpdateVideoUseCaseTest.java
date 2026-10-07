@@ -38,7 +38,7 @@ class UpdateVideoUseCaseTest {
 
     private static final String OLD_TITLE = "Duna";
     private static final String EXPECTED_TITLE = "Duna: Parte 2";
-    private static final String CATEGORY_ID = "aaa-filmes";
+    private static final String CATEGORY_ID = "11111111-1111-1111-1111-111111111111";
 
     @Mock
     private CategoryGateway categoryGateway;

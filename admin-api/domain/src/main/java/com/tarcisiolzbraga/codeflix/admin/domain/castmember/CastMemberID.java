@@ -4,7 +4,10 @@ import com.tarcisiolzbraga.codeflix.admin.domain.Identifier;
 import java.util.Objects;
 import java.util.UUID;
 
-public record CastMemberID(String value) implements Identifier {
+// O id é UUID, e não String, porque é o que ele sempre foi na prática: unique() sorteia um UUID e a
+// coluna é CHAR(36). Com String, duas grafias do mesmo id eram dois ids diferentes — e como o MySQL
+// compara ignorando a caixa, o banco achava a linha enquanto a comparação em memória dizia que não.
+public record CastMemberID(UUID value) implements Identifier {
 
     public CastMemberID {
         Objects.requireNonNull(value, "'value' should not be null");
@@ -15,15 +18,17 @@ public record CastMemberID(String value) implements Identifier {
     }
 
     public static CastMemberID from(final String value) {
-        return new CastMemberID(value);
+        return from(Identifier.uuidOf(value, CastMemberID.class));
     }
 
     public static CastMemberID from(final UUID value) {
-        return new CastMemberID(value.toString().toLowerCase());
+        return new CastMemberID(value);
     }
 
+    // toString() do UUID é sempre minúsculo, então a normalização que antes era feita à mão num
+    // dos dois from(...) — e esquecida no outro — passa a ser propriedade do tipo.
     @Override
     public String getValue() {
-        return this.value;
+        return this.value.toString();
     }
 }

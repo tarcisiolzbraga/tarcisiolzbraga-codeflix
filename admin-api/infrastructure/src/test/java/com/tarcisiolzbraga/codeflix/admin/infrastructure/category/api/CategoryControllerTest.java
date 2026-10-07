@@ -50,7 +50,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class CategoryControllerTest {
 
     private static final String CATEGORIES_PATH = "/categories";
-    private static final String EXPECTED_ID = "123";
+    private static final String EXPECTED_ID = "11111111-1111-1111-1111-111111111111";
     private static final String EXPECTED_NAME = "Filmes";
     private static final String EXPECTED_DESCRIPTION = "A mais assistida";
     private static final String VALID_BODY =
@@ -137,7 +137,7 @@ class CategoryControllerTest {
         final var response = this.mockMvc.perform(get(CATEGORIES_PATH + "/" + EXPECTED_ID));
 
         response.andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.message").value("Category with ID 123 was not found"));
+                .andExpect(jsonPath("$.message").value("Category with ID %s was not found".formatted(EXPECTED_ID)));
     }
 
     // Falha de infraestrutura não é erro de domínio: o advice deixa passar. Sem container de
@@ -248,7 +248,8 @@ class CategoryControllerTest {
 
         response.andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message")
-                        .value("Category with ID 123 is linked to at least one Genre; deactivate it instead"))
+                        .value("Category with ID %s is linked to at least one Genre; deactivate it instead"
+                                .formatted(EXPECTED_ID)))
                 .andExpect(jsonPath("$.errors").isEmpty());
     }
 }

@@ -17,7 +17,9 @@ import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.Genre;
 import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreGateway;
+import com.tarcisiolzbraga.codeflix.admin.domain.validation.ValidationError;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.Notification;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,8 +31,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class CreateGenreUseCaseTest {
 
     private static final String EXPECTED_NAME = "Ação";
-    private static final String MOVIES_ID = "aaa-filmes";
-    private static final String SERIES_ID = "bbb-series";
+    private static final String MOVIES_ID = "11111111-1111-1111-1111-111111111111";
+    private static final String SERIES_ID = "22222222-2222-2222-2222-222222222222";
 
     @Mock
     private CategoryGateway categoryGateway;
@@ -133,6 +135,42 @@ class CreateGenreUseCaseTest {
         assertEquals(
                 "Some categories could not be found: %s, %s".formatted(MOVIES_ID, SERIES_ID),
                 firstErrorOf(actualResult.getLeft()));
+        verify(genreGateway, never()).create(any());
+    }
+
+    // Regressão do defeito que motivou o id virar UUID. Antes, from(String) guardava a grafia como
+    // veio: o id em maiúsculas não era igual ao que o gateway devolvia do banco em minúsculas, e o
+    // contains() da checagem acusava de inexistente uma categoria que existe. Só aparecia em lista
+    // mista, porque com um id só a comparação de tamanho passava por cima.
+    @Test
+    void givenAnExistingCategoryInUppercase_whenCallExecute_thenReportOnlyTheTrulyMissingOne() {
+        final var existing = "AAAAAAAA-0000-0000-0000-00000000000F";
+        final var missing = "bbbbbbbb-0000-0000-0000-00000000000f";
+        final var command = CreateGenreCommand.with(EXPECTED_NAME, true, Set.of(existing, missing));
+        when(categoryGateway.findExistingIds(any()))
+                .thenReturn(Set.of(CategoryID.from(existing.toLowerCase())));
+
+        final var actualResult = useCase.execute(command);
+
+        assertTrue(actualResult.isLeft());
+        assertEquals(
+                "Some categories could not be found: %s".formatted(missing),
+                firstErrorOf(actualResult.getLeft()));
+        verify(genreGateway, never()).create(any());
+    }
+
+    // Id malformado não interrompe: entra na mesma Notification que o nome inválido, senão quem
+    // chamou receberia um erro por tentativa em vez de todos de uma vez.
+    @Test
+    void givenAMalformedCategoryAndInvalidName_whenCallExecute_thenReturnLeftWithBothErrors() {
+        final var command = CreateGenreCommand.with(null, true, Set.of("nao-e-um-uuid"));
+
+        final var actualResult = useCase.execute(command);
+
+        assertTrue(actualResult.isLeft());
+        assertEquals(
+                List.of("'nao-e-um-uuid' is not a valid CategoryID", "'name' should not be null"),
+                actualResult.getLeft().getErrors().stream().map(ValidationError::message).toList());
         verify(genreGateway, never()).create(any());
     }
 

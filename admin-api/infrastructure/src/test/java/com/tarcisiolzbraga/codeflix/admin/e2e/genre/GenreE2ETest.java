@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
 import com.tarcisiolzbraga.codeflix.admin.e2e.CategoryE2EDsl;
 import com.tarcisiolzbraga.codeflix.admin.e2e.GenreE2EDsl;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.E2ETest;
@@ -67,13 +68,29 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
 
     @Test
     void givenAnUnknownCategoryAndNoName_whenCreate_thenReturnUnprocessableContentWithBothErrors() {
-        final var request = new CreateGenreRequest(null, Set.of("nao-existe"), null);
+        final var unknown = CategoryID.unique().getValue();
+        final var request = new CreateGenreRequest(null, Set.of(unknown), null);
 
         final var actualException = assertThrows(HttpClientErrorException.class, () -> createAGenre(request));
 
         assertEquals(HttpStatus.UNPROCESSABLE_CONTENT, actualException.getStatusCode());
         assertEquals(
-                List.of("Some categories could not be found: nao-existe", "'name' should not be null"),
+                List.of("Some categories could not be found: %s".formatted(unknown), "'name' should not be null"),
+                actualException.getResponseBodyAs(ApiError.class).errors());
+        assertEquals(0, listGenres(0, 10).total());
+    }
+
+    // Id que nem UUID é não chega a ser procurado, mas o erro continua se acumulando com os outros:
+    // quem mandou a requisição recebe tudo o que está errado nela de uma vez.
+    @Test
+    void givenAMalformedCategoryAndNoName_whenCreate_thenReturnUnprocessableContentWithBothErrors() {
+        final var request = new CreateGenreRequest(null, Set.of("nao-e-um-uuid"), null);
+
+        final var actualException = assertThrows(HttpClientErrorException.class, () -> createAGenre(request));
+
+        assertEquals(HttpStatus.UNPROCESSABLE_CONTENT, actualException.getStatusCode());
+        assertEquals(
+                List.of("'nao-e-um-uuid' is not a valid CategoryID", "'name' should not be null"),
                 actualException.getResponseBodyAs(ApiError.class).errors());
         assertEquals(0, listGenres(0, 10).total());
     }

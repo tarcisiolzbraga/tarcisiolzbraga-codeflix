@@ -35,9 +35,9 @@ class CreateVideoUseCaseTest {
 
     private static final String EXPECTED_TITLE = "Duna";
     private static final String EXPECTED_DESCRIPTION = "Paul Atreides em Arrakis";
-    private static final String CATEGORY_ID = "aaa-filmes";
-    private static final String GENRE_ID = "bbb-ficcao";
-    private static final String MEMBER_ID = "ccc-chalamet";
+    private static final String CATEGORY_ID = "11111111-1111-1111-1111-111111111111";
+    private static final String GENRE_ID = "22222222-2222-2222-2222-222222222222";
+    private static final String MEMBER_ID = "33333333-3333-3333-3333-333333333333";
     private static final String RATING_MESSAGE = "'rating' should not be null";
 
     @Mock

@@ -31,8 +31,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class UpdateGenreUseCaseTest {
 
     private static final String EXPECTED_NAME = "Ação";
-    private static final String MOVIES_ID = "aaa-filmes";
-    private static final String SERIES_ID = "bbb-series";
+    private static final String MOVIES_ID = "11111111-1111-1111-1111-111111111111";
+    private static final String SERIES_ID = "22222222-2222-2222-2222-222222222222";
 
     @Mock
     private CategoryGateway categoryGateway;

@@ -3,7 +3,9 @@ package com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.tarcisiolzbraga.codeflix.admin.domain.castmember.CastMemberID;
 import com.tarcisiolzbraga.codeflix.admin.domain.category.CategoryID;
+import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreID;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.SearchQuery;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -35,7 +37,7 @@ class VideoSearchRequestTest {
     void givenReferenceFilters_whenCallToSearchQuery_thenConvertThemToTypedIds() {
         final var categoryId = CategoryID.unique().getValue();
         final var request = new VideoSearchRequest(
-                null, null, null, null, null, Set.of(categoryId), Set.of("g1"), Set.of("m1"));
+                null, null, null, null, null, Set.of(categoryId), Set.of(GenreID.unique().getValue()), Set.of(CastMemberID.unique().getValue()));
 
         final var actualQuery = request.toSearchQuery();
 

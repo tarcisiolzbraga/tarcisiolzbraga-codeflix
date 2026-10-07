@@ -71,7 +71,7 @@ class GenreMySQLGatewayIT {
     void givenUnknownId_whenCallDeleteById_thenDoNothing() {
         this.genreGateway.create(Genre.newGenre("Ação", true));
 
-        this.genreGateway.deleteById(GenreID.from("nao-existe"));
+        this.genreGateway.deleteById(GenreID.unique());
 
         assertEquals(1, this.genreRepository.count());
     }
@@ -90,7 +90,7 @@ class GenreMySQLGatewayIT {
 
     @Test
     void givenUnknownId_whenCallFindById_thenReturnEmpty() {
-        final var actualGenre = this.genreGateway.findById(GenreID.from("nao-existe"));
+        final var actualGenre = this.genreGateway.findById(GenreID.unique());
 
         assertTrue(actualGenre.isEmpty());
     }

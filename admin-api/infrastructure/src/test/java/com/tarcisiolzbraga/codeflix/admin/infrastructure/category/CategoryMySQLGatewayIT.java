@@ -58,7 +58,7 @@ class CategoryMySQLGatewayIT {
     void givenUnknownId_whenCallDeleteById_thenDoNothing() {
         this.categoryGateway.create(Category.newCategory("Filmes", null, true));
 
-        this.categoryGateway.deleteById(CategoryID.from("nao-existe"));
+        this.categoryGateway.deleteById(CategoryID.unique());
 
         assertEquals(1, this.categoryRepository.count());
     }
@@ -75,7 +75,7 @@ class CategoryMySQLGatewayIT {
 
     @Test
     void givenUnknownId_whenCallFindById_thenReturnEmpty() {
-        final var actualCategory = this.categoryGateway.findById(CategoryID.from("nao-existe"));
+        final var actualCategory = this.categoryGateway.findById(CategoryID.unique());
 
         assertTrue(actualCategory.isEmpty());
     }
@@ -134,7 +134,7 @@ class CategoryMySQLGatewayIT {
     void givenPersistedCategories_whenCallFindExistingIds_thenReturnOnlyTheExistingOnes() {
         final var movies = this.categoryGateway.create(Category.newCategory("Filmes", null, true));
         final var series = this.categoryGateway.create(Category.newCategory("Series", null, true));
-        final var unknown = CategoryID.from("nao-existe");
+        final var unknown = CategoryID.unique();
 
         final var actualIds = this.categoryGateway
                 .findExistingIds(Set.of(movies.getId(), series.getId(), unknown));
@@ -146,7 +146,7 @@ class CategoryMySQLGatewayIT {
     void givenOnlyUnknownIds_whenCallFindExistingIds_thenReturnEmpty() {
         this.categoryGateway.create(Category.newCategory("Filmes", null, true));
 
-        final var actualIds = this.categoryGateway.findExistingIds(Set.of(CategoryID.from("nao-existe")));
+        final var actualIds = this.categoryGateway.findExistingIds(Set.of(CategoryID.unique()));
 
         assertTrue(actualIds.isEmpty());
     }

@@ -64,15 +64,16 @@ import org.springframework.test.web.servlet.MockMvc;
 class VideoControllerTest {
 
     private static final String VIDEOS_PATH = "/videos";
-    private static final String EXPECTED_ID = "123";
+    private static final String EXPECTED_ID = "11111111-1111-1111-1111-111111111111";
     private static final String EXPECTED_TITLE = "Duna";
-    private static final String CATEGORY_ID = "c1";
+    private static final String CATEGORY_ID = "22222222-2222-2222-2222-222222222222";
     private static final Instant CREATED_AT = Instant.parse("2026-01-31T10:15:30.123456Z");
     private static final Instant UPDATED_AT = Instant.parse("2026-02-01T08:00:00Z");
     private static final String VALID_BODY =
             """
             {"title":"Duna","description":"Arrakis","launchedAt":2021,"duration":155.0,"rating":"12",
-             "categories":["c1"]}""";
+             "categories":["%s"]}"""
+                    .formatted(CATEGORY_ID);
 
     @Autowired
     private MockMvc mockMvc;

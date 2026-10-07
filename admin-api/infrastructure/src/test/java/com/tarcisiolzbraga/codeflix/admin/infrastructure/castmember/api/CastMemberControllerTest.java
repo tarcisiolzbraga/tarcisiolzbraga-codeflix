@@ -44,7 +44,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class CastMemberControllerTest {
 
     private static final String CAST_MEMBERS_PATH = "/cast-members";
-    private static final String EXPECTED_ID = "123";
+    private static final String EXPECTED_ID = "11111111-1111-1111-1111-111111111111";
     private static final String EXPECTED_NAME = "Vin Diesel";
     private static final Instant CREATED_AT = Instant.parse("2026-01-31T10:15:30.123456Z");
     private static final Instant UPDATED_AT = Instant.parse("2026-02-01T08:00:00Z");

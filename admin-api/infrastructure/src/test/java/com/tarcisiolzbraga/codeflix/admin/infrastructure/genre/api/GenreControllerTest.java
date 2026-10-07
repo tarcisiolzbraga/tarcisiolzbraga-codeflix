@@ -46,7 +46,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class GenreControllerTest {
 
     private static final String GENRES_PATH = "/genres";
-    private static final String EXPECTED_ID = "123";
+    private static final String EXPECTED_ID = "11111111-1111-1111-1111-111111111111";
     private static final String EXPECTED_NAME = "Ação";
     private static final Set<String> EXPECTED_CATEGORIES = Set.of("c1", "c2");
     private static final String VALID_BODY =
@@ -150,7 +150,7 @@ class GenreControllerTest {
         final var response = this.mockMvc.perform(get(GENRES_PATH + "/" + EXPECTED_ID));
 
         response.andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.message").value("Genre with ID 123 was not found"));
+                .andExpect(jsonPath("$.message").value("Genre with ID %s was not found".formatted(EXPECTED_ID)));
     }
 
     @Test
