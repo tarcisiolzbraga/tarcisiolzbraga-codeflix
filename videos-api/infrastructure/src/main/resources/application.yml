@@ -27,28 +27,33 @@ kafka:
       # earliest para o snapshot inicial do Debezium ser consumido na primeira subida: com latest o
       # catálogo nasceria vazio e só veria o que mudasse a partir de então.
       auto-offset-reset: earliest
-      max-attempts: 4
+      # 7, e não 4: o atraso dobra a cada tentativa (1s, 2s, 4s, ...), então 4 tentativas toleram
+      # 7 segundos de admin fora do ar e 7 toleram 63. Um restart do admin leva ~17s medidos, e
+      # tudo o que chegasse nessa janela ia direto para a fila morta — que aqui só registra em log.
+      # O preço é um tópico de retentativa a mais por degrau; eles são não bloqueantes, cada um com
+      # seu consumidor, então mensagem ruim demora mais para ser declarada ruim sem segurar o resto.
+      max-attempts: 7
     cast-member:
       id: kafka-listener-cast-member
       topics: adm_videos_mysql.adm_videos.cast_member
       group-id: videos-api-codeflix
       concurrency: 1
       auto-offset-reset: earliest
-      max-attempts: 4
+      max-attempts: 7
     genre:
       id: kafka-listener-genre
       topics: adm_videos_mysql.adm_videos.genre
       group-id: videos-api-codeflix
       concurrency: 1
       auto-offset-reset: earliest
-      max-attempts: 4
+      max-attempts: 7
     video:
       id: kafka-listener-video
       topics: adm_videos_mysql.adm_videos.video
       group-id: videos-api-codeflix
       concurrency: 1
       auto-offset-reset: earliest
-      max-attempts: 4
+      max-attempts: 7
 
 spring:
   profiles:
