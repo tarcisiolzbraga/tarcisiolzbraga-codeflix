@@ -26,6 +26,11 @@ services:
     profiles: ["observability"]
     environment:
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      # Sem esta chave o Kibana desliga as APIs de alerting e de conectores, porque não consegue
+      # cifrar os objetos salvos que guardam credencial. Falha em silêncio: a interface abre, e só
+      # a API responde 500. Qualquer texto de 32 caracteres ou mais serve; trocá-la invalida os
+      # objetos cifrados que já existirem.
+      XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY: ${KIBANA_ENCRYPTION_KEY}
     ports:
       - "${KIBANA_PORT}:5601"
     depends_on:

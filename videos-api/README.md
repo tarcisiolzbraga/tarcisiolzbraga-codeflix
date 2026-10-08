@@ -152,6 +152,54 @@ Três coisas que o consumidor trata, todas medidas contra o ambiente de verdade:
   compactação de log, que é ignorado;
 - operação desconhecida e `TRUNCATE` são registradas e ignoradas, em vez de parar a partição.
 
+### Quando a replicação falha
+
+O evento diz **qual id mudou**; o registro completo vem da API REST do admin. Se essa chamada
+falhar, a mensagem é retentada em tópicos próprios, com atraso que dobra a cada vez — 1s, 2s, 4s,
+e assim por diante, até sete tentativas. São **63 segundos** de tolerância, e o número não é
+arbitrário: um restart do admin leva cerca de 17 segundos, medidos. Com as quatro tentativas que
+havia antes, a janela era de 7 segundos, e subir uma versão nova do admin custava replicação.
+
+As retentativas **não bloqueiam**: cada degrau vive num tópico próprio, com o seu consumidor, então
+uma mensagem presa não segura as outras.
+
+O que esgotar as sete tentativas vai para a **fila morta**, que apenas registra em log. Isso é
+deliberado: reprocessar ali o que já falhou sete vezes ao longo de um minuto falharia de novo. O
+que chega nessa fila não é indisponibilidade passageira — é mensagem que não vai passar, por bug ou
+por payload que o consumidor não entende.
+
+**Nada se perde.** A mensagem continua no tópico da fila morta, pela retenção do Kafka. E recuperar
+é barato por uma propriedade do desenho: o evento carrega **só o id**, e gravar a réplica é
+idempotente. Então não é preciso reenviar a mensagem original — basta disparar a replicação
+daquele id de novo:
+
+| Como | Quando usar |
+|---|---|
+| republicar a mensagem no tópico principal | o caso comum; o payload está no log da fila morta |
+| tocar a linha no admin, por exemplo com um `update` | quando é mais fácil chegar ao admin que ao broker |
+| recriar o conector do Debezium, refazendo o snapshot | quando muita coisa se perdeu de uma vez |
+
+#### O alerta
+
+A pilha de observabilidade traz uma regra do Kibana que vigia exatamente essa linha de log, em
+[`../provisioning/observability/kibana/`](../provisioning/observability/kibana/). Ela é versionada
+como JSON e registrada por API, do mesmo jeito que o conector do Debezium:
+
+```bash
+curl -sS -X POST "http://localhost:${KIBANA_PORT}/api/alerting/rule" \
+  -H 'kbn-xsrf: true' -H 'Content-Type: application/json' \
+  --data-binary @provisioning/observability/kibana/dead-letter-alert.json
+```
+
+Ela procura nível `ERROR` com a expressão `fila morta` nos últimos 5 minutos, roda de minuto em
+minuto e dispara a partir da primeira ocorrência. Sobe **sem ação associada**: aparece em
+*Alerts*, no Kibana. Enviar e-mail ou mensagem exige conector configurado, e isso depende de onde a
+pilha estiver rodando.
+
+> O Kibana precisa de `KIBANA_ENCRYPTION_KEY` no `.env` para aceitar a regra. Sem ela, a API de
+> alerting fica **desligada e responde 500**, sem dizer por quê — a interface abre normalmente, o
+> que torna a falha difícil de ler.
+
 ## O que o catálogo serve
 
 GraphQL em `/api/graphql`, com uma consulta por agregado, `video(id:)` para um título só, e os

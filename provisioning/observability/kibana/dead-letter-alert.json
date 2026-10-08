@@ -1,0 +1,23 @@
+{
+  "name": "Mensagem na fila morta do CDC",
+  "rule_type_id": ".es-query",
+  "consumer": "stackAlerts",
+  "enabled": true,
+  "tags": ["cdc", "replicacao"],
+  "schedule": { "interval": "1m" },
+  "params": {
+    "searchType": "esQuery",
+    "index": ["admin-codeflix-*"],
+    "timeField": "@timestamp",
+    "esQuery": "{\"query\":{\"bool\":{\"filter\":[{\"term\":{\"log.level.keyword\":\"ERROR\"}},{\"match_phrase\":{\"message\":\"fila morta\"}}]}}}",
+    "size": 100,
+    "timeWindowSize": 5,
+    "timeWindowUnit": "m",
+    "threshold": [0],
+    "thresholdComparator": ">",
+    "excludeHitsFromPreviousRun": true,
+    "aggType": "count",
+    "groupBy": "all"
+  },
+  "actions": []
+}
