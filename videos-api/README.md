@@ -252,3 +252,25 @@ FC3, consultado lendo o repositório. Ele **informa, não decide**, e as diverg�
 | papéis | um por agregado, mais assinante | assinante e administrador, só |
 | papel da mutation | o mesmo das leituras | administrador |
 | teto de `perPage` | não há | 1 a 100, pedido fora é recusado |
+| token para chamar o admin | cinco classes e um job, à mão | `OAuth2AuthorizedClientManager` do Spring |
+| cache da busca no admin | `@Cacheable` por id, com TTL | **não há**, de propósito — veja abaixo |
+| resiliência | `@CircuitBreaker`, `@Bulkhead` e `@Retry` no cliente | `@RetryableTopic` e fila morta |
+
+### Por que não há cache na busca ao admin
+
+O curso guarda em cache o retorno de `categoryOfId` e dos irmãos dele. Aqui não, e a razão é que
+esses clientes são chamados **só pelos listeners do Kafka** — ou seja, em cima da busca da fonte da
+verdade, no caminho da replicação.
+
+Com cache, duas alterações seguidas no mesmo registro quebram a réplica: a primeira busca guarda o
+valor, a segunda recebe o guardado e replica a versão velha. E **expirar o cache não conserta**,
+porque nada reconsulta: o listener só age quando chega evento, e o evento já passou. A réplica fica
+errada até alguém mexer naquele registro de novo, por outro motivo.
+
+O ganho também é menor do que parece: uma alteração em lote de 500 registros são 500 ids
+diferentes, e cache por id não ajuda nisso. Ele só ajudaria em chamadas repetidas ao mesmo id, que
+é justamente quando queremos o valor novo.
+
+O mesmo raciocínio pesa contra o circuit breaker: ele existe para não pendurar quem espera uma
+resposta, e aqui ninguém espera — a chamada está num consumidor de fila, onde demorar não machuca,
+e o backoff do `@RetryableTopic` já evita a martelada.
