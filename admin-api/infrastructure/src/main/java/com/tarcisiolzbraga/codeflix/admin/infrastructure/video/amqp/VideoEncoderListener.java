@@ -3,6 +3,7 @@ package com.tarcisiolzbraga.codeflix.admin.infrastructure.video.amqp;
 import com.tarcisiolzbraga.codeflix.admin.application.video.media.update.UpdateMediaStatusCommand;
 import com.tarcisiolzbraga.codeflix.admin.application.video.media.update.UpdateMediaStatusUseCase;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.MediaStatus;
+import com.tarcisiolzbraga.codeflix.admin.domain.exceptions.NotFoundException;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoMediaType;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.VideoEncoderCompleted;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.VideoEncoderError;
@@ -18,8 +19,14 @@ import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
-// Ouve o retorno do codificador. Mensagem que não dá para entender é registrada e descartada, nunca
-// devolvida à fila: sem isso ela voltaria para sempre, e o consumidor não sairia do lugar.
+// Ouve o retorno do codificador. Mensagem que não leva a lugar nenhum é registrada e descartada,
+// nunca devolvida à fila: sem isso ela voltaria para sempre, e o consumidor não sairia do lugar.
+//
+// São três os casos, e vale dizer por que o terceiro existe. Ilegível e tipo desconhecido são
+// óbvios. O terceiro é a resposta bem formada sobre um vídeo que não está mais aqui — apagado
+// entre o envio e a resposta, ou de outro ambiente. Ela se lê perfeitamente, e por isso escapava:
+// a NotFoundException subia do caso de uso, saía deste método, e o Spring devolvia a mensagem à
+// fila por padrão. O resultado era laço quente, com a mesma mensagem falhando sem parar.
 @Component
 public class VideoEncoderListener {
 
@@ -29,6 +36,7 @@ public class VideoEncoderListener {
     private static final String UNREADABLE_MESSAGE = "[message:video.encoded] [status:unreadable] [payload:{}]";
     private static final String UNKNOWN_TYPE_MESSAGE = "[message:video.encoded] [status:unknownType] [payload:{}]";
     private static final String ENCODER_ERROR_MESSAGE = "[message:video.encoded] [status:error] [payload:{}]";
+    private static final String UNKNOWN_VIDEO_MESSAGE = "[message:video.encoded] [status:unknownVideo] [payload:{}]";
 
     private final UpdateMediaStatusUseCase updateMediaStatusUseCase;
     private final ObjectMapper objectMapper;
@@ -61,15 +69,26 @@ public class VideoEncoderListener {
             return;
         }
         switch (result) {
-            case VideoEncoderCompleted completed -> execute(completed, type.get(), MediaStatus.COMPLETED);
-            case VideoEncoderProcessing processing -> execute(processing, type.get(), MediaStatus.PROCESSING);
+            case VideoEncoderCompleted completed -> execute(completed, type.get(), MediaStatus.COMPLETED, message);
+            case VideoEncoderProcessing processing -> execute(processing, type.get(), MediaStatus.PROCESSING, message);
             case VideoEncoderError _ -> log.error(ENCODER_ERROR_MESSAGE, message);
         }
     }
 
-    private void execute(final VideoEncoderResult result, final VideoMediaType type, final MediaStatus status) {
+    // Vídeo que não existe é tratado como mensagem sem destino, e não como falha a repetir: tentar
+    // de novo daria no mesmo, e a mensagem voltaria para sempre. Só a NotFoundException é capturada
+    // — falha de banco ou de rede continua subindo, porque essa sim melhora numa segunda tentativa.
+    private void execute(
+            final VideoEncoderResult result,
+            final VideoMediaType type,
+            final MediaStatus status,
+            final String message) {
         final var encodedPath = result instanceof VideoEncoderCompleted completed ? completed.encodedPath() : "";
-        this.updateMediaStatusUseCase.execute(
-                new UpdateMediaStatusCommand(result.videoId(), type, status, result.checksum(), encodedPath));
+        try {
+            this.updateMediaStatusUseCase.execute(
+                    new UpdateMediaStatusCommand(result.videoId(), type, status, result.checksum(), encodedPath));
+        } catch (final NotFoundException exception) {
+            log.error(UNKNOWN_VIDEO_MESSAGE, message);
+        }
     }
 }

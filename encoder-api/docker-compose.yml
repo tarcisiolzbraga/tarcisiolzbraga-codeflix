@@ -1,7 +1,19 @@
 # O codificador de vídeo. Diferente dos dois serviços Java, a imagem compila o código dentro dela:
 # Go compila rápido, e assim gerar a imagem não exige ter o Go instalado.
+# Teto do log de cada container. Sem isto o Docker guarda o json-file sem limite nenhum, e um
+# serviço em laço enche o disco: aconteceu, com 73 GB num container só.
+#
+# 50 MB por arquivo e 5 arquivos dão 250 MB por container — folgado para investigar um problema de
+# dias atrás, e três ordens de grandeza abaixo do que um laço é capaz de escrever.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   encoder-api:
+    logging: *logging
     build:
       context: .
       dockerfile: Dockerfile
@@ -30,6 +42,7 @@ services:
   # Banco só do encoder, separado do MySQL do admin: são serviços diferentes, e o estado de um não
   # é assunto do outro. O curso também usa Postgres aqui.
   encoder-postgres:
+    logging: *logging
     image: postgres:17-alpine
     container_name: adm_videos_encoder_postgres
     environment:

@@ -9,8 +9,20 @@
 # O segredo do client não fica no arquivo versionado: o Keycloak não substitui variável de
 # ambiente dentro do import, então a troca é feita aqui, antes de ele ler o arquivo. A
 # substituição é a do bash, que trata o valor como texto literal e não interpreta nada dele.
+# Teto do log de cada container. Sem isto o Docker guarda o json-file sem limite nenhum, e um
+# serviço em laço enche o disco: aconteceu, com 73 GB num container só.
+#
+# 50 MB por arquivo e 5 arquivos dão 250 MB por container — folgado para investigar um problema de
+# dias atrás, e três ordens de grandeza abaixo do que um laço é capaz de escrever.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   keycloak:
+    logging: *logging
     image: quay.io/keycloak/keycloak:26.8.0
     container_name: adm_videos_keycloak
     environment:

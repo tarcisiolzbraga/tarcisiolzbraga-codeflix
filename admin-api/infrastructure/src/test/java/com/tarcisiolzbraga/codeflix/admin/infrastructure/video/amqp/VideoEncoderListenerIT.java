@@ -1,6 +1,10 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.video.amqp;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.mockingDetails;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.video.AudioVideoMedia;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.MediaStatus;
@@ -9,6 +13,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoFixture;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoID;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
+import com.tarcisiolzbraga.codeflix.admin.application.video.media.update.UpdateMediaStatusUseCase;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.configuration.AmqpProperties;
 import java.time.Duration;
 import java.time.Instant;
@@ -16,6 +21,7 @@ import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 // A jornada da fila: a mensagem entra pelo broker de verdade e o vídeo muda no banco de verdade.
 @IntegrationTest
@@ -32,6 +38,11 @@ class VideoEncoderListenerIT {
 
     @Autowired
     private AmqpProperties amqpProperties;
+
+    // Espião, e não dublê: o comportamento real é o que faz a NotFoundException subir. O que se
+    // quer dele é só a contagem de chamadas.
+    @MockitoSpyBean
+    private UpdateMediaStatusUseCase updateMediaStatusUseCase;
 
     @Test
     void givenACompletedMessage_whenTheEncoderSendsIt_thenTheVideoKeepsTheEncodedPath() {
@@ -67,6 +78,27 @@ class VideoEncoderListenerIT {
 
         final var actualMedia = awaitMedia(video.getId(), media -> media.status() == MediaStatus.COMPLETED);
         assertEquals("encoded/duna.mp4", actualMedia.encodedLocation());
+    }
+
+    // A resposta se lê perfeitamente, mas fala de um vídeo que não está aqui — apagado entre o
+    // envio e a resposta, ou vindo de outro ambiente. A NotFoundException subia do caso de uso e o
+    // Spring devolvia a mensagem à fila, que voltava e falhava sem parar.
+    //
+    // O que denuncia o laço é a CONTAGEM, não o resultado: mesmo em laço o consumidor processa as
+    // outras mensagens no meio, então "continua funcionando" passa dos dois jeitos. Uma única
+    // chamada ao caso de uso é o que prova que a mensagem foi descartada em vez de recircular.
+    @Test
+    void givenAnAnswerForAVideoThatIsNotHere_whenTheEncoderSendsIt_thenProcessItOnceAndDropIt() {
+        final var fantasma = VideoID.unique().getValue();
+
+        send("""
+                {"status":"COMPLETED","videoId":"%s","type":"VIDEO","checksum":"abc1",\
+"encodedPath":"encoded/fantasma.mp4"}"""
+                .formatted(fantasma));
+
+        awaitAtLeastOneCall();
+        sleepFor(Duration.ofSeconds(2));
+        verify(this.updateMediaStatusUseCase, times(1)).execute(argThat(command -> fantasma.equals(command.videoId())));
     }
 
     @Test
@@ -110,6 +142,26 @@ class VideoEncoderListenerIT {
             sleep();
         }
         throw new AssertionError("a mídia não chegou ao estado esperado: " + media);
+    }
+
+    private void awaitAtLeastOneCall() {
+        final var deadline = Instant.now().plus(TIMEOUT);
+        while (Instant.now().isBefore(deadline)) {
+            if (!mockingDetails(this.updateMediaStatusUseCase).getInvocations().isEmpty()) {
+                return;
+            }
+            sleep();
+        }
+        throw new AssertionError("o caso de uso nunca foi chamado");
+    }
+
+    private void sleepFor(final Duration duration) {
+        try {
+            Thread.sleep(duration.toMillis());
+        } catch (final InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(exception);
+        }
     }
 
     private void sleep() {
