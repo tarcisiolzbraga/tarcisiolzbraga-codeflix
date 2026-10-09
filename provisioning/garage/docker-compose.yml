@@ -1,8 +1,20 @@
 # Armazenamento das mídias, compatível com S3. --single-node monta o layout sozinho e
 # --default-bucket cria o bucket e a chave com as credenciais abaixo; sem isso o Garage
 # sobe sem layout e recusa toda requisição. A permissão é por chave e por bucket.
+# Teto do log de cada container. Sem isto o Docker guarda o json-file sem limite nenhum, e um
+# serviço em laço enche o disco: aconteceu, com 73 GB num container só.
+#
+# 50 MB por arquivo e 5 arquivos dão 250 MB por container — folgado para investigar um problema de
+# dias atrás, e três ordens de grandeza abaixo do que um laço é capaz de escrever.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   garage:
+    logging: *logging
     image: dxflrs/garage:v2.3.0
     container_name: adm_videos_garage
     entrypoint: ["/garage"]

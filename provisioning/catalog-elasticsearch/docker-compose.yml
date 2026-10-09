@@ -1,8 +1,20 @@
 # O armazenamento de leitura do catálogo. É um Elasticsearch separado do que a observabilidade
 # sobe: aquele guarda log, este guarda catálogo, e juntá-los faria uma recarga de índice de um
 # apagar o do outro. Por isso o nome: `elasticsearch`, sem prefixo, é o da observabilidade.
+# Teto do log de cada container. Sem isto o Docker guarda o json-file sem limite nenhum, e um
+# serviço em laço enche o disco: aconteceu, com 73 GB num container só.
+#
+# 50 MB por arquivo e 5 arquivos dão 250 MB por container — folgado para investigar um problema de
+# dias atrás, e três ordens de grandeza abaixo do que um laço é capaz de escrever.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   catalog-elasticsearch:
+    logging: *logging
     image: docker.elastic.co/elasticsearch/elasticsearch:9.5.4
     container_name: videos_api_elasticsearch
     environment:

@@ -1,7 +1,19 @@
 # O catálogo servido ao usuário final. O jar vem do host: rodar `./gradlew bootJar` nesta pasta
 # antes de `docker compose up -d --build videos-api`, da raiz do monorepo.
+# Teto do log de cada container. Sem isto o Docker guarda o json-file sem limite nenhum, e um
+# serviço em laço enche o disco: aconteceu, com 73 GB num container só.
+#
+# 50 MB por arquivo e 5 arquivos dão 250 MB por container — folgado para investigar um problema de
+# dias atrás, e três ordens de grandeza abaixo do que um laço é capaz de escrever.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   videos-api:
+    logging: *logging
     build:
       context: .
       dockerfile: Dockerfile

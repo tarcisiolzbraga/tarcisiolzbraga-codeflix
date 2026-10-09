@@ -3,8 +3,20 @@
 # `docker compose --profile observability up -d`. O Elasticsearch sozinho quer meio giga de heap.
 #
 # Uma rede à parte não é necessária: a rede padrão do projeto já liga todos pelo nome do serviço.
+# Teto do log de cada container. Sem isto o Docker guarda o json-file sem limite nenhum, e um
+# serviço em laço enche o disco: aconteceu, com 73 GB num container só.
+#
+# 50 MB por arquivo e 5 arquivos dão 250 MB por container — folgado para investigar um problema de
+# dias atrás, e três ordens de grandeza abaixo do que um laço é capaz de escrever.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
 services:
   elasticsearch:
+    logging: *logging
     image: docker.elastic.co/elasticsearch/elasticsearch:9.5.4
     container_name: adm_videos_elasticsearch
     profiles: ["observability"]
@@ -21,6 +33,7 @@ services:
       - elasticsearch_data:/usr/share/elasticsearch/data
 
   kibana:
+    logging: *logging
     image: docker.elastic.co/kibana/kibana:9.5.4
     container_name: adm_videos_kibana
     profiles: ["observability"]
@@ -37,6 +50,7 @@ services:
       - elasticsearch
 
   logstash:
+    logging: *logging
     image: docker.elastic.co/logstash/logstash:9.5.4
     container_name: adm_videos_logstash
     profiles: ["observability"]
@@ -49,6 +63,7 @@ services:
       - elasticsearch
 
   filebeat:
+    logging: *logging
     image: docker.elastic.co/beats/filebeat:9.5.4
     container_name: adm_videos_filebeat
     profiles: ["observability"]
