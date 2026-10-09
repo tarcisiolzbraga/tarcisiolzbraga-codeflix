@@ -58,6 +58,14 @@ Esgotadas as tentativas (`ENCODER_MAX_ATTEMPTS`, cinco por padrão), o encoder *
 `ERROR` antes de desistir. Isso não é detalhe: o admin só tira a mídia de `PROCESSING` quando o
 encoder responde, e desistir calado a deixaria presa para sempre.
 
+## Log
+
+Em ECS, com os mesmos nomes de campo dos serviços Java — `@timestamp`, `log.level`, `message`,
+`service.name`. Não é preciosismo: a pilha de observabilidade consulta por esses nomes. O alerta da
+fila morta filtra por `log.level`, o Logstash extrai pares de `message`, e o Kibana agrupa por
+`service.name`. Com os nomes que o `slog` usa por padrão — `time`, `level`, `msg` — o log chegaria
+ao Elasticsearch sem se misturar com o resto: apareceria, e não seria encontrável.
+
 ## Decisões
 
 A referência é o [microsservico-encoder](https://github.com/codeedu/microsservico-encoder) do curso,

@@ -173,3 +173,49 @@ func EhPassageiro(err error) bool {
 	}
 	return !errors.Is(err, storage.ErrNotFound) && !errors.Is(err, domain.ErrUnknownMediaType)
 }
+
+// Decisao é o que fazer com uma mensagem depois de processada.
+type Decisao int
+
+const (
+	// Confirmar: deu certo, ou falhou de um jeito que não melhora. A mensagem sai da fila.
+	Confirmar Decisao = iota
+	// Reagendar: falha passageira com tentativas sobrando. Volta depois do atraso.
+	Reagendar
+	// Desistir: tentativas esgotadas. Avisa o admin e tira da fila.
+	Desistir
+	// Descartar: falha definitiva de processamento, sem a quem responder.
+	Descartar
+)
+
+// Decidir separa a política da fiação. Estava dentro do main, onde não havia como exercitá-la: a
+// escada de tentativas só tinha teste nas peças, e nunca na decisão que as combina.
+func Decidir(err error, tentativaAtual, maxTentativas int) Decisao {
+	switch {
+	case err == nil:
+		return Confirmar
+	case !EhPassageiro(err):
+		return Descartar
+	case tentativaAtual+1 > maxTentativas:
+		return Desistir
+	default:
+		return Reagendar
+	}
+}
+
+// AtrasoDe dobra a cada tentativa, com teto. É a mesma forma da escada da videos-api: cresce rápido
+// o bastante para cobrir uma indisponibilidade, e o teto evita esperas absurdas.
+func AtrasoDe(tentativa int) time.Duration {
+	if tentativa < 1 {
+		tentativa = 1
+	}
+	// O deslocamento estoura o int64 bem antes disto, e o teto já cobre qualquer valor grande.
+	if tentativa > 20 {
+		return time.Minute
+	}
+	atraso := time.Second << (tentativa - 1)
+	if atraso > time.Minute {
+		return time.Minute
+	}
+	return atraso
+}

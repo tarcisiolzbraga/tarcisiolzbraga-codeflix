@@ -227,3 +227,49 @@ func Test_givenAnUnreadableNotice_whenReportFailure_thenSayThereIsNobodyToTell(t
 		t.Error("não devia publicar resposta nenhuma")
 	}
 }
+
+// A escada de tentativas tinha teste nas peças — a fila devolve depois do atraso, o serviço avisa
+// o admin —, mas a decisão que as combina vivia dentro do main e não era exercitada por nada.
+func Test_givenAFailureAndAnAttemptCount_whenDecide_thenChooseWhatToDo(t *testing.T) {
+	passageiro := errors.New("connection refused")
+	casos := []struct {
+		nome      string
+		err       error
+		tentativa int
+		max       int
+		esperado  service.Decisao
+	}{
+		{"sucesso", nil, 0, 5, service.Confirmar},
+		{"passageiro com folga", passageiro, 0, 5, service.Reagendar},
+		{"passageiro na última", passageiro, 4, 5, service.Reagendar},
+		{"passageiro esgotado", passageiro, 5, 5, service.Desistir},
+		{"passageiro além do teto", passageiro, 9, 5, service.Desistir},
+		{"definitivo não insiste", storage.ErrNotFound, 0, 5, service.Descartar},
+		{"tipo desconhecido não insiste", domain.ErrUnknownMediaType, 0, 5, service.Descartar},
+	}
+	for _, caso := range casos {
+		t.Run(caso.nome, func(t *testing.T) {
+			actual := service.Decidir(caso.err, caso.tentativa, caso.max)
+
+			if actual != caso.esperado {
+				t.Errorf("esperava %v, veio %v", caso.esperado, actual)
+			}
+		})
+	}
+}
+
+// O atraso dobra e tem teto. O teto importa: sem ele a espera cresceria até valores absurdos, e o
+// deslocamento acabaria estourando o inteiro.
+func Test_givenAnAttemptNumber_whenAskTheDelay_thenDoubleUpToTheCap(t *testing.T) {
+	esperados := map[int]time.Duration{
+		1: time.Second, 2: 2 * time.Second, 3: 4 * time.Second,
+		6: 32 * time.Second, 7: time.Minute, 60: time.Minute,
+	}
+	for tentativa, esperado := range esperados {
+		actual := service.AtrasoDe(tentativa)
+
+		if actual != esperado {
+			t.Errorf("tentativa %d: esperava %v, veio %v", tentativa, esperado, actual)
+		}
+	}
+}
