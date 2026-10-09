@@ -86,7 +86,8 @@ func rodar(ctx context.Context, log *slog.Logger) error {
 	}
 
 	operarios := inteiro("ENCODER_WORKERS", 2)
-	log.Info("encoder no ar", "operários", operarios)
+	maxTentativas := inteiro("ENCODER_MAX_ATTEMPTS", 5)
+	log.Info("encoder no ar", "operários", operarios, "tentativas", maxTentativas)
 
 	var grupo sync.WaitGroup
 	for i := 0; i < operarios; i++ {
@@ -94,7 +95,7 @@ func rodar(ctx context.Context, log *slog.Logger) error {
 		go func() {
 			defer grupo.Done()
 			for entrega := range entregas {
-				processar(ctx, encoder, entrega, log)
+				processar(ctx, encoder, fila, entrega, maxTentativas, log)
 			}
 		}()
 	}
@@ -105,24 +106,61 @@ func rodar(ctx context.Context, log *slog.Logger) error {
 	return nil
 }
 
-func processar(ctx context.Context, encoder *service.Encoder, entrega queue.Delivery, log *slog.Logger) {
+func processar(ctx context.Context, encoder *service.Encoder, fila *queue.Client, entrega queue.Delivery, maxTentativas int, log *slog.Logger) {
 	err := encoder.Handle(ctx, entrega.Body)
+
 	switch {
 	case err == nil:
-		if err := entrega.Ack(); err != nil {
-			log.Error("não deu para confirmar a mensagem", "erro", err)
-		}
+		confirmar(entrega, log)
+
 	case service.EhPassageiro(err):
-		log.Warn("falha passageira; a mensagem volta para a fila", "erro", err)
-		if err := entrega.Requeue(); err != nil {
-			log.Error("não deu para devolver a mensagem", "erro", err)
+		proxima := entrega.Attempt + 1
+		if proxima > maxTentativas {
+			// Desistir calado deixaria a mídia em PROCESSING para sempre, porque o admin só sai
+			// desse estado quando o encoder responde. Avisar é o que fecha o ciclo.
+			log.Error("tentativas esgotadas; avisando o admin", "tentativas", entrega.Attempt, "erro", err)
+			if err := encoder.ReportFailure(ctx, entrega.Body, "tentativas esgotadas: "+err.Error()); err != nil {
+				log.Error("não deu nem para avisar o admin", "erro", err)
+			}
+			confirmar(entrega, log)
+			return
 		}
+		atraso := atrasoDe(proxima)
+		log.Warn("falha passageira; nova tentativa agendada",
+			"tentativa", proxima, "atraso", atraso.String(), "erro", err)
+		// Agenda e confirma: a mensagem sai desta fila e reaparece sozinha depois do atraso. Sem
+		// isso, Requeue a devolveria na hora e o laço giraria quente até alguém intervir.
+		if err := fila.Retry(ctx, entrega.Body, proxima, atraso); err != nil {
+			log.Error("não deu para agendar; devolvendo à fila", "erro", err)
+			if err := entrega.Requeue(); err != nil {
+				log.Error("não deu nem para devolver", "erro", err)
+			}
+			return
+		}
+		confirmar(entrega, log)
+
 	default:
 		log.Error("falha definitiva; a mensagem é descartada", "erro", err)
 		if err := entrega.Discard(); err != nil {
 			log.Error("não deu para descartar a mensagem", "erro", err)
 		}
 	}
+}
+
+func confirmar(entrega queue.Delivery, log *slog.Logger) {
+	if err := entrega.Ack(); err != nil {
+		log.Error("não deu para confirmar a mensagem", "erro", err)
+	}
+}
+
+// atrasoDe dobra a cada tentativa, com teto. É a mesma forma da escada da videos-api: cresce
+// rápido o bastante para cobrir uma indisponibilidade, e o teto evita esperas absurdas.
+func atrasoDe(tentativa int) time.Duration {
+	atraso := time.Second << (tentativa - 1)
+	if atraso > time.Minute {
+		return time.Minute
+	}
+	return atraso
 }
 
 // obrigatoria derruba a subida quando falta configuração, em vez de deixar o encoder rodar

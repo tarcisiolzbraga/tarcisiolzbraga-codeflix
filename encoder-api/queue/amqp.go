@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -23,6 +24,14 @@ const (
 	Exchange          = "video.events"
 	CreatedQueue      = "video.created.queue"
 	EncodedRoutingKey = "video.encoded"
+
+	// A fila de espera é nossa, não do contrato com o admin: ela não tem consumidor. A mensagem
+	// fica ali o tempo do TTL e, ao expirar, o próprio broker a devolve para video.created.queue.
+	// É isso que dá a escada de tentativas sem ninguém ficar dormindo segurando um operário.
+	RetryQueue = "video.encoder.retry.queue"
+	// O cabeçalho que conta as tentativas. Sem ele não há como desistir, e a mensagem circularia
+	// para sempre entre a fila de espera e a principal.
+	AttemptHeader = "x-encoder-attempt"
 )
 
 type Config struct {
@@ -88,6 +97,35 @@ func (c *Client) DeclareTopology() error {
 			return fmt.Errorf("%w: binding %s: %w", ErrQueue, fila, err)
 		}
 	}
+
+	// Sem binding e sem consumidor: nada é roteado para cá, a mensagem é publicada direto na fila.
+	// Ao expirar, o x-dead-letter a manda de volta para a principal.
+	if _, err := c.channel.QueueDeclare(RetryQueue, true, false, false, false, amqp.Table{
+		"x-dead-letter-exchange":    Exchange,
+		"x-dead-letter-routing-key": "video.created",
+	}); err != nil {
+		return fmt.Errorf("%w: fila de espera: %w", ErrQueue, err)
+	}
+	return nil
+}
+
+// Retry põe a mensagem na fila de espera, de onde o broker a devolve sozinho depois do atraso.
+//
+// O TTL vai por mensagem, e não na fila: assim uma fila só atende todos os degraus da escada, em
+// vez de uma fila por atraso.
+func (c *Client) Retry(ctx context.Context, payload []byte, tentativa int, atraso time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	err := c.channel.PublishWithContext(ctx, "", RetryQueue, false, false, amqp.Publishing{
+		ContentType:  "application/json",
+		DeliveryMode: amqp.Persistent,
+		Expiration:   strconv.FormatInt(atraso.Milliseconds(), 10),
+		Headers:      amqp.Table{AttemptHeader: int32(tentativa)},
+		Body:         payload,
+	})
+	if err != nil {
+		return fmt.Errorf("%w: agendar nova tentativa: %w", ErrQueue, err)
+	}
 	return nil
 }
 
@@ -112,7 +150,10 @@ func (c *Client) Publish(ctx context.Context, payload []byte) error {
 // Delivery é uma mensagem recebida, com o reconhecimento na mão de quem a processa.
 type Delivery struct {
 	Body []byte
-	raw  amqp.Delivery
+	// Attempt é quantas vezes esta mensagem já foi tentada. Zero na primeira vez: o cabeçalho só
+	// existe depois de a mensagem passar pela fila de espera.
+	Attempt int
+	raw     amqp.Delivery
 }
 
 // Ack confirma: a mensagem sai da fila.
@@ -145,7 +186,7 @@ func (c *Client) Consume(ctx context.Context, consumidor string) (<-chan Deliver
 					return
 				}
 				select {
-				case saida <- Delivery{Body: entrega.Body, raw: entrega}:
+				case saida <- Delivery{Body: entrega.Body, Attempt: tentativaDe(entrega), raw: entrega}:
 				case <-ctx.Done():
 					return
 				}
@@ -153,4 +194,23 @@ func (c *Client) Consume(ctx context.Context, consumidor string) (<-chan Deliver
 		}
 	}()
 	return saida, nil
+}
+
+// tentativaDe lê o contador do cabeçalho. O AMQP entrega inteiro em larguras diferentes conforme
+// quem publicou, então os casos cobrem as que aparecem na prática.
+func tentativaDe(entrega amqp.Delivery) int {
+	valor, tem := entrega.Headers[AttemptHeader]
+	if !tem {
+		return 0
+	}
+	switch n := valor.(type) {
+	case int32:
+		return int(n)
+	case int64:
+		return int(n)
+	case int:
+		return n
+	default:
+		return 0
+	}
 }

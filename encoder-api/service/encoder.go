@@ -102,6 +102,33 @@ func (e *Encoder) Handle(ctx context.Context, payload []byte) error {
 	return e.responder(ctx, job)
 }
 
+// ReportFailure avisa o admin de que esta mídia não vai converter.
+//
+// Existe para quando as tentativas se esgotam: o admin só tira a mídia de PROCESSING quando o
+// encoder responde, então desistir sem avisar a deixaria presa para sempre. Monta a resposta a
+// partir do aviso original porque, a essa altura, não há trabalho em memória.
+func (e *Encoder) ReportFailure(ctx context.Context, payload []byte, motivo string) error {
+	media, err := messaging.ParseVideoMediaCreated(payload, e.Now())
+	if err != nil {
+		// Se nem dá para ler o aviso, não há a quem responder: o admin precisa de videoId, type e
+		// checksum para saber de qual envio a resposta fala.
+		return fmt.Errorf("aviso ilegível, sem a quem responder: %w", err)
+	}
+
+	job, err := domain.NewJob("", media, e.Now())
+	if err != nil {
+		// O caminho de saída é vazio porque não houve saída; o construtor o exige, então o erro é
+		// montado à mão.
+		job = &domain.Job{Media: media, Status: domain.StatusError, Error: motivo, CreatedAt: e.Now()}
+	} else if err := job.Fail(motivo, e.Now()); err != nil {
+		return err
+	}
+	job.Status = domain.StatusError
+	job.Error = motivo
+
+	return e.responder(ctx, job)
+}
+
 // converter faz o trabalho em si, numa pasta temporária que some no fim.
 func (e *Encoder) converter(ctx context.Context, job *domain.Job) error {
 	trabalho, err := os.MkdirTemp(e.WorkDir, "job-")

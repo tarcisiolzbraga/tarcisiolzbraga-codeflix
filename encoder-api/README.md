@@ -40,6 +40,24 @@ Pelo compose, da raiz do monorepo:
 docker compose up -d encoder-api
 ```
 
+## Quando a conversão falha
+
+Nem toda falha merece o mesmo tratamento, e o encoder separa três:
+
+| | O que é | O que acontece |
+|---|---|---|
+| aviso ilegível | JSON quebrado, tipo desconhecido | descartado; não há a quem responder |
+| falha definitiva | arquivo não existe no Garage | vira `ERROR` para o admin |
+| falha passageira | Garage ou banco fora do ar | nova tentativa, com espera |
+
+A espera não é um `sleep` segurando o operário: a mensagem vai para uma **fila de espera com TTL**,
+sem consumidor, e o próprio broker a devolve quando o tempo passa. O atraso dobra a cada tentativa
+— 1s, 2s, 4s… — com teto de um minuto, e um cabeçalho conta as tentativas.
+
+Esgotadas as tentativas (`ENCODER_MAX_ATTEMPTS`, cinco por padrão), o encoder **avisa o admin** com
+`ERROR` antes de desistir. Isso não é detalhe: o admin só tira a mídia de `PROCESSING` quando o
+encoder responde, e desistir calado a deixaria presa para sempre.
+
 ## Decisões
 
 A referência é o [microsservico-encoder](https://github.com/codeedu/microsservico-encoder) do curso,

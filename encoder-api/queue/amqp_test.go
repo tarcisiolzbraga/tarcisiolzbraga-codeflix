@@ -163,3 +163,58 @@ func lerDaFilaDoAdmin(t *testing.T, cfg queue.Config) string {
 	t.Fatal("a resposta não apareceu em video.encoded.queue")
 	return ""
 }
+
+// O defeito que isto conserta: antes, falha passageira voltava à fila na hora e o laço girava
+// quente. Agora a mensagem espera na fila de espera e o próprio broker a devolve.
+func Test_givenATransientFailure_whenScheduleRetry_thenItComesBackAfterTheDelay(t *testing.T) {
+	cliente, _ := umCliente(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	entregas, err := cliente.Consume(ctx, "teste-espera")
+	if err != nil {
+		t.Fatalf("não deu para consumir: %v", err)
+	}
+
+	if err := cliente.Retry(ctx, []byte(`{"videoId":"v1"}`), 1, 1500*time.Millisecond); err != nil {
+		t.Fatalf("não deu para agendar: %v", err)
+	}
+
+	select {
+	case <-entregas:
+		t.Fatal("não devia voltar antes do atraso")
+	case <-time.After(700 * time.Millisecond):
+	}
+	select {
+	case devolvida := <-entregas:
+		if string(devolvida.Body) != `{"videoId":"v1"}` {
+			t.Errorf("voltou diferente: %s", devolvida.Body)
+		}
+		if devolvida.Attempt != 1 {
+			t.Errorf("a contagem devia sobreviver à ida e volta, veio %d", devolvida.Attempt)
+		}
+		_ = devolvida.Ack()
+	case <-ctx.Done():
+		t.Fatal("a mensagem não voltou depois do atraso")
+	}
+}
+
+// Sem o contador sobrevivendo, não há como desistir, e a mensagem circularia para sempre entre a
+// fila de espera e a principal.
+func Test_givenSeveralRetries_whenEachComesBack_thenTheCountGrows(t *testing.T) {
+	cliente, _ := umCliente(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	entregas, _ := cliente.Consume(ctx, "teste-contagem")
+
+	_ = cliente.Retry(ctx, []byte(`{"videoId":"v1"}`), 3, 300*time.Millisecond)
+
+	select {
+	case devolvida := <-entregas:
+		if devolvida.Attempt != 3 {
+			t.Errorf("esperava 3, veio %d", devolvida.Attempt)
+		}
+		_ = devolvida.Ack()
+	case <-ctx.Done():
+		t.Fatal("a mensagem não voltou")
+	}
+}

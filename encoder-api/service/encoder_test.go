@@ -68,8 +68,12 @@ func umEncoder(t *testing.T, d *dubles) *service.Encoder {
 		Storage: d, Uploader: d, Converter: d, Publisher: d, Repository: d,
 		WorkDir: t.TempDir(),
 		Now:     func() time.Time { return agora },
-		Log:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Log:     umLogSilencioso(),
 	}
+}
+
+func umLogSilencioso() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 func statusDe(t *testing.T, payload []byte) string {
@@ -181,5 +185,45 @@ func Test_givenDifferentFailures_whenAskIfTransient_thenTellThemApart(t *testing
 				t.Errorf("esperava %v, veio %v", caso.passageiro, actual)
 			}
 		})
+	}
+}
+
+// Desistir calado deixaria a mídia em PROCESSING para sempre: o admin só sai desse estado quando o
+// encoder responde.
+func Test_givenExhaustedAttempts_whenReportFailure_thenTellTheAdmin(t *testing.T) {
+	d := &dubles{}
+
+	err := umEncoder(t, d).ReportFailure(context.Background(), []byte(avisoValido), "tentativas esgotadas")
+
+	if err != nil {
+		t.Fatalf("não esperava erro, veio %v", err)
+	}
+	if len(d.respostas) != 1 {
+		t.Fatalf("esperava uma resposta, vieram %d", len(d.respostas))
+	}
+	var m map[string]any
+	_ = json.Unmarshal(d.respostas[0], &m)
+	if m["status"] != "ERROR" {
+		t.Errorf("esperava ERROR, veio %v", m["status"])
+	}
+	if m["message"] != "tentativas esgotadas" {
+		t.Errorf("o motivo devia viajar junto, veio %v", m["message"])
+	}
+	// O checksum é o que permite ao admin saber de qual envio esta desistência fala.
+	if m["checksum"] != "abc123" {
+		t.Errorf("o checksum devia voltar, veio %v", m["checksum"])
+	}
+}
+
+func Test_givenAnUnreadableNotice_whenReportFailure_thenSayThereIsNobodyToTell(t *testing.T) {
+	d := &dubles{}
+
+	err := umEncoder(t, d).ReportFailure(context.Background(), []byte("lixo"), "qualquer")
+
+	if err == nil {
+		t.Error("sem videoId e checksum não há a quem responder")
+	}
+	if len(d.respostas) != 0 {
+		t.Error("não devia publicar resposta nenhuma")
 	}
 }
