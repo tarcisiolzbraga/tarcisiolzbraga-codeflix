@@ -1,0 +1,5 @@
+# O build acontece dentro da imagem, então o contexto precisa do código — mas não do que é só
+# resultado local.
+coverage.out
+*.out
+.git
