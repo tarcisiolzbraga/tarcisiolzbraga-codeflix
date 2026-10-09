@@ -7,7 +7,7 @@ Os serviços de back-end do Codeflix, num repositório só. Cada serviço tem o 
 |---|---|---|
 | [`admin-api/`](admin-api/) | administra o catálogo: cria, edita e publica. É a fonte do dado. | 8080 |
 | [`videos-api/`](videos-api/) | serve o catálogo ao usuário final, replicando o que a `admin-api` publica. | 8082 |
-| `encoder-api/` | 🚧 ainda não existe: converte as mídias enviadas. | — |
+| [`encoder-api/`](encoder-api/) | converte as mídias que a `admin-api` recebe. Em Go. | — |
 | [`build-logic/`](build-logic/) | não é serviço: a configuração de build que os serviços Java dividem. | — |
 | [`provisioning/`](provisioning/) | não é serviço: os containers de apoio, um compose por parte. | — |
 

@@ -15,6 +15,7 @@ include:
   # os containers de apoio, que por sua vez incluem um compose por parte
   - path: provisioning/docker-compose.yml
 
-  # as duas aplicações, cada uma com o compose ao lado do próprio Dockerfile
+  # as aplicações, cada uma com o compose ao lado do próprio Dockerfile
   - path: admin-api/docker-compose.yml
   - path: videos-api/docker-compose.yml
+  - path: encoder-api/docker-compose.yml

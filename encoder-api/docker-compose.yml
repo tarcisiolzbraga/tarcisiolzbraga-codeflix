@@ -1,0 +1,52 @@
+# O codificador de vídeo. Diferente dos dois serviços Java, a imagem compila o código dentro dela:
+# Go compila rápido, e assim gerar a imagem não exige ter o Go instalado.
+services:
+  encoder-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: adm_videos_encoder
+    env_file:
+      - ../.env
+    environment:
+      # Dentro da rede do compose os serviços se acham pelo nome; o .env traz os valores de quem
+      # roda no host, e estas linhas os substituem.
+      DATABASE_URL: postgres://${ENCODER_DB_USER}:${ENCODER_DB_PASSWORD}@encoder-postgres:5432/${ENCODER_DB_NAME}?sslmode=disable
+      AMQP_URL: amqp://${AMQP_USER}:${AMQP_PASSWORD}@rabbitmq:5672/
+      STORAGE_ENDPOINT: http://garage:3900
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+    # service_healthy no banco, e não só started: o encoder conecta na subida e sai se não
+    # conseguir — esperar o container existir não basta, ele precisa estar aceitando conexão.
+    depends_on:
+      encoder-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      garage:
+        condition: service_started
+    labels:
+      filebeat_collector: "true"
+
+  # Banco só do encoder, separado do MySQL do admin: são serviços diferentes, e o estado de um não
+  # é assunto do outro. O curso também usa Postgres aqui.
+  encoder-postgres:
+    image: postgres:17-alpine
+    container_name: adm_videos_encoder_postgres
+    environment:
+      POSTGRES_USER: ${ENCODER_DB_USER}
+      POSTGRES_PASSWORD: ${ENCODER_DB_PASSWORD}
+      POSTGRES_DB: ${ENCODER_DB_NAME}
+    ports:
+      - "${ENCODER_DB_PORT}:5432"
+    volumes:
+      - encoder_postgres_data:/var/lib/postgresql/data
+    # pg_isready com o usuário e o banco certos: sem -U ele usa o do sistema e responde que não
+    # está pronto mesmo depois de estar.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ENCODER_DB_USER} -d ${ENCODER_DB_NAME}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  encoder_postgres_data:
