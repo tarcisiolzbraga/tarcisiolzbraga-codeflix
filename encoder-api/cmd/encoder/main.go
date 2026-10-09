@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/tarcisiolzbraga/codeflix/encoder/encoding"
+	"github.com/tarcisiolzbraga/codeflix/encoder/logging"
 	"github.com/tarcisiolzbraga/codeflix/encoder/persistence"
 	"github.com/tarcisiolzbraga/codeflix/encoder/queue"
 	"github.com/tarcisiolzbraga/codeflix/encoder/service"
@@ -19,7 +20,9 @@ import (
 )
 
 func main() {
-	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	// Em ECS, como os outros dois serviços: é por esses nomes de campo que a pilha de
+	// observabilidade consulta.
+	log := logging.New(os.Stdout, slog.LevelInfo, "encoder-api")
 
 	// SIGINT e SIGTERM: o primeiro é o Ctrl+C, o segundo é o que o Docker manda ao derrubar o
 	// container. Sem tratar o segundo, o encoder morreria no meio de uma conversão.
@@ -109,23 +112,22 @@ func rodar(ctx context.Context, log *slog.Logger) error {
 func processar(ctx context.Context, encoder *service.Encoder, fila *queue.Client, entrega queue.Delivery, maxTentativas int, log *slog.Logger) {
 	err := encoder.Handle(ctx, entrega.Body)
 
-	switch {
-	case err == nil:
+	switch service.Decidir(err, entrega.Attempt, maxTentativas) {
+	case service.Confirmar:
 		confirmar(entrega, log)
 
-	case service.EhPassageiro(err):
-		proxima := entrega.Attempt + 1
-		if proxima > maxTentativas {
-			// Desistir calado deixaria a mídia em PROCESSING para sempre, porque o admin só sai
-			// desse estado quando o encoder responde. Avisar é o que fecha o ciclo.
-			log.Error("tentativas esgotadas; avisando o admin", "tentativas", entrega.Attempt, "erro", err)
-			if err := encoder.ReportFailure(ctx, entrega.Body, "tentativas esgotadas: "+err.Error()); err != nil {
-				log.Error("não deu nem para avisar o admin", "erro", err)
-			}
-			confirmar(entrega, log)
-			return
+	case service.Desistir:
+		// Desistir calado deixaria a mídia em PROCESSING para sempre, porque o admin só sai desse
+		// estado quando o encoder responde. Avisar é o que fecha o ciclo.
+		log.Error("tentativas esgotadas; avisando o admin", "tentativas", entrega.Attempt, "erro", err)
+		if err := encoder.ReportFailure(ctx, entrega.Body, "tentativas esgotadas: "+err.Error()); err != nil {
+			log.Error("não deu nem para avisar o admin", "erro", err)
 		}
-		atraso := atrasoDe(proxima)
+		confirmar(entrega, log)
+
+	case service.Reagendar:
+		proxima := entrega.Attempt + 1
+		atraso := service.AtrasoDe(proxima)
 		log.Warn("falha passageira; nova tentativa agendada",
 			"tentativa", proxima, "atraso", atraso.String(), "erro", err)
 		// Agenda e confirma: a mensagem sai desta fila e reaparece sozinha depois do atraso. Sem
@@ -139,7 +141,7 @@ func processar(ctx context.Context, encoder *service.Encoder, fila *queue.Client
 		}
 		confirmar(entrega, log)
 
-	default:
+	case service.Descartar:
 		log.Error("falha definitiva; a mensagem é descartada", "erro", err)
 		if err := entrega.Discard(); err != nil {
 			log.Error("não deu para descartar a mensagem", "erro", err)
@@ -151,16 +153,6 @@ func confirmar(entrega queue.Delivery, log *slog.Logger) {
 	if err := entrega.Ack(); err != nil {
 		log.Error("não deu para confirmar a mensagem", "erro", err)
 	}
-}
-
-// atrasoDe dobra a cada tentativa, com teto. É a mesma forma da escada da videos-api: cresce
-// rápido o bastante para cobrir uma indisponibilidade, e o teto evita esperas absurdas.
-func atrasoDe(tentativa int) time.Duration {
-	atraso := time.Second << (tentativa - 1)
-	if atraso > time.Minute {
-		return time.Minute
-	}
-	return atraso
 }
 
 // obrigatoria derruba a subida quando falta configuração, em vez de deixar o encoder rodar
