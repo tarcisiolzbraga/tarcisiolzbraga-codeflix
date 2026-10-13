@@ -3,13 +3,13 @@
 # da raiz vale para todos — o compose o lê uma vez e interpola nos incluídos.
 #
 # Os profiles mantêm o `docker compose up -d` do dia a dia enxuto:
-#   (sem profile)            MySQL, RabbitMQ, Garage, Keycloak, o Elasticsearch do catálogo e as
-#                            duas aplicações
+#   (sem profile)            MySQL, RabbitMQ, Garage, Keycloak, o Elasticsearch do catálogo, o
+#                            MySQL da assinatura e as aplicações
 #   --profile cdc            Kafka e Kafka Connect, que alimentam o catálogo
 #   --profile observability  Elasticsearch de log, Kibana, Logstash e Filebeat
 #
-# As duas aplicações empacotam o jar no host, então antes de subi-las rode o bootJar da pasta de
-# cada uma. Para subir só a infraestrutura, nomeie os serviços:
+# As três aplicações Java empacotam o jar no host, então antes de subi-las rode o bootJar da pasta
+# de cada uma. Para subir só a infraestrutura, nomeie os serviços:
 #   docker compose up -d mysql rabbitmq garage keycloak catalog-elasticsearch
 include:
   # os containers de apoio, que por sua vez incluem um compose por parte
@@ -19,3 +19,4 @@ include:
   - path: admin-api/docker-compose.yml
   - path: videos-api/docker-compose.yml
   - path: encoder-api/docker-compose.yml
+  - path: subscription-api/docker-compose.yml
