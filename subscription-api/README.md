@@ -55,6 +55,18 @@ docker compose up -d subscription-api               # da raiz do monorepo
 ./gradlew bootJar               # build/libs/application.jar, na raiz do serviço
 ```
 
+## A coleção de requisições
+
+`.postman/subscription-api-codeflix.postman_collection.json` é a regressão manual da API, e só vale
+completa: rota nova entra nela no mesmo trabalho. Rode a pasta `0. Autenticação` primeiro — ela
+guarda o token nas variáveis da coleção, e as outras o usam.
+
+Preencha `clientSecret` com o `KEYCLOAK_CLIENT_SECRET` do `.env`; o arquivo versionado vai com o
+campo vazio.
+
+Como não há remoção de plano, a coleção não limpa o que cria: rodar de novo acrescenta planos, sem
+quebrar nada e sem depender do que ficou da execução anterior.
+
 ## Por que banco próprio
 
 O MySQL da `admin-api` já existe, já tem binlog ligado e já tem o usuário do Debezium: um schema a
@@ -96,6 +108,37 @@ não há task `flywayMigrate` separada como na referência do curso.
 
 Nunca editar migration já commitada: o checksum muda e o Flyway para em estado de reparação. O
 ajuste é uma migration nova.
+
+## As rotas do plano
+
+O plano é administração: quem o cria e altera é o operador do catálogo.
+
+| Rota | O que faz |
+|---|---|
+| `POST /plans` | cria. Sem o campo `active`, o plano nasce **fora de venda** |
+| `GET /plans/{id}` | busca pelo id, inclusive fora de venda |
+| `PUT /plans/{id}` | troca nome, descrição e preço. **Não aceita `active`** |
+| `PUT /plans/{id}/activate` | põe à venda. Idempotente |
+| `PUT /plans/{id}/deactivate` | tira de venda. Não apaga nada |
+
+Três decisões aí dentro que divergem da referência do curso:
+
+- **Ativar e desativar têm rotas próprias**, e o `PUT` do recurso não decide ativação. No curso o
+  corpo da alteração carrega um booleano `active` que escolhe entre ativar e desativar; os
+  `CLAUDE.md` do monorepo proíbem booleano escolhendo entre dois comportamentos.
+- **Criar sem `active` nasce fora de venda**, ao contrário das categorias da `admin-api`, que nascem
+  ativas: um plano ativo é um plano à venda, e pôr algo à venda é ato deliberado.
+- **O preço é `BigDecimal`**, não `Double`: a coluna é `DECIMAL(15,2)` e dinheiro em ponto flutuante
+  acumula erro em soma e comparação.
+
+Os status de erro são os de sempre: `422` para dado que o domínio recusa, `404` para plano que não
+existe e `409` quando a gravação perdeu a corrida do lock otimista.
+
+### Não há remoção de plano
+
+De propósito, e é a razão de a coleção de requisições não limpar o que cria: plano referenciado por
+assinatura não pode desaparecer, e tirar de venda já resolve o caso de uso. Quem precisar zerar o
+banco de desenvolvimento recria o volume.
 
 ## Autenticação
 
