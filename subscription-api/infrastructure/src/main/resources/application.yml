@@ -1,0 +1,64 @@
+# Configuração comum aos três perfis: development, homolog e production.
+# Sem perfil ativo (bootRun, testes), vale o development; nos outros ambientes o perfil
+# vem de SPRING_PROFILES_ACTIVE.
+server:
+  port: 8084
+
+spring:
+  profiles:
+    default: development
+  threads:
+    virtual:
+      # Cada requisição roda numa virtual thread: esperar o JDBC não prende thread do SO.
+      # O teto de consultas simultâneas continua sendo o pool de conexões (Hikari).
+      enabled: true
+  datasource:
+    # Sem valor padrão: fora do development, variável faltando derruba a subida em vez
+    # de apontar para um banco errado.
+    url: jdbc:mysql://${SUBSCRIPTION_DB_HOST}:${SUBSCRIPTION_DB_PORT}/${SUBSCRIPTION_DB_NAME}
+    username: ${SUBSCRIPTION_DB_USER}
+    password: ${SUBSCRIPTION_DB_PASSWORD}
+    hikari:
+      pool-name: subscription-pool
+      # Com virtual threads, o pool é o que limita as consultas simultâneas. Fixo (mínimo
+      # igual ao máximo), como recomenda o HikariCP: nada de abrir conexão no pico.
+      maximum-pool-size: ${SUBSCRIPTION_DB_POOL_SIZE:20}
+      minimum-idle: ${SUBSCRIPTION_DB_POOL_SIZE:20}
+      # Espera máxima por uma conexão livre (ms): no pico, falha rápido em vez de enfileirar.
+      connection-timeout: 2000
+      # Recicla a conexão (10 min) bem antes do wait_timeout do MySQL (8 h).
+      max-lifetime: 600000
+      # Ligado, ao contrário da admin-api — e a diferença é a persistência, não descuido. Lá o
+      # Hibernate abre transação em toda escrita e o pool pode entregar a conexão suja; aqui não há
+      # contexto de persistência, então um update solto do JdbcClient não tem quem o commite: com
+      # auto-commit desligado o Hikari o desfaria ao devolver a conexão, sem erro algum no log.
+      # Escrita que toca mais de uma tabela (agregado mais a fila de eventos) declara
+      # @Transactional, e aí o gerenciador de transação desliga o auto-commit pelo tempo dela.
+      auto-commit: true
+      # Recomendações do HikariCP para o MySQL Connector/J.
+      data-source-properties:
+        cachePrepStmts: true
+        prepStmtCacheSize: 250
+        prepStmtCacheSqlLimit: 2048
+        useServerPrepStmts: true
+        useLocalSessionState: true
+        useLocalTransactionState: true
+        rewriteBatchedStatements: true
+        cacheResultSetMetadata: true
+        cacheServerConfiguration: true
+        elideSetAutoCommits: true
+        maintainTimeStats: false
+  flyway:
+    locations: classpath:db/migration
+
+# Autenticação. Como no banco, sem valor padrão: variável faltando derruba a subida em vez de
+# validar token contra o emissor errado.
+keycloak:
+  issuer-uri: ${KEYCLOAK_ISSUER_URI}
+
+# Identifica a aplicação no log estruturado, que é como o Kibana a separa das outras.
+logging:
+  structured:
+    ecs:
+      service:
+        name: subscription-codeflix

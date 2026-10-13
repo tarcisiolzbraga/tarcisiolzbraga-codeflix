@@ -1,0 +1,36 @@
+# Máquina do desenvolvedor: credenciais do .env da raiz do monorepo (o mesmo do docker compose e o
+# mesmo dos outros serviços) e banco local.
+spring:
+  config:
+    import: optional:file:../.env[.properties]
+  datasource:
+    url: jdbc:mysql://${SUBSCRIPTION_DB_HOST:localhost}:${SUBSCRIPTION_DB_PORT:3307}/${SUBSCRIPTION_DB_NAME:subscription}
+    hikari:
+      # Na máquina local, poucas conexões bastam; e conexão presa por mais de 2 s vira aviso no log.
+      maximum-pool-size: ${SUBSCRIPTION_DB_POOL_SIZE:5}
+      minimum-idle: ${SUBSCRIPTION_DB_POOL_SIZE:5}
+      leak-detection-threshold: 2000
+
+# O Keycloak do docker compose, o mesmo realm dos outros serviços.
+keycloak:
+  issuer-uri: http://${KEYCLOAK_HOST:localhost}:${KEYCLOAK_PORT:8081}/realms/${KEYCLOAK_REALM:codeflix}
+
+# O console segue legível para quem está desenvolvendo, e o arquivo sai em ECS, o esquema da própria
+# Elastic — é dele que o Filebeat se alimenta. O Boot 4 formata sozinho: nada de logback-spring.xml
+# nem de encoder a mais no classpath.
+#
+# Só no development: em homolog e produção quem recolhe o log é a plataforma, a partir do stdout, e
+# essa decisão é outra.
+logging:
+  file:
+    name: ${LOG_FILE:build/logs/subscription-codeflix.json}
+  structured:
+    format:
+      file: ecs
+    ecs:
+      service:
+        environment: development
+  level:
+    com.tarcisiolzbraga.codeflix.subscription: debug
+    # Sem Hibernate aqui: quem monta o SQL é o JdbcClient, e é este logger que o mostra.
+    org.springframework.jdbc.core.JdbcTemplate: debug
