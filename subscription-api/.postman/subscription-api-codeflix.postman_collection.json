@@ -1,0 +1,631 @@
+{
+  "info": {
+    "name": "subscription-api-codeflix",
+    "description": "Regressão manual da API de assinaturas. Rode a pasta 0 primeiro: ela guarda o token nas variáveis da coleção. Não há remoção de plano no serviço, de propósito, então a coleção não limpa o que cria — rodar de novo acrescenta planos, sem quebrar nada.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "keycloakUrl",
+      "value": "http://localhost:8081"
+    },
+    {
+      "key": "keycloakRealm",
+      "value": "codeflix"
+    },
+    {
+      "key": "clientId",
+      "value": "admin-codeflix"
+    },
+    {
+      "key": "clientSecret",
+      "value": ""
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8084"
+    },
+    {
+      "key": "planoId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Autenticação",
+      "item": [
+        {
+          "name": "Pega o token no Keycloak",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{keycloakUrl}}/realms/{{keycloakRealm}}/protocol/openid-connect/token",
+              "host": [
+                "{{keycloakUrl}}"
+              ],
+              "path": [
+                "realms",
+                "{{keycloakRealm}}",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{clientSecret}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const corpo = pm.response.json();",
+                  "pm.collectionVariables.set(\"accessToken\", corpo.access_token);",
+                  "pm.test(\"devolve um token\", () => pm.expect(corpo.access_token).to.be.a(\"string\").and.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sem token a API recusa",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/plans/11111111-1111-1111-1111-111111111111",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans",
+                "11111111-1111-1111-1111-111111111111"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Planos",
+      "item": [
+        {
+          "name": "Cria o plano Plus",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Plus\",\n  \"description\": \"O catálogo inteiro, em até quatro telas\",\n  \"currency\": \"BRL\",\n  \"price\": 49.9\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"traz o header Location\", () => pm.response.to.have.header(\"Location\"));",
+                  "const corpo = pm.response.json();",
+                  "pm.test(\"o corpo tem só o id\", () => pm.expect(Object.keys(corpo)).to.eql([\"id\"]));",
+                  "pm.test(\"devolve o id\", () => pm.expect(corpo.id).to.be.a(\"string\").and.not.empty);",
+                  "pm.collectionVariables.set(\"planoId\", corpo.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Busca o plano criado e confere que nasceu fora de venda",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/plans/{{planoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans",
+                "{{planoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const corpo = pm.response.json();",
+                  "pm.test(\"o conjunto de campos é o do contrato\", () => pm.expect(Object.keys(corpo).sort()).to.eql(",
+                  "    [\"active\",\"createdAt\",\"currency\",\"description\",\"id\",\"name\",\"price\",\"updatedAt\"]));",
+                  "pm.test(\"é o plano criado\", () => pm.expect(corpo.name).to.eql(\"Plus\"));",
+                  "pm.test(\"o preço atravessou com os centavos\", () => pm.expect(Number(corpo.price)).to.eql(49.90));",
+                  "pm.test(\"a moeda é o código de três letras\", () => pm.expect(corpo.currency).to.eql(\"BRL\"));",
+                  "pm.test(\"sem active no corpo, nasce fora de venda\", () => pm.expect(corpo.active).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Põe o plano à venda",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/plans/{{planoId}}/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans",
+                "{{planoId}}",
+                "activate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"passa a estar à venda\", () => pm.expect(pm.response.json().active).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ativar de novo não muda nada",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/plans/{{planoId}}/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans",
+                "{{planoId}}",
+                "activate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"segue à venda\", () => pm.expect(pm.response.json().active).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Altera nome, descrição e preço",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/plans/{{planoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans",
+                "{{planoId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Plus Anual\",\n  \"description\": \"O mesmo plano, cobrado por ano\",\n  \"currency\": \"BRL\",\n  \"price\": 499.0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"o corpo tem só o id\", () => pm.expect(Object.keys(pm.response.json())).to.eql([\"id\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confere os valores novos e que a venda não mudou",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/plans/{{planoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans",
+                "{{planoId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const corpo = pm.response.json();",
+                  "pm.test(\"o nome é o novo\", () => pm.expect(corpo.name).to.eql(\"Plus Anual\"));",
+                  "pm.test(\"o preço é o novo\", () => pm.expect(Number(corpo.price)).to.eql(499.00));",
+                  "pm.test(\"alterar dados não mexeu na venda\", () => pm.expect(corpo.active).to.eql(true));",
+                  "pm.test(\"o updatedAt andou\", () => pm.expect(new Date(corpo.updatedAt) > new Date(corpo.createdAt)).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tira o plano de venda",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/plans/{{planoId}}/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans",
+                "{{planoId}}",
+                "deactivate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"sai de venda\", () => pm.expect(pm.response.json().active).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. O que a API recusa",
+      "item": [
+        {
+          "name": "Recusa plano sem nome",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Sem nome\",\n  \"currency\": \"BRL\",\n  \"price\": 10.0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 422\", () => pm.response.to.have.status(422));",
+                  "const corpo = pm.response.json();",
+                  "pm.test(\"o corpo do erro tem só message\", () => pm.expect(Object.keys(corpo)).to.eql([\"message\"]));",
+                  "pm.test(\"diz o que recusou\", () => pm.expect(corpo.message).to.eql(\"'name' should not be empty\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recusa preço negativo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Negativo\",\n  \"description\": \"Pre\\u00e7o inv\\u00e1lido\",\n  \"currency\": \"BRL\",\n  \"price\": -1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"diz o que recusou\", () => pm.expect(pm.response.json().message).to.eql(\"'amount' should not be negative\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recusa moeda desconhecida",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Moeda\",\n  \"description\": \"C\\u00f3digo inexistente\",\n  \"currency\": \"XYZ\",\n  \"price\": 10.0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"diz o que recusou\", () => pm.expect(pm.response.json().message).to.eql(\"'XYZ' is not a valid currency\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recusa nome com mais de 100 caracteres",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n  \"description\": \"Nome longo\",\n  \"currency\": \"BRL\",\n  \"price\": 10.0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"diz o limite\", () => pm.expect(pm.response.json().message).to.eql(\"'name' should not have more than 100 characters\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Busca id inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/plans/99999999-9999-9999-9999-999999999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans",
+                "99999999-9999-9999-9999-999999999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"diz que não achou\", () => pm.expect(pm.response.json().message).to.include(\"was not found\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recusa id que não é UUID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/plans/7",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans",
+                "7"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 422, não 404: o id é inválido, não ausente\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"diz o que recusou\", () => pm.expect(pm.response.json().message).to.eql(\"'7' is not a valid PlanId\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Altera plano inexistente",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/plans/99999999-9999-9999-9999-999999999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans",
+                "99999999-9999-9999-9999-999999999999"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Plus Anual\",\n  \"description\": \"O mesmo plano, cobrado por ano\",\n  \"currency\": \"BRL\",\n  \"price\": 499.0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

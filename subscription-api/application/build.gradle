@@ -16,6 +16,10 @@ configurations {
 dependencies {
     api project(':domain')
 
+    // Os fixtures do domínio: é com eles que o teste do caso de uso monta os mesmos agregados que a
+    // infrastructure monta, sem copiar a montagem.
+    testImplementation testFixtures(project(':domain'))
+
     testImplementation "org.mockito:mockito-junit-jupiter:$mockitoVersion"
     mockitoAgent "org.mockito:mockito-core:$mockitoVersion"
 }
