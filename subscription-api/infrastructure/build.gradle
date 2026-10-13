@@ -32,6 +32,10 @@ dependencies {
 
     testImplementation testFixtures(project(':domain'))
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    // Fora dos starters do Boot, e nenhum dos outros dois serviços o declara: é ele que traz os
+    // post-processors de requisição (jwt(), authorities()) usados para exercitar as regras de acesso
+    // sem Keycloak no ar.
+    testImplementation 'org.springframework.security:spring-security-test'
     testImplementation platform('org.testcontainers:testcontainers-bom:2.0.5')
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
     testImplementation 'org.testcontainers:testcontainers-mysql'
