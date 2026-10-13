@@ -1,14 +1,13 @@
 # Integração contínua do monorepo. Três etapas em ordem, da mais rápida para a mais cara, para o
 # retorno de um erro bobo não esperar os containers subirem.
 #
-# Os dois serviços Java entram numa matriz, e não em jobs copiados: eles têm o mesmo build, e a
-# diferença é só a pasta. O encoder, quando entrar, ganha job próprio — ele é Go, outra cadeia de
-# ferramentas.
+# Os serviços Java entram numa matriz, e não em jobs copiados: eles têm o mesmo build, e a diferença
+# é só a pasta. O encoder tem job próprio — ele é Go, outra cadeia de ferramentas.
 #
 # Sem filtro por caminho de propósito. Filtrar teste pelo que mudou dá push verde com contrato
 # quebrado: mexer só no admin-api — uma coluna renomeada, um payload diferente — quebra a videos-api,
 # que replica o dado dele e captura as mensagens de CDC da saída dele. Com as suítes em minutos, sai
-# mais barato rodar as duas sempre. O filtro entra no dia em que houver deploy, e aí no deploy.
+# mais barato rodar todas sempre. O filtro entra no dia em que houver deploy, e aí no deploy.
 name: CI
 
 on:
@@ -30,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [admin-api, videos-api]
+        service: [admin-api, videos-api, subscription-api]
     defaults:
       run:
         working-directory: ${{ matrix.service }}
@@ -58,7 +57,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [admin-api, videos-api]
+        service: [admin-api, videos-api, subscription-api]
     defaults:
       run:
         working-directory: ${{ matrix.service }}
@@ -93,7 +92,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [admin-api, videos-api]
+        service: [admin-api, videos-api, subscription-api]
     steps:
       - uses: actions/checkout@v4
 

@@ -8,6 +8,7 @@ Os serviços de back-end do Codeflix, num repositório só. Cada serviço tem o 
 | [`admin-api/`](admin-api/) | administra o catálogo: cria, edita e publica. É a fonte do dado. | 8080 |
 | [`videos-api/`](videos-api/) | serve o catálogo ao usuário final, replicando o que a `admin-api` publica. | 8082 |
 | [`encoder-api/`](encoder-api/) | converte as mídias que a `admin-api` recebe. Em Go. | — |
+| [`subscription-api/`](subscription-api/) | diz quem é assinante e se a cobrança do mês passou. É quem dá direito ao catálogo. | 8084 |
 | [`build-logic/`](build-logic/) | não é serviço: a configuração de build que os serviços Java dividem. | — |
 | [`provisioning/`](provisioning/) | não é serviço: os containers de apoio, um compose por parte. | — |
 
@@ -40,7 +41,7 @@ própria pasta, junto dos arquivos que monta.
 
 ```bash
 cp .env.example .env                 # primeira vez: preencher os segredos
-docker compose up -d mysql rabbitmq garage keycloak catalog-elasticsearch
+docker compose up -d mysql rabbitmq garage keycloak catalog-elasticsearch subscription-mysql
 docker compose --profile cdc up -d   # Kafka e Kafka Connect, para a replicação
 ```
 

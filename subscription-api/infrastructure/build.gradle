@@ -1,0 +1,62 @@
+plugins {
+    id 'codeflix.java-conventions'
+    id 'org.springframework.boot'
+    id 'io.spring.dependency-management'
+    id 'jacoco-report-aggregation'
+}
+
+tasks.named('bootJar') {
+    archiveFileName = 'application.jar'
+    destinationDirectory = rootProject.layout.buildDirectory.dir('libs')
+}
+
+tasks.named('jar') {
+    enabled = false
+}
+
+dependencies {
+    implementation project(':domain')
+    implementation project(':application')
+
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    // JDBC, e não data-jpa: os agregados daqui são persistidos por SQL escrito à mão, com o
+    // JdbcClient. Não há contexto de persistência, nem entidade espelhando a tabela.
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    implementation 'org.flywaydb:flyway-mysql'
+    // fora do BOM do Boot; a linha 3.x é a compatível com o Boot 4
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+
+    testImplementation testFixtures(project(':domain'))
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    // Fora dos starters do Boot, e nenhum dos outros dois serviços o declara: é ele que traz os
+    // post-processors de requisição (jwt(), authorities()) usados para exercitar as regras de acesso
+    // sem Keycloak no ar.
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation platform('org.testcontainers:testcontainers-bom:2.0.5')
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:testcontainers-mysql'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+}
+
+tasks.named('bootRun') {
+    workingDir = rootProject.projectDir
+}
+
+// Cobertura dos três módulos num relatório só (a infrastructure depende dos outros dois).
+tasks.named('testCodeCoverageReport', JacocoReport) {
+    reports {
+        html.required = true
+        html.outputLocation = rootProject.layout.buildDirectory.dir('reports/jacoco/html')
+        xml.required = true
+        xml.outputLocation = rootProject.layout.buildDirectory.file('reports/jacoco/jacoco.xml')
+    }
+}
+
+// O build já roda os testes; gerar o relatório junto sai quase de graça e mantém ele atualizado.
+tasks.named('check') {
+    dependsOn tasks.named('testCodeCoverageReport')
+}
