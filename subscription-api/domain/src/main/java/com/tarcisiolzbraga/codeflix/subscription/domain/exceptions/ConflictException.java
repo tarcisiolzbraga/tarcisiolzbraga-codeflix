@@ -25,6 +25,12 @@ public class ConflictException extends DomainException {
         return new ConflictException("the email %s is already taken".formatted(email));
     }
 
+    // Clicar no link de validação duas vezes não cria duas contas. É conflito, e não erro de
+    // validação: o pedido estava certo, o estado é que não permite mais.
+    public static ConflictException signUpAlreadyConfirmed() {
+        return new ConflictException("this sign-up was already confirmed");
+    }
+
     public static ConflictException staleVersion(
             final Class<? extends AggregateRoot<?>> aggregate, final Identifier id) {
         return new ConflictException(MESSAGE_TEMPLATE.formatted(aggregate.getSimpleName(), id.getValue()));

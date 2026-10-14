@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "subscription-api-codeflix",
-    "description": "Regressão manual da API de assinaturas. Rode a pasta 0 primeiro: ela guarda o token nas variáveis da coleção. Não há remoção de plano no serviço, de propósito, então a coleção não limpa o que cria — rodar de novo acrescenta planos, sem quebrar nada.",
+    "description": "Regressão manual da API de assinaturas. Rode a pasta 0 primeiro: ela guarda o token nas variáveis da coleção. Não há remoção de plano no serviço, de propósito, então a coleção não limpa o que cria — rodar de novo acrescenta planos, sem quebrar nada. O cadastro usa um e-mail sorteado por execução, porque o realm do Keycloak não é esvaziado.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -41,6 +41,18 @@
     },
     {
       "key": "planoId",
+      "value": ""
+    },
+    {
+      "key": "novoEmail",
+      "value": ""
+    },
+    {
+      "key": "tokenDoEmail",
+      "value": ""
+    },
+    {
+      "key": "contaId",
       "value": ""
     }
   ],
@@ -620,6 +632,313 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"responde 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Cadastro",
+      "description": "O cadastro não fecha dentro do Postman: o token vai no e-mail, que hoje fica na fila mail.signup.validation.queue. Pegue o link no painel do broker (15672) e chame a última requisição desta pasta com o token dele. O que dá para automatizar está aqui.",
+      "item": [
+        {
+          "name": "Sorteia um e-mail para este ciclo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v3/api-docs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v3",
+                "api-docs"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// O realm do Keycloak nao e limpo entre execucoes: cada ciclo usa um e-mail proprio.",
+                  "pm.collectionVariables.set(\"novoEmail\", \"assinante-\" + Date.now() + \"@codeflix.com.br\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"a API esta no ar\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"guardou o e-mail do ciclo\", () => pm.expect(pm.collectionVariables.get(\"novoEmail\")).to.include(\"@\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pede o cadastro",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/sign-up",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "sign-up"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstname\": \"Tarcisio\",\n  \"lastname\": \"Braga\",\n  \"email\": \"{{novoEmail}}\",\n  \"password\": \"uma-senha-boa\",\n  \"documentNumber\": \"11144477735\",\n  \"documentType\": \"cpf\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 202\", () => pm.response.to.have.status(202));",
+                  "const corpo = pm.response.json();",
+                  "pm.test(\"o corpo tem so message\", () => pm.expect(Object.keys(corpo)).to.eql([\"message\"]));",
+                  "pm.test(\"a mensagem e a generica\", () => pm.expect(corpo.message).to.eql(\"a validation email is on its way\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pede de novo: a resposta nao muda",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/sign-up",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "sign-up"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstname\": \"Tarcisio\",\n  \"lastname\": \"Braga\",\n  \"email\": \"{{novoEmail}}\",\n  \"password\": \"uma-senha-boa\",\n  \"documentNumber\": \"11144477735\",\n  \"documentType\": \"cpf\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 202 igual\", () => pm.response.to.have.status(202));",
+                  "pm.test(\"a mensagem e a mesma: a resposta nao conta se o e-mail existe\",",
+                  "    () => pm.expect(pm.response.json().message).to.eql(\"a validation email is on its way\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recusa documento invalido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/sign-up",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "sign-up"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstname\": \"Tarcisio\",\n  \"lastname\": \"Braga\",\n  \"email\": \"{{novoEmail}}\",\n  \"password\": \"uma-senha-boa\",\n  \"documentNumber\": \"11111111111\",\n  \"documentType\": \"cpf\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"diz o que recusou\", () => pm.expect(pm.response.json().message).to.eql(\"'cpf' is invalid\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recusa senha curta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/sign-up",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "sign-up"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstname\": \"Tarcisio\",\n  \"lastname\": \"Braga\",\n  \"email\": \"{{novoEmail}}\",\n  \"password\": \"curta\",\n  \"documentNumber\": \"11144477735\",\n  \"documentType\": \"cpf\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"diz o minimo\", () => pm.expect(pm.response.json().message).to.eql(\"'password' should have at least 8 characters\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirma com token inexistente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/sign-up/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "sign-up",
+                "confirm"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"um-token-que-nunca-existiu\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"nao ecoa o token na mensagem\",",
+                  "    () => pm.expect(pm.response.json().message).to.not.include(\"um-token-que-nunca-existiu\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirma com o token do e-mail (preencha tokenDoEmail)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/sign-up/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "sign-up",
+                "confirm"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{tokenDoEmail}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Preencha a variavel tokenDoEmail com o token do link que esta na fila.",
+                  "if (!pm.collectionVariables.get(\"tokenDoEmail\")) {",
+                  "    pm.test.skip(\"tokenDoEmail nao preenchido: pegue o link na fila do broker\", () => {});",
+                  "} else {",
+                  "    pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "    const corpo = pm.response.json();",
+                  "    pm.test(\"o corpo tem so accountId\", () => pm.expect(Object.keys(corpo)).to.eql([\"accountId\"]));",
+                  "    pm.collectionVariables.set(\"contaId\", corpo.accountId);",
+                  "}"
                 ]
               }
             }

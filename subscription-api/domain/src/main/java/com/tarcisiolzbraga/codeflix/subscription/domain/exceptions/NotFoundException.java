@@ -18,6 +18,12 @@ public class NotFoundException extends DomainException {
         super(message);
     }
 
+    // Sem o token na mensagem, de propósito: ele é a credencial do e-mail, e mensagem de erro vai
+    // para log e para o corpo da resposta. Dizer que não existe já é tudo o que o cliente precisa.
+    public static NotFoundException signUpLink() {
+        return new NotFoundException("the sign-up link was not found or is no longer valid");
+    }
+
     public static NotFoundException with(final Class<? extends AggregateRoot<?>> aggregate, final Identifier id) {
         return new NotFoundException(MESSAGE_TEMPLATE.formatted(aggregate.getSimpleName(), id.getValue()));
     }

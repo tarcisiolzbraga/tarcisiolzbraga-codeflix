@@ -22,12 +22,17 @@
     {
       "name": "video.events", "vhost": "/", "type": "direct",
       "durable": true, "auto_delete": false, "internal": false, "arguments": {}
+    },
+    {
+      "name": "mail.events", "vhost": "/", "type": "direct",
+      "durable": true, "auto_delete": false, "internal": false, "arguments": {}
     }
   ],
 
   "queues": [
     { "name": "video.created.queue", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
-    { "name": "video.encoded.queue", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} }
+    { "name": "video.encoded.queue", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+    { "name": "mail.signup.validation.queue", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} }
   ],
 
   "bindings": [
@@ -38,6 +43,10 @@
     {
       "source": "video.events", "vhost": "/", "destination": "video.encoded.queue",
       "destination_type": "queue", "routing_key": "video.encoded", "arguments": {}
+    },
+    {
+      "source": "mail.events", "vhost": "/", "destination": "mail.signup.validation.queue",
+      "destination_type": "queue", "routing_key": "mail.signup.validation", "arguments": {}
     }
   ]
 }

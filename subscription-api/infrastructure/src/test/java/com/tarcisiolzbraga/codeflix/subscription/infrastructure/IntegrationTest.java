@@ -22,6 +22,7 @@ import org.springframework.context.annotation.Import;
 @Inherited
 @Tag("integrationTest")
 @SpringBootTest(classes = Main.class)
-@Import({MySQLContainerConfiguration.class, KeycloakContainerConfiguration.class})
+@Import({MySQLContainerConfiguration.class, KeycloakContainerConfiguration.class,
+        RabbitMQContainerConfiguration.class})
 @ExtendWith(MySQLCleanUpExtension.class)
 public @interface IntegrationTest {}

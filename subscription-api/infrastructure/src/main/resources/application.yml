@@ -50,6 +50,11 @@ spring:
         maintainTimeStats: false
   flyway:
     locations: classpath:db/migration
+  rabbitmq:
+    host: ${AMQP_HOST}
+    port: ${AMQP_PORT}
+    username: ${AMQP_USER}
+    password: ${AMQP_PASSWORD}
 
 # Autenticação. Como no banco, sem valor padrão: variável faltando derruba a subida em vez de
 # validar token contra o emissor errado.
@@ -65,6 +70,21 @@ keycloak:
     client-secret: ${KEYCLOAK_CLIENT_SECRET}
     # Por nome, não por id: o id nasce na importação do realm e muda a cada recriação do container.
     subscribers-group: ${KEYCLOAK_SUBSCRIBERS_GROUP:subscribers}
+
+# O que sai deste serviço: o pedido de validação de e-mail. Quem entrega é um serviço de e-mail
+# próprio, do outro lado da fila — aqui não há SMTP nem template.
+#
+# A mesma topologia está em ../provisioning/rabbitmq/definitions.json, que o broker do compose
+# carrega. Divergir faz a subida falhar com PRECONDITION_FAILED.
+amqp:
+  exchange: mail.events
+  queues:
+    sign-up-validation:
+      queue: mail.signup.validation.queue
+      routing-key: mail.signup.validation
+  # Onde a pessoa confirma o cadastro: é a página do front, não uma rota desta API. O link do e-mail
+  # leva até lá, e é o front que chama o POST de confirmar com o token.
+  confirmation-url: ${SIGNUP_CONFIRMATION_URL}
 
 # Identifica a aplicação no log estruturado, que é como o Kibana a separa das outras.
 logging:
