@@ -26,6 +26,10 @@ public class NotFoundException extends DomainException {
         return new NotFoundException("there is no account for whoever is calling");
     }
 
+    public static NotFoundException callerSubscription() {
+        return new NotFoundException("there is no subscription for whoever is calling");
+    }
+
     public static NotFoundException signUpLink() {
         return new NotFoundException("the sign-up link was not found or is no longer valid");
     }

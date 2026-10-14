@@ -18,10 +18,13 @@ public sealed interface SubscriptionCommand extends AssertionConcern {
 
     // A cobrança falhou e ainda há prazo. O vencimento NÃO anda: é o que mantém a assinatura
     // vencida e faz a próxima tentativa acontecer.
+    //
+    // A transação é opcional aqui, ao contrário do Renew: o provedor recusa antes de abrir
+    // transação quando a comunicação falha, e nesse caso não há id. Exigir um obrigaria quem chama
+    // a inventar um valor, e id inventado no banco é pior que coluna nula.
     record MarkIncomplete(String reason, String transactionId) implements SubscriptionCommand {
         public MarkIncomplete {
             this.assertArgumentNotEmpty(reason, "'reason' should not be empty");
-            this.assertArgumentNotEmpty(transactionId, "'transactionId' should not be empty");
         }
     }
 

@@ -205,6 +205,27 @@ class SubscriptionTest {
         assertEquals(before, subscription.updatedAt());
     }
 
+    // O provedor recusa antes de abrir transação quando a comunicação falha, e aí não há id.
+    // Exigir um obrigaria quem chama a inventar um valor, e id inventado no banco é pior que coluna
+    // nula.
+    @Test
+    void givenAFailureWithNoTransaction_whenMarkedIncomplete_thenItIsAcceptedWithoutOne() {
+        final var subscription = SubscriptionFixture.storedSubscription();
+
+        subscription.execute(new SubscriptionCommand.MarkIncomplete("provedor fora do ar", null));
+
+        assertEquals(SubscriptionStatus.INCOMPLETE, subscription.status());
+        assertNull(subscription.lastTransactionId());
+    }
+
+    @Test
+    void givenAnIncompleteWithoutAReason_whenCreated_thenTheCommandRefuses() {
+        final var actual =
+                assertThrows(DomainException.class, () -> new SubscriptionCommand.MarkIncomplete(" ", "tx-1"));
+
+        assertEquals("'reason' should not be empty", actual.getMessage());
+    }
+
     @Test
     void givenARenewWithoutATransaction_whenCreated_thenTheCommandRefuses() {
         final var actual = assertThrows(DomainException.class, () -> new SubscriptionCommand.Renew("  "));
