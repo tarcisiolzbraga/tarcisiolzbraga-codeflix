@@ -14,6 +14,8 @@ spring:
 # O Keycloak do docker compose, o mesmo realm dos outros serviços.
 keycloak:
   issuer-uri: http://${KEYCLOAK_HOST:localhost}:${KEYCLOAK_PORT:8081}/realms/${KEYCLOAK_REALM:codeflix}
+  admin:
+    client-id: ${SUBSCRIPTION_KEYCLOAK_CLIENT_ID:subscription-api-codeflix}
 
 # O console segue legível para quem está desenvolvendo, e o arquivo sai em ECS, o esquema da própria
 # Elastic — é dele que o Filebeat se alimenta. O Boot 4 formata sozinho: nada de logback-spring.xml

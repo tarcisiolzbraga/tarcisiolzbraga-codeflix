@@ -53,8 +53,18 @@ spring:
 
 # Autenticação. Como no banco, sem valor padrão: variável faltando derruba a subida em vez de
 # validar token contra o emissor errado.
+#
+# O endereço da API administrativa e o do token não aparecem aqui: são derivados do issuer-uri, para
+# não haver dois lugares dizendo onde o Keycloak está.
 keycloak:
   issuer-uri: ${KEYCLOAK_ISSUER_URI}
+  # A credencial com que o serviço administra os usuários do realm. O client tem as roles
+  # manage-users e view-users do realm-management, e é o único com poder sobre o realm.
+  admin:
+    client-id: ${SUBSCRIPTION_KEYCLOAK_CLIENT_ID}
+    client-secret: ${KEYCLOAK_CLIENT_SECRET}
+    # Por nome, não por id: o id nasce na importação do realm e muda a cada recriação do container.
+    subscribers-group: ${KEYCLOAK_SUBSCRIBERS_GROUP:subscribers}
 
 # Identifica a aplicação no log estruturado, que é como o Kibana a separa das outras.
 logging:

@@ -23,6 +23,9 @@ dependencies {
     // JdbcClient. Não há contexto de persistência, nem entidade espelhando a tabela.
     implementation 'org.springframework.boot:spring-boot-starter-jdbc'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // No Boot 4 a autoconfiguração do RestClient saiu do starter de web para um módulo próprio:
+    // sem ele não existe o RestClient.Builder que o cliente do Keycloak injeta.
+    implementation 'org.springframework.boot:spring-boot-starter-restclient'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
     implementation 'org.springframework.boot:spring-boot-starter-flyway'
     implementation 'org.flywaydb:flyway-mysql'

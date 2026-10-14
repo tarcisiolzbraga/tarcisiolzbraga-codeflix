@@ -10,7 +10,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
-// O serviço com um MySQL de verdade, sem servidor web. A tag separa quem precisa de Docker: a task
+// O serviço com um MySQL e um Keycloak de verdade, sem servidor web. Os dois containers são
+// estáticos e sobem uma vez por execução, então quem não usa o Keycloak não paga por ele duas vezes. A tag separa quem precisa de Docker: a task
 // unitTests exclui esta e a do e2e.
 //
 // classes explícito porque os IT de caso de uso ficam no pacote da application, de onde a busca por
@@ -21,6 +22,6 @@ import org.springframework.context.annotation.Import;
 @Inherited
 @Tag("integrationTest")
 @SpringBootTest(classes = Main.class)
-@Import(MySQLContainerConfiguration.class)
+@Import({MySQLContainerConfiguration.class, KeycloakContainerConfiguration.class})
 @ExtendWith(MySQLCleanUpExtension.class)
 public @interface IntegrationTest {}
