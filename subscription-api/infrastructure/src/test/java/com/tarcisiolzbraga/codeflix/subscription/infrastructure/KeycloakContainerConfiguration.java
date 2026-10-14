@@ -64,8 +64,19 @@ public class KeycloakContainerConfiguration {
         return new KeycloakTestToken(issuerUri(), CLIENT_ID, CLIENT_SECRET);
     }
 
+    // Token de pessoa, para as rotas `/me`: o client que o emite é criado no container, não no realm
+    // versionado — o porquê está no KeycloakTestUserToken.
+    @Bean
+    KeycloakTestUserToken keycloakTestUserToken() {
+        return new KeycloakTestUserToken(baseUrl(), REALM);
+    }
+
     private static String issuerUri() {
-        return "http://%s:%d/realms/%s".formatted(CONTAINER.getHost(), CONTAINER.getMappedPort(HTTP_PORT), REALM);
+        return "%s/realms/%s".formatted(baseUrl(), REALM);
+    }
+
+    private static String baseUrl() {
+        return "http://%s:%d".formatted(CONTAINER.getHost(), CONTAINER.getMappedPort(HTTP_PORT));
     }
 
     // O arquivo versionado traz um marcador no lugar do segredo, do mesmo jeito que o docker compose
