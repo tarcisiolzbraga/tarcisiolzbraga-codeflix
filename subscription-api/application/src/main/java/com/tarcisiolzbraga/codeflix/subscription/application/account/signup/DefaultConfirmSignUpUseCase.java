@@ -49,7 +49,7 @@ public class DefaultConfirmSignUpUseCase extends ConfirmSignUpUseCase {
 
         final var account = this.gateways.accounts().save(pending.toAccount(AccountId.unique()));
         this.gateways.pendingSignUps().save(pending);
-        this.gateways.identityProvider().markEmailVerified(pending.userId());
+        grantSubscriberAccess(pending);
 
         return ConfirmSignUpOutput.from(account);
     }
@@ -69,6 +69,24 @@ public class DefaultConfirmSignUpUseCase extends ConfirmSignUpUseCase {
             pending.confirm(this.clock.instant());
             this.gateways.pendingSignUps().save(pending);
         }
+        // Repetido aqui, e não só no caminho de cima: é o que faz repetir consertar: se o processo
+        // morreu depois de gravar a conta e antes de falar com o provedor, a pessoa teria conta e
+        // nenhum acesso, e clicar no link de novo termina o serviço.
+        grantSubscriberAccess(pending);
         return ConfirmSignUpOutput.from(existing);
+    }
+
+    // A role de assinante vem junto com a conta, e não com a assinatura.
+    //
+    // É tentador amarrá-la a ter assinatura viva, mas aí nasceria um nó: as rotas de assinatura
+    // exigem a role, e sem a role não haveria como assinar. O que a role diz é "tem conta neste
+    // serviço"; quem tem direito ao catálogo é outra pergunta, decidida pelo estado da assinatura e
+    // de quem serve o vídeo, não por grupo no provedor de identidade.
+    //
+    // As duas chamadas são idempotentes do lado do Keycloak: conferir e-mail já conferido e pôr num
+    // grupo em que já está não mudam nada, e é isso que permite chamá-las em dois caminhos.
+    private void grantSubscriberAccess(final PendingSignUp pending) {
+        this.gateways.identityProvider().markEmailVerified(pending.userId());
+        this.gateways.identityProvider().addToSubscribers(pending.userId());
     }
 }
