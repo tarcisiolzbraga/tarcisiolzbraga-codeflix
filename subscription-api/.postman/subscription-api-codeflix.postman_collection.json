@@ -945,6 +945,118 @@
           ]
         }
       ]
+    },
+    {
+      "name": "4. A conta de quem chama",
+      "description": "Estas rotas respondem sobre a conta de quem apresenta o token, pelo `sub` dele. O token desta coleção é de um service account (admin-codeflix), que não tem conta aqui — então o que dá para afirmar é o 404, que é o comportamento correto para token válido sem conta. Exercitá-las com uma conta de verdade pede um token de pessoa, e o realm não permite o fluxo de senha em nenhum client; é decisão em aberto.",
+      "item": [
+        {
+          "name": "A conta de quem chama: 404 para quem nao tem",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 404, nao 401: o token e valido, conta e que nao ha\",",
+                  "    () => pm.response.to.have.status(404));",
+                  "const corpo = pm.response.json();",
+                  "pm.test(\"o corpo do erro tem so message\", () => pm.expect(Object.keys(corpo)).to.eql([\"message\"]));",
+                  "pm.test(\"nao ecoa o id de quem chamou\",",
+                  "    () => pm.expect(corpo.message).to.eql(\"there is no account for whoever is calling\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Trocar endereco: 404 para quem nao tem conta",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me/billing-address",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me",
+                "billing-address"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"zipcode\": \"01310930\",\n  \"number\": \"1578\",\n  \"complement\": \"apto 42\",\n  \"country\": \"BR\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"a mesma mensagem da outra rota\",",
+                  "    () => pm.expect(pm.response.json().message).to.eql(\"there is no account for whoever is calling\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sem token as duas recusam",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"e 401, nao 404: sem token nao se descobre se a conta existe\",",
+                  "    () => pm.expect(pm.response.code).to.not.eql(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

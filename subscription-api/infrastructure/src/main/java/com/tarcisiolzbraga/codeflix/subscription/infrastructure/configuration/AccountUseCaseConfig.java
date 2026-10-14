@@ -1,5 +1,9 @@
 package com.tarcisiolzbraga.codeflix.subscription.infrastructure.configuration;
 
+import com.tarcisiolzbraga.codeflix.subscription.application.account.billing.ChangeBillingAddressUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.account.billing.DefaultChangeBillingAddressUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.account.get.DefaultGetMyAccountUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.account.get.GetMyAccountUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.account.signup.ConfirmSignUpGateways;
 import com.tarcisiolzbraga.codeflix.subscription.application.account.signup.ConfirmSignUpUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.account.signup.DefaultConfirmSignUpUseCase;
@@ -45,5 +49,15 @@ public class AccountUseCaseConfig {
     @Bean
     ConfirmSignUpUseCase confirmSignUpUseCase(final ConfirmSignUpGateways gateways, final Clock clock) {
         return new DefaultConfirmSignUpUseCase(gateways, clock);
+    }
+
+    @Bean
+    GetMyAccountUseCase getMyAccountUseCase(final AccountGateway accounts) {
+        return new DefaultGetMyAccountUseCase(accounts);
+    }
+
+    @Bean
+    ChangeBillingAddressUseCase changeBillingAddressUseCase(final AccountGateway accounts) {
+        return new DefaultChangeBillingAddressUseCase(accounts);
     }
 }
