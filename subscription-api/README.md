@@ -166,6 +166,26 @@ gasto, e a pessoa ficaria travada.
 Por isso não há transação envolvendo as duas escritas: ela também não cobriria a chamada ao
 Keycloak, que vem depois e não participa de transação de banco.
 
+### A conta, depois de existir
+
+| Rota | Quem alcança | O que faz |
+|---|---|---|
+| `GET /accounts/me` | assinante ou administrador | a conta de **quem está chamando** |
+| `PUT /accounts/me/billing-address` | assinante ou administrador | troca o endereço de cobrança |
+
+**`/me`, e não `/{id}`.** Com id no caminho, um assinante poderia pedir a conta de outro, e toda
+rota daqui teria de conferir propriedade — uma checagem fácil de esquecer na rota seguinte. A conta
+sai do `sub` do token, que é o mesmo id do provedor de identidade que a conta guarda, e a pergunta
+"esta conta é sua?" deixa de existir.
+
+Token válido de quem não tem conta aqui — um service account, por exemplo — recebe **404**, não 401:
+a autenticação está certa, conta é que não há.
+
+O corpo da resposta não traz senha nem o id do provedor: a primeira nunca sai daqui, e o segundo é
+detalhe de como a autenticação funciona. E `billingAddress` vem **nulo** quando a conta não tem
+endereço, não como um objeto de campos vazios — o front precisa distinguir "não informou" de
+"informou vazio".
+
 ### Quem envia o e-mail
 
 Não é este serviço. Ele publica o pedido em `mail.events` com a routing key
