@@ -20,8 +20,8 @@ import org.springframework.security.web.SecurityFilterChain;
 // do assinante, e o administrador também alcança as duas. A documentação da API fica aberta: ela não
 // expõe dado nenhum, e em produção o springdoc já está desligado.
 //
-// O cadastro é a única rota sem token, e não poderia ser outra coisa: quem se cadastra ainda não tem
-// usuário no Keycloak para pedir um. É ele que cria o usuário lá.
+// O cadastro e a confirmação são as rotas sem token, e não poderiam ser outra coisa: quem se cadastra
+// ainda não tem usuário no Keycloak para pedir um, e quem clica no link de validação também não.
 //
 // Ligado em todos os perfis, diferente da referência, que desliga a segurança no development com um
 // @Profile("!development"): com ela desligada no perfil em que se desenvolve, o controle de acesso
@@ -43,6 +43,12 @@ public class SecurityConfig {
     private static final String ROLE_ADMIN = "CODEFLIX_ADMIN";
     private static final String ROLE_SUBSCRIBER = "CODEFLIX_SUBSCRIBER";
 
+    // As duas rotas do cadastro, e só elas. Quem se cadastra ainda não tem usuário no Keycloak para
+    // pedir token, e quem clica no link de validação também não — é justamente a confirmação que
+    // marca o e-mail como conferido. Listadas uma a uma em vez de /accounts/sign-up/**: com o
+    // curinga, qualquer rota futura embaixo desse caminho nasceria aberta sem ninguém decidir.
+    private static final String[] SIGN_UP_PATHS = {"/accounts/sign-up", "/accounts/sign-up/confirm"};
+
     private static final String[] DOCS_PATHS = {
         "/v3/api-docs/**", "/v3/api-docs", "/swagger-ui/**", "/swagger-ui.html"
     };
@@ -63,7 +69,7 @@ public class SecurityConfig {
                 .permitAll()
                 .requestMatchers(DOCS_PATHS)
                 .permitAll()
-                .requestMatchers(HttpMethod.POST, "/accounts/sign-up")
+                .requestMatchers(HttpMethod.POST, SIGN_UP_PATHS)
                 .permitAll()
                 .requestMatchers("/plans/**")
                 .hasRole(ROLE_ADMIN)

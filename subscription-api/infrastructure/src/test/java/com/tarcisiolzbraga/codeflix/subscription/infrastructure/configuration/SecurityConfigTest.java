@@ -112,6 +112,27 @@ class SecurityConfigTest {
         actual.andExpect(status().isNotFound());
     }
 
+    // Quem clica no link do e-mail não tem token: a confirmação tem de passar pela autorização, e o
+    // 404 aqui é a prova de que passou — o controller dela não entra nesta fatia.
+    @Test
+    void givenNoToken_whenConfirmsTheSignUp_thenIsLetThrough() throws Exception {
+        final var request = post("/accounts/sign-up/confirm");
+
+        final var actual = mvc.perform(request);
+
+        actual.andExpect(status().isNotFound());
+    }
+
+    // Só as duas rotas do cadastro são abertas: outra coisa embaixo de /accounts/ segue protegida.
+    @Test
+    void givenNoToken_whenCallsAnotherAccountPath_thenIsUnauthorized() throws Exception {
+        final var request = post("/accounts/sign-up/anything-else");
+
+        final var actual = mvc.perform(request);
+
+        actual.andExpect(status().isUnauthorized());
+    }
+
     @Test
     void givenNoToken_whenCallsTheErrorPathDirectly_thenIsUnauthorized() throws Exception {
         final var request = get("/error");
