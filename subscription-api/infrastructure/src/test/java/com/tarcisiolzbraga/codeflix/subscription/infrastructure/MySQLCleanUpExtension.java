@@ -15,7 +15,7 @@ public class MySQLCleanUpExtension implements BeforeEachCallback {
 
     // A ordem importa: uma tabela que referencia outra vem antes, por causa das foreign keys.
     // Tabela nova entra nesta lista.
-    private static final List<String> TABLES = List.of("plan");
+    private static final List<String> TABLES = List.of("account", "plan");
 
     @Override
     public void beforeEach(final ExtensionContext context) {
