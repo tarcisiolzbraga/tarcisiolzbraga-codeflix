@@ -122,12 +122,12 @@ flowchart TD
     F --> G
     G --> H[202: 'a validation email is on its way']
     H --> I[a pessoa clica no link] --> J[POST /accounts/sign-up/confirm]
-    J --> K[a conta nasce, e o e-mail vira conferido no Keycloak]
+    J --> K[a conta nasce, o e-mail vira conferido e a pessoa entra no grupo subscribers]
 ```
 
 | Rota | Quem alcança | O que faz |
 |---|---|---|
-| `POST /accounts/sign-up` | qualquer um, sem token | pede o cadastro. Responde **202** e a **mesma** mensagem sempre |
+| `POST /accounts/sign-up`, `POST /accounts/sign-up/confirm` | qualquer um, sem token | pede o cadastro. Responde **202** e a **mesma** mensagem sempre |
 | `POST /accounts/sign-up/confirm` | qualquer um, sem token | confirma com o token do e-mail. É aqui que a conta nasce |
 
 As duas são abertas porque não poderiam ser outra coisa: quem se cadastra ainda não tem usuário no
@@ -165,6 +165,20 @@ gasto, e a pessoa ficaria travada.
 
 Por isso não há transação envolvendo as duas escritas: ela também não cobriria a chamada ao
 Keycloak, que vem depois e não participa de transação de banco.
+
+### A role de assinante vem com a conta
+
+A confirmação põe a pessoa no grupo `subscribers` do Keycloak, que concede `CODEFLIX_SUBSCRIBER` —
+sem isso ela teria conta aqui e **nenhuma rota alcançável**, nem para ler a própria conta, nem para
+assinar.
+
+É tentador amarrar a role a ter assinatura viva, mas isso faria um nó: as rotas de assinatura exigem
+a role, e sem a role não haveria como assinar. O que a role diz é "tem conta neste serviço"; quem
+tem direito ao catálogo é outra pergunta, decidida pelo estado da assinatura.
+
+A concessão vem **depois** de a conta existir — na ordem inversa, uma interrupção deixaria alguém
+com role de assinante e sem conta aqui — e acontece também quando se clica no link de novo, que é o
+que faz a repetição consertar uma interrupção entre gravar a conta e falar com o Keycloak.
 
 ### A conta, depois de existir
 
@@ -229,6 +243,68 @@ De propósito, e é a razão de a coleção de requisições não limpar o que c
 assinatura não pode desaparecer, e tirar de venda já resolve o caso de uso. Quem precisar zerar o
 banco de desenvolvimento recria o volume.
 
+## As rotas da assinatura
+
+Todas são sobre a assinatura de **quem está chamando**, pela mesma razão do `/me` da conta: nenhuma
+recebe id de assinatura, então não existe caminho para pedir a de outro.
+
+| Rota | O que faz |
+|---|---|
+| `POST /subscriptions` | assina um plano. Nasce em trial, vencendo em um mês |
+| `GET /subscriptions/me` | a assinatura de quem chama, inclusive a cancelada |
+| `POST /subscriptions/me/charge` | cobra, se estiver vencida |
+| `PUT /subscriptions/me/cancel` | cancela. Idempotente |
+
+**Assinar não cobra.** A assinatura nasce em trial com um mês pela frente; cobrar é ato separado, e
+é o que a faz virar ativa.
+
+**Cobrança recusada responde `200`**, não `4xx`. A requisição foi atendida e o serviço fez o que
+devia — quem recusou foi o provedor. O resultado está no corpo:
+
+```json
+{ "subscription": { "status": "incomplete" }, "charged": false,
+  "transactionId": "fake-…", "reason": "the card was refused" }
+```
+
+É esse `reason` que o front mostra para a pessoa trocar o cartão. Assinatura **não vencida** responde
+`charged: false` com `transactionId` nulo, sem sequer chamar o provedor: cobrar antes do vencimento
+seria cobrar duas vezes no mês.
+
+Conta **sem endereço de cobrança** recebe `422` dizendo o que falta, em vez de uma tentativa que
+falharia no provedor. Quem assinou precisa chamar `PUT /accounts/me/billing-address` antes de cobrar.
+
+Quem já tem assinatura não cancelada recebe `409` ao assinar de novo. **Cancelada não tranca a
+conta**: reassinar é legítimo, e a assinatura nova é outra.
+
+A tolerância antes do cancelamento é `subscription.tolerance-days`, com **2** como padrão. `0`
+cancela na primeira recusa.
+
+### O provedor de pagamento é de mentira
+
+Não há provedor de verdade ainda. O que existe é um `FakePaymentGateway` que decide pelo **prefixo
+do token do cartão**, e não um mock que aprova sempre — é o que torna os três caminhos do ciclo
+exercitáveis à mão:
+
+| Token do cartão | O que acontece |
+|---|---|
+| `tok_refused…` | recusado pelo provedor, com transação aberta |
+| `tok_unreachable…` | recusado sem transação: o provedor não respondeu |
+| qualquer outro | aprovado |
+
+Ele avisa no log a cada cobrança que é de mentira, e **não sobe em produção**: sem provedor de
+verdade configurado, o perfil `production` não sobe. Não subir é melhor que subir aprovando toda
+cobrança em silêncio.
+
+O corpo da cobrança leva **só o token do cartão**. Número e CVV não têm campo onde entrar — quem os
+troca por um token é o provedor, direto com o navegador de quem assina —, e isso mantém o serviço
+fora do escopo do PCI DSS.
+
+### Para ver o ciclo inteiro à mão
+
+O vencimento é de um mês, então à mão só se vê a cobrança recusar por não estar vencida. Para ver a
+virada do estado, a pasta `3. Assinatura` da coleção cobre as respostas, e a jornada automatizada
+(`SubscriptionE2ETest`) adianta o relógio e passa por trial → ativa → incompleta → cancelada.
+
 ## Autenticação
 
 O realm é o mesmo dos outros serviços, em `../provisioning/keycloak/realm.json`, e as roles que
@@ -238,17 +314,33 @@ A divisão das rotas é essa:
 
 | Rota | Quem alcança |
 |---|---|
-| `POST /accounts/sign-up` | qualquer um, sem token |
+| `POST /accounts/sign-up`, `POST /accounts/sign-up/confirm` | qualquer um, sem token |
 | `/plans/**` | `CODEFLIX_ADMIN` |
 | `/accounts/**`, `/subscriptions/**` | `CODEFLIX_ADMIN` ou `CODEFLIX_SUBSCRIBER` |
 | a documentação da API | qualquer um (e em produção ela está desligada) |
 
-O cadastro é a única rota aberta, e não poderia ser outra coisa: quem se cadastra ainda não tem
-usuário no Keycloak para pedir um token — é justamente ele que cria o usuário lá.
+Token válido de um client de **outro** serviço — o da `videos-api`, por exemplo — recebe `403`: ele
+não tem nenhuma das duas roles daqui. Já um token que tem a role mas não tem conta neste serviço
+recebe `404`, porque aí a autorização passou e conta é que não há.
+
+As duas do cadastro são as únicas rotas abertas, e não poderiam ser outra coisa: quem se cadastra
+ainda não tem usuário no Keycloak para pedir um token — é justamente o cadastro que cria o usuário
+lá — e quem clica no link do e-mail também não.
 
 A segurança fica ligada em **todos** os perfis, inclusive no `development`. A referência do curso a
 desliga com `@Profile("!development")`, e isso deixaria o controle de acesso sem ser exercitado
 justamente no ambiente em que se trabalha.
+
+### Não há fluxo de senha direta no realm
+
+Nenhum client do realm versionado aceita usuário e senha, e isso é escolha: o fluxo de senha direta
+foi depreciado no OAuth 2.1, e um front de navegador deve usar código de autorização com PKCE.
+
+A consequência prática é que **não se obtém token de uma pessoa pela linha de comando** — por isso a
+coleção de requisições usa o token de client, cujo `sub` não é pessoa nenhuma, e as rotas `/me`
+respondem `404` para ele. A jornada automatizada precisa de token de pessoa de verdade, e cria um
+client só para isso **dentro do container de teste**; ele não existe em
+`../provisioning/keycloak/realm.json`.
 
 ## Nota sobre o CDC
 
