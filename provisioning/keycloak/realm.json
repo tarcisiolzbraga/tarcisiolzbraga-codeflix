@@ -59,6 +59,17 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "secret": "__KEYCLOAK_CLIENT_SECRET__"
+    },
+    {
+      "clientId": "subscription-api-codeflix",
+      "name": "A subscription-api-codeflix, que administra os usuários do realm",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "secret": "__KEYCLOAK_CLIENT_SECRET__"
     }
   ],
 
@@ -93,6 +104,22 @@
       "realmRoles": [
         "CODEFLIX_SUBSCRIBER"
       ]
+    },
+    {
+      "username": "service-account-subscription-api-codeflix",
+      "enabled": true,
+      "serviceAccountClientId": "subscription-api-codeflix",
+      "clientRoles": {
+        "realm-management": [ "manage-users", "view-users" ]
+      }
+    }
+  ],
+
+  "groups": [
+    {
+      "name": "subscribers",
+      "path": "/subscribers",
+      "realmRoles": [ "CODEFLIX_SUBSCRIBER" ]
     }
   ]
 }
