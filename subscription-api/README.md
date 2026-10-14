@@ -109,6 +109,75 @@ não há task `flywayMigrate` separada como na referência do curso.
 Nunca editar migration já commitada: o checksum muda e o Flyway para em estado de reparação. O
 ajuste é uma migration nova.
 
+## O cadastro
+
+```mermaid
+flowchart TD
+    A[POST /accounts/sign-up] --> B{o e-mail já tem conta?}
+    B -->|sim| C[202, e nenhum e-mail sai]
+    B -->|não| D{já existe no Keycloak?}
+    D -->|sim| E[reaproveita a pessoa de lá]
+    D -->|não| F[cria no Keycloak com a senha]
+    E --> G[guarda o pendente e publica a validação]
+    F --> G
+    G --> H[202: 'a validation email is on its way']
+    H --> I[a pessoa clica no link] --> J[POST /accounts/sign-up/confirm]
+    J --> K[a conta nasce, e o e-mail vira conferido no Keycloak]
+```
+
+| Rota | Quem alcança | O que faz |
+|---|---|---|
+| `POST /accounts/sign-up` | qualquer um, sem token | pede o cadastro. Responde **202** e a **mesma** mensagem sempre |
+| `POST /accounts/sign-up/confirm` | qualquer um, sem token | confirma com o token do e-mail. É aqui que a conta nasce |
+
+As duas são abertas porque não poderiam ser outra coisa: quem se cadastra ainda não tem usuário no
+Keycloak para pedir token, e quem clica no link também não — é justamente a confirmação que marca o
+e-mail como conferido.
+
+### A resposta é sempre igual, de propósito
+
+E-mail novo, e-mail que já existe no Keycloak e e-mail que já tem conta recebem **202 com a mesma
+mensagem**. Qualquer diferença contaria a um estranho se um endereço está cadastrado. É por isso que
+o caso de uso de cadastrar não devolve nada: o controller não tem como responder diferente por
+acidente.
+
+Quem pede o cadastro com o e-mail de outra pessoa não avança: a validação vai para a caixa de
+entrada **dela**, e sem o token não há confirmação. E não se cria usuário quando o e-mail já existe
+no Keycloak, então **ninguém sobrescreve a senha de outro** se cadastrando com o endereço dele.
+
+### O token
+
+Sorteado com `SecureRandom`, 32 bytes, em base64 de URL. O banco guarda só o **resumo SHA-256** — um
+vazamento de leitura do banco não entrega confirmação de cadastro alheio. O que vai no e-mail é o
+token em claro, e ele vive 24 horas.
+
+Pedir o cadastro de novo é legítimo, porque a mensagem pode não ter chegado: o pedido novo apaga os
+pendentes não confirmados daquele e-mail, então **só o link mais novo vale**.
+
+Clicar no link duas vezes devolve a **mesma conta**, e não um erro.
+
+### Por que a conta é gravada antes do pendente
+
+A ordem é escolhida para que interrupção no meio se conserte por repetição, e não por intervenção.
+Morrendo o processo entre as duas gravações, sobra conta sem confirmação — e repetir reconhece esse
+estado e termina o serviço. Na ordem inversa sobraria pendente confirmado sem conta, com o token já
+gasto, e a pessoa ficaria travada.
+
+Por isso não há transação envolvendo as duas escritas: ela também não cobriria a chamada ao
+Keycloak, que vem depois e não participa de transação de banco.
+
+### Quem envia o e-mail
+
+Não é este serviço. Ele publica o pedido em `mail.events` com a routing key
+`mail.signup.validation`, e a mensagem leva o endereço, o primeiro nome e o **link pronto**. Quem
+entrega é um serviço de e-mail próprio, que ainda não existe — então, hoje, a mensagem fica na fila.
+
+Para experimentar à mão: suba o RabbitMQ, faça o cadastro, e pegue o link em
+`mail.signup.validation.queue` pelo painel do broker, na 15672.
+
+O link aponta para a página do front (`SIGNUP_CONFIRMATION_URL`), não para uma rota desta API: é o
+front que chama o `POST` de confirmar com o token. Front também não existe ainda.
+
 ## As rotas do plano
 
 O plano é administração: quem o cria e altera é o operador do catálogo.
