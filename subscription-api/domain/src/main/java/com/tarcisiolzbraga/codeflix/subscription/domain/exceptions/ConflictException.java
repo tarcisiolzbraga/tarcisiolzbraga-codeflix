@@ -18,6 +18,13 @@ public class ConflictException extends DomainException {
         super(message);
     }
 
+    // O e-mail é por onde a pessoa entra, então dois cadastros com o mesmo não coexistem. Quem chama
+    // precisa distinguir isto de erro interno: é o que leva o cadastro a só mandar validar, em vez
+    // de tentar criar de novo.
+    public static ConflictException emailAlreadyTaken(final String email) {
+        return new ConflictException("the email %s is already taken".formatted(email));
+    }
+
     public static ConflictException staleVersion(
             final Class<? extends AggregateRoot<?>> aggregate, final Identifier id) {
         return new ConflictException(MESSAGE_TEMPLATE.formatted(aggregate.getSimpleName(), id.getValue()));
