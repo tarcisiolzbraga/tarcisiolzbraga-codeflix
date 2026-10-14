@@ -119,6 +119,26 @@ class AccountJdbcGatewayIT {
                 actual.getMessage());
     }
 
+    // O cadastro usa esta busca para saber se já existe conta para o e-mail.
+    @Test
+    void givenAStoredAccount_whenLooksItUpByEmail_thenFindsIt() {
+        final var account = AccountFixture.account();
+        gateway.save(account);
+
+        final var actual = gateway.accountOfEmail(AccountFixture.email()).orElseThrow();
+
+        assertEquals(account.id(), actual.id());
+    }
+
+    @Test
+    void givenAnEmailWithNoAccount_whenLooksItUp_thenNothingComesBack() {
+        gateway.save(AccountFixture.account());
+
+        final var actual = gateway.accountOfEmail(new Email("ninguem@codeflix.com.br"));
+
+        assertTrue(actual.isEmpty());
+    }
+
     @Test
     void givenAMissingId_whenReadsIt_thenNothingComesBack() {
         final var anId = AccountId.unique();

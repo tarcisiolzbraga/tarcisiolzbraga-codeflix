@@ -40,6 +40,12 @@ public class AccountJdbcGateway implements AccountGateway {
     }
 
     @Override
+    public Optional<Account> accountOfEmail(final Email anEmail) {
+        final var sql = "SELECT %s FROM account WHERE email = :email".formatted(COLUMNS);
+        return this.database.queryOne(sql, Map.of("email", anEmail.value()), accountMapper());
+    }
+
+    @Override
     public Account save(final Account anAccount) {
         if (anAccount.version() == 0) {
             insert(anAccount);
