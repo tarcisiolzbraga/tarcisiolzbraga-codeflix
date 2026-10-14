@@ -46,6 +46,12 @@ public class AccountJdbcGateway implements AccountGateway {
     }
 
     @Override
+    public Optional<Account> accountOfUserId(final UserId anUserId) {
+        final var sql = "SELECT %s FROM account WHERE idp_user_id = :userId".formatted(COLUMNS);
+        return this.database.queryOne(sql, Map.of("userId", anUserId.value()), accountMapper());
+    }
+
+    @Override
     public Account save(final Account anAccount) {
         if (anAccount.version() == 0) {
             insert(anAccount);

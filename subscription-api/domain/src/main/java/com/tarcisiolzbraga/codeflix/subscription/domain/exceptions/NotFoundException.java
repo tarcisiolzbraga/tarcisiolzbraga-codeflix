@@ -20,6 +20,12 @@ public class NotFoundException extends DomainException {
 
     // Sem o token na mensagem, de propósito: ele é a credencial do e-mail, e mensagem de erro vai
     // para log e para o corpo da resposta. Dizer que não existe já é tudo o que o cliente precisa.
+    // Token válido de quem não tem conta aqui — um service account, por exemplo — não é falha de
+    // autenticação: é não ter conta. Não repete o id de quem chamou, que ele já tem.
+    public static NotFoundException callerAccount() {
+        return new NotFoundException("there is no account for whoever is calling");
+    }
+
     public static NotFoundException signUpLink() {
         return new NotFoundException("the sign-up link was not found or is no longer valid");
     }

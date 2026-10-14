@@ -7,6 +7,8 @@ import static com.tarcisiolzbraga.codeflix.subscription.infrastructure.api.ApiRe
 import static com.tarcisiolzbraga.codeflix.subscription.infrastructure.api.ApiResponseDocs.UNPROCESSABLE;
 import static com.tarcisiolzbraga.codeflix.subscription.infrastructure.api.ApiResponseDocs.UNPROCESSABLE_DESCRIPTION;
 
+import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.AccountResponse;
+import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.BillingAddressRequest;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.ConfirmSignUpRequest;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.ConfirmSignUpResponse;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.SignUpRequest;
@@ -18,7 +20,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
+import java.security.Principal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -67,4 +72,37 @@ public interface AccountAPI {
             description = "O link venceu, ou o token está mal formado",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     ConfirmSignUpResponse confirmSignUp(@RequestBody ConfirmSignUpRequest request);
+
+    // `/me` em vez de `/{id}`: com id no caminho, um assinante poderia pedir a conta de outro, e
+    // toda rota daqui teria de conferir propriedade. A conta sai do `sub` do token, que é o mesmo id
+    // do provedor que a conta guarda, e a pergunta "esta conta é sua?" deixa de existir.
+    @GetMapping("/me")
+    @Operation(summary = "A conta de quem está chamando", description = "Identificada pelo token, não por id.")
+    @ApiResponse(
+            responseCode = OK,
+            description = "A conta",
+            content = @Content(schema = @Schema(implementation = AccountResponse.class)))
+    @ApiResponse(
+            responseCode = NOT_FOUND,
+            description = "O token é válido, mas quem o apresenta não tem conta aqui",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    AccountResponse myAccount(Principal caller);
+
+    @PutMapping("/me/billing-address")
+    @Operation(
+            summary = "Troca o endereço de cobrança",
+            description = "Substitui o endereço inteiro. Só o complemento é opcional.")
+    @ApiResponse(
+            responseCode = OK,
+            description = "A conta, já com o endereço novo",
+            content = @Content(schema = @Schema(implementation = AccountResponse.class)))
+    @ApiResponse(
+            responseCode = NOT_FOUND,
+            description = "O token é válido, mas quem o apresenta não tem conta aqui",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(
+            responseCode = UNPROCESSABLE,
+            description = UNPROCESSABLE_DESCRIPTION,
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    AccountResponse changeBillingAddress(Principal caller, @RequestBody BillingAddressRequest request);
 }

@@ -139,6 +139,27 @@ class AccountJdbcGatewayIT {
         assertTrue(actual.isEmpty());
     }
 
+    // É por aqui que a rota de autoatendimento acha a conta de quem está chamando, pelo `sub` do
+    // token.
+    @Test
+    void givenAStoredAccount_whenLooksItUpByTheProviderId_thenFindsIt() {
+        final var account = AccountFixture.account();
+        gateway.save(account);
+
+        final var actual = gateway.accountOfUserId(AccountFixture.userId()).orElseThrow();
+
+        assertEquals(account.id(), actual.id());
+    }
+
+    @Test
+    void givenAProviderIdWithNoAccount_whenLooksItUp_thenNothingComesBack() {
+        gateway.save(AccountFixture.account());
+
+        final var actual = gateway.accountOfUserId(new UserId("ninguem"));
+
+        assertTrue(actual.isEmpty());
+    }
+
     @Test
     void givenAMissingId_whenReadsIt_thenNothingComesBack() {
         final var anId = AccountId.unique();
