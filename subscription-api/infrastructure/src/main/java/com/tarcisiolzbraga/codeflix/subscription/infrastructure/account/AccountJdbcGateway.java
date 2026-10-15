@@ -1,5 +1,6 @@
 package com.tarcisiolzbraga.codeflix.subscription.infrastructure.account;
 
+import com.tarcisiolzbraga.codeflix.subscription.domain.DomainEventPublisher;
 import com.tarcisiolzbraga.codeflix.subscription.domain.account.Account;
 import com.tarcisiolzbraga.codeflix.subscription.domain.account.AccountGateway;
 import com.tarcisiolzbraga.codeflix.subscription.domain.account.AccountId;
@@ -18,6 +19,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 // Sem entidade espelhando a tabela: o mapeador lê o ResultSet direto para dentro do agregado.
 @Repository
@@ -28,9 +30,11 @@ public class AccountJdbcGateway implements AccountGateway {
             address_zipcode, address_number, address_complement, address_country""";
 
     private final DatabaseClient database;
+    private final DomainEventPublisher events;
 
-    public AccountJdbcGateway(final DatabaseClient database) {
+    public AccountJdbcGateway(final DatabaseClient database, final DomainEventPublisher events) {
         this.database = Objects.requireNonNull(database, "'database' should not be null");
+        this.events = Objects.requireNonNull(events, "'events' should not be null");
     }
 
     @Override
@@ -51,13 +55,17 @@ public class AccountJdbcGateway implements AccountGateway {
         return this.database.queryOne(sql, Map.of("userId", anUserId.value()), accountMapper());
     }
 
+    // @Transactional pelo mesmo motivo do SubscriptionJdbcGateway: a conta e a fila de saída são
+    // duas tabelas, e as duas escritas precisam acontecer juntas ou nenhuma.
     @Override
+    @Transactional
     public Account save(final Account anAccount) {
         if (anAccount.version() == 0) {
             insert(anAccount);
         } else {
             update(anAccount);
         }
+        anAccount.publishDomainEvents(this.events);
         return anAccount;
     }
 

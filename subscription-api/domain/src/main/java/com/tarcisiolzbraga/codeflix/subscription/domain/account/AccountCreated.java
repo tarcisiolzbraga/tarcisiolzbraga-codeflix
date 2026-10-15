@@ -4,9 +4,10 @@ import com.tarcisiolzbraga.codeflix.subscription.domain.DomainEvent;
 import com.tarcisiolzbraga.codeflix.subscription.domain.utils.InstantUtils;
 import java.time.Instant;
 
-// A conta existir é o fato que o resto do sistema espera: é por ele que o assinante entra no grupo
-// de assinantes no provedor de identidade. Ninguém o consome ainda — a fila de saída é a fatia
-// seguinte —, e o agregado já o registra para o consumidor não precisar de mudança no domínio.
+// A conta existir é o fato, e ele é publicado para quem vier a se interessar — não para conceder
+// acesso: a role de conta é concedida pela própria confirmação do cadastro, em linha, porque sem
+// ela a pessoa não alcançaria nem a rota de assinar e não se pode fazer isso depender de o CDC
+// estar de pé. Quem depende de evento é o catálogo, que vem da assinatura.
 public record AccountCreated(String aggregateId, Instant occurredOn) implements DomainEvent {
 
     private static final String AGGREGATE_TYPE = "Account";
