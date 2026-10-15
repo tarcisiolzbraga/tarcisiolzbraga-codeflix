@@ -91,7 +91,7 @@
                 },
                 {
                   "key": "client_id",
-                  "value": "subscriber-codeflix"
+                  "value": "catalog-test-codeflix"
                 },
                 {
                   "key": "client_secret",
@@ -99,7 +99,7 @@
                 }
               ]
             },
-            "description": "O client subscriber-codeflix, com a role CODEFLIX_SUBSCRIBER: é com ele que um consumidor lê o catálogo."
+            "description": "O client catalog-test-codeflix, com a role CODEFLIX_SUBSCRIBER fixa: ele burla o gate da assinatura de propósito, para o catálogo ser exercitado sem subir a subscription-api inteira. Um consumidor de verdade NÃO lê o catálogo assim: ele recebe a role pelo grupo subscribers, que a assinatura concede e o cancelamento revoga."
           },
           "event": [
             {

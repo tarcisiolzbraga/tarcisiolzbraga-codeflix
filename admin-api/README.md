@@ -72,8 +72,8 @@ springdoc já está desligado. Sem token a resposta é 401; com token válido e 
 O realm traz quatro clients: `admin-codeflix`, com a role de administrador; `categories-codeflix`, só com a de
 categorias — este serve justamente para ver o 403 nas rotas dos outros agregados; `videos-api-codeflix`, com
 as quatro roles de leitura, que é a credencial da API de catálogo e nunca escreve nada aqui; e
-`subscriber-codeflix`, com a role de assinante, que **não** serve para nada aqui — ela existe para ler o
-catálogo do outro lado, e está neste realm porque o realm é um só. As notas do realm estão em
+`catalog-test-codeflix`, com a role de assinante, que **não** serve para nada aqui — é um client de teste
+que lê o catálogo do outro lado, e está neste realm porque o realm é um só. As notas do realm estão em
 `../provisioning/keycloak/README.md`, porque o Keycloak recusa comentário dentro do arquivo de import.
 
 **A entrada no `/etc/hosts` não é opcional.** O `iss` do token é a URL que o cliente usou para pedi-lo, e a

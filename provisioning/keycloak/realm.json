@@ -51,8 +51,8 @@
       "secret": "__KEYCLOAK_CLIENT_SECRET__"
     },
     {
-      "clientId": "subscriber-codeflix",
-      "name": "Assinante, que lê o catálogo servido pela videos-api-codeflix",
+      "clientId": "catalog-test-codeflix",
+      "name": "CLIENT DE TESTE: lê o catálogo sem assinatura, de propósito. Não é como um consumidor lê — veja o README do realm",
       "enabled": true,
       "publicClient": false,
       "serviceAccountsEnabled": true,
@@ -119,9 +119,9 @@
       ]
     },
     {
-      "username": "service-account-subscriber-codeflix",
+      "username": "service-account-catalog-test-codeflix",
       "enabled": true,
-      "serviceAccountClientId": "subscriber-codeflix",
+      "serviceAccountClientId": "catalog-test-codeflix",
       "realmRoles": [
         "CODEFLIX_SUBSCRIBER"
       ]

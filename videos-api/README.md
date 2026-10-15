@@ -81,12 +81,17 @@ Para usar o GraphiQL local, pegue um token do Keycloak do compose do admin e col
 ```bash
 curl -s -X POST http://localhost:8081/realms/codeflix/protocol/openid-connect/token \
   -d grant_type=client_credentials \
-  -d client_id=subscriber-codeflix \
+  -d client_id=catalog-test-codeflix \
   -d client_secret="$KEYCLOAK_CLIENT_SECRET" | jq -r .access_token
 ```
 
-O client `subscriber-codeflix` é o do assinante; para a mutation de exemplo, use o `admin-codeflix`.
-Os dois vivem no realm da raiz do monorepo, que é um só — veja `../provisioning/keycloak/README.md`.
+O `catalog-test-codeflix` é um **client de teste**: ele tem a role de assinante fixa e por isso lê o
+catálogo sem assinatura nenhuma, o que é exatamente o atalho que se quer ao exercitar o catálogo sozinho.
+Um consumidor de verdade não entra assim — ele recebe a role pelo grupo `subscribers`, que a
+`subscription-api` concede quando a assinatura passa a valer e revoga no cancelamento.
+
+Para a mutation de exemplo, use o `admin-codeflix`. Os dois vivem no realm da raiz do monorepo, que é um
+só — veja `../provisioning/keycloak/README.md`.
 
 ### Perfis
 

@@ -61,7 +61,7 @@ class CastMemberE2ETest implements CastMemberE2EDsl {
 
     @BeforeEach
     void bindToTheRunningServer() {
-        this.client = clientWith(this.token.subscriber());
+        this.client = clientWith(this.token.catalogTest());
     }
 
     // O token vai no cabeçalho padrão do cliente: é como um consumidor de verdade fala com a API,

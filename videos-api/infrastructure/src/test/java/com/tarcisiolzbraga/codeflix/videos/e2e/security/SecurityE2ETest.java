@@ -54,7 +54,7 @@ class SecurityE2ETest {
 
     @Test
     void givenTheSubscriberRole_whenReadTheCatalog_thenServeIt() {
-        final var actualResponse = read(this.token.subscriber());
+        final var actualResponse = read(this.token.catalogTest());
 
         assertNull(actualResponse.get("errors"), String.valueOf(actualResponse.get("errors")));
         assertNotNull(actualResponse.get("data"));
@@ -82,7 +82,7 @@ class SecurityE2ETest {
     // nele. É aqui que essa diferença fica provada.
     @Test
     void givenTheSubscriberRole_whenCallTheExampleMutation_thenRefuseIt() {
-        final var actualResponse = save(this.token.subscriber());
+        final var actualResponse = save(this.token.catalogTest());
 
         assertEquals("FORBIDDEN", classificationOf(actualResponse));
     }
