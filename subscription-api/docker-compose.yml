@@ -30,6 +30,7 @@ services:
       SUBSCRIPTION_DB_HOST: subscription-mysql
       SUBSCRIPTION_DB_PORT: 3306
       KEYCLOAK_ISSUER_URI: http://keycloak:${KEYCLOAK_PORT}/realms/${KEYCLOAK_REALM}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     ports:
       - "${SUBSCRIPTION_APP_PORT}:8084"
     # service_healthy no banco, e não só started: o Flyway roda na subida e a aplicação sai se não

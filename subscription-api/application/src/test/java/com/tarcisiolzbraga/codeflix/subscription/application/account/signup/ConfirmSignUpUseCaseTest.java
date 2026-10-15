@@ -94,10 +94,10 @@ class ConfirmSignUpUseCaseTest {
         verify(identityProviderGateway).markEmailVerified(AccountFixture.userId());
     }
 
-    // A role de assinante vem com a conta, não com a assinatura: as rotas de assinatura a exigem, e
-    // sem ela não haveria como assinar — quem confirma o cadastro ficaria trancado para fora.
+    // O que a confirmação concede é **conta**, não catálogo. A primeira versão disto dava a role de
+    // assinante aqui, e aí quem só confirmava um e-mail passava a poder assistir sem pagar.
     @Test
-    void givenAValidToken_whenConfirms_thenTheProviderGrantsSubscriberAccess() {
+    void givenAValidToken_whenConfirms_thenTheProviderGrantsAccountAccess() {
         final var token = SignUpToken.generate();
         when(pendingSignUpGateway.pendingSignUpOfToken(any())).thenReturn(Optional.of(pendingFor(token)));
         when(accountGateway.accountOfEmail(any())).thenReturn(Optional.empty());
@@ -106,11 +106,27 @@ class ConfirmSignUpUseCaseTest {
 
         useCase().execute(new ConfirmSignUpCommand(token.value()));
 
-        verify(identityProviderGateway).addToSubscribers(AccountFixture.userId());
+        verify(identityProviderGateway).grantAccountAccess(AccountFixture.userId());
+    }
+
+    // O teste que guarda o furo: confirmar um cadastro **não** dá acesso ao catálogo. A role de
+    // assinante é o que a videos-api exige nas queries, e concedê-la aqui deixava qualquer pessoa
+    // que confirmasse um e-mail assistir sem assinar e sem pagar. Quem a concede é a assinatura.
+    @Test
+    void givenAValidToken_whenConfirms_thenNoCatalogAccessIsGranted() {
+        final var token = SignUpToken.generate();
+        when(pendingSignUpGateway.pendingSignUpOfToken(any())).thenReturn(Optional.of(pendingFor(token)));
+        when(accountGateway.accountOfEmail(any())).thenReturn(Optional.empty());
+        when(accountGateway.save(any())).thenAnswer(returnsFirstArg());
+        when(pendingSignUpGateway.save(any())).thenAnswer(returnsFirstArg());
+
+        useCase().execute(new ConfirmSignUpCommand(token.value()));
+
+        verify(identityProviderGateway, never()).grantCatalogAccess(any());
     }
 
     // O acesso é concedido depois de a conta existir: conceder antes deixaria, numa interrupção,
-    // alguém com role de assinante e sem conta neste serviço.
+    // alguém com a role e sem conta neste serviço.
     @Test
     void givenAValidToken_whenConfirms_thenTheAccountIsStoredBeforeTheProviderIsTold() {
         final var token = SignUpToken.generate();
@@ -123,7 +139,7 @@ class ConfirmSignUpUseCaseTest {
 
         final var order = inOrder(accountGateway, identityProviderGateway);
         order.verify(accountGateway).save(any());
-        order.verify(identityProviderGateway).addToSubscribers(AccountFixture.userId());
+        order.verify(identityProviderGateway).grantAccountAccess(AccountFixture.userId());
     }
 
     // O estado que uma interrupção entre gravar a conta e falar com o provedor deixa: conta criada
@@ -138,7 +154,7 @@ class ConfirmSignUpUseCaseTest {
         useCase().execute(new ConfirmSignUpCommand(token.value()));
 
         verify(accountGateway, never()).save(any());
-        verify(identityProviderGateway).addToSubscribers(AccountFixture.userId());
+        verify(identityProviderGateway).grantAccountAccess(AccountFixture.userId());
     }
 
     @Test

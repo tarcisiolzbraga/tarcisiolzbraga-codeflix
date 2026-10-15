@@ -55,6 +55,12 @@ spring:
     port: ${AMQP_PORT}
     username: ${AMQP_USER}
     password: ${AMQP_PASSWORD}
+  # Só consumo: a escrita de evento vai para a tabela, e quem a leva ao Kafka é o Debezium.
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
 # Autenticação. Como no banco, sem valor padrão: variável faltando derruba a subida em vez de
 # validar token contra o emissor errado.
@@ -69,6 +75,8 @@ keycloak:
     client-id: ${SUBSCRIPTION_KEYCLOAK_CLIENT_ID}
     client-secret: ${KEYCLOAK_CLIENT_SECRET}
     # Por nome, não por id: o id nasce na importação do realm e muda a cada recriação do container.
+    # São dois grupos porque são dois acessos: ter conta aqui, e poder assistir.
+    accounts-group: ${KEYCLOAK_ACCOUNTS_GROUP:accounts}
     subscribers-group: ${KEYCLOAK_SUBSCRIBERS_GROUP:subscribers}
 
 # O que sai deste serviço: o pedido de validação de e-mail. Quem entrega é um serviço de e-mail
@@ -85,6 +93,28 @@ amqp:
   # Onde a pessoa confirma o cadastro: é a página do front, não uma rota desta API. O link do e-mail
   # leva até lá, e é o front que chama o POST de confirmar com o token.
   confirmation-url: ${SIGNUP_CONFIRMATION_URL}
+
+# O que entra neste serviço pelo CDC: a própria fila de saída, lida de volta do binlog.
+#
+# O nome do tópico é <topic.prefix>.<banco>.<tabela>, e tem de casar com o
+# ../provisioning/cdc/subscription-mysql-cdc.json. Divergir faz o consumidor esperar por um tópico
+# que nunca recebe nada — sem erro no log, que é o pior jeito de falhar.
+kafka:
+  consumers:
+    events:
+      id: kafka-listener-events
+      topics: subscription_mysql.subscription.event
+      group-id: subscription-api-codeflix
+      # Um só: os tópicos do Debezium nascem com uma partição, e é ela que garante a ordem dos
+      # eventos de uma mesma assinatura — cancelado chegando antes de renovado daria o estado errado.
+      concurrency: 1
+      # earliest para nenhum evento gravado antes da primeira subida do consumidor ficar sem
+      # consequência: com latest, quem assinasse enquanto o consumidor estivesse fora ficaria sem
+      # acesso ao catálogo para sempre.
+      auto-offset-reset: earliest
+      # Mesma conta da videos-api: o atraso dobra a cada tentativa, então 7 toleram 63 segundos de
+      # Keycloak fora do ar. O que passar disso vai para a fila morta, que só registra em log.
+      max-attempts: 7
 
 # Identifica a aplicação no log estruturado, que é como o Kibana a separa das outras.
 logging:

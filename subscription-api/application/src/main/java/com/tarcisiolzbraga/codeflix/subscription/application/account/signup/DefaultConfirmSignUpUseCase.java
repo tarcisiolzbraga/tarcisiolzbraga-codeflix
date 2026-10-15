@@ -49,7 +49,7 @@ public class DefaultConfirmSignUpUseCase extends ConfirmSignUpUseCase {
 
         final var account = this.gateways.accounts().save(pending.toAccount(AccountId.unique()));
         this.gateways.pendingSignUps().save(pending);
-        grantSubscriberAccess(pending);
+        grantAccountAccess(pending);
 
         return ConfirmSignUpOutput.from(account);
     }
@@ -72,21 +72,24 @@ public class DefaultConfirmSignUpUseCase extends ConfirmSignUpUseCase {
         // Repetido aqui, e não só no caminho de cima: é o que faz repetir consertar: se o processo
         // morreu depois de gravar a conta e antes de falar com o provedor, a pessoa teria conta e
         // nenhum acesso, e clicar no link de novo termina o serviço.
-        grantSubscriberAccess(pending);
+        grantAccountAccess(pending);
         return ConfirmSignUpOutput.from(existing);
     }
 
-    // A role de assinante vem junto com a conta, e não com a assinatura.
+    // O que a confirmação concede é **conta**, não catálogo.
     //
-    // É tentador amarrá-la a ter assinatura viva, mas aí nasceria um nó: as rotas de assinatura
-    // exigem a role, e sem a role não haveria como assinar. O que a role diz é "tem conta neste
-    // serviço"; quem tem direito ao catálogo é outra pergunta, decidida pelo estado da assinatura e
-    // de quem serve o vídeo, não por grupo no provedor de identidade.
+    // A primeira versão disto concedia a role de assinante aqui, e estava errada: quem só
+    // confirmasse um e-mail passava a poder assistir, porque é `CODEFLIX_SUBSCRIBER` que a
+    // videos-api exige nas queries do catálogo. Ninguém pagava e ninguém perdia o acesso ao
+    // cancelar. O defeito não aparecia olhando este serviço sozinho.
+    //
+    // Agora são dois acessos: aqui vem o de conta, que é o que permite alcançar a rota de assinar;
+    // o do catálogo vem e sai com a assinatura, pelos eventos de domínio.
     //
     // As duas chamadas são idempotentes do lado do Keycloak: conferir e-mail já conferido e pôr num
     // grupo em que já está não mudam nada, e é isso que permite chamá-las em dois caminhos.
-    private void grantSubscriberAccess(final PendingSignUp pending) {
+    private void grantAccountAccess(final PendingSignUp pending) {
         this.gateways.identityProvider().markEmailVerified(pending.userId());
-        this.gateways.identityProvider().addToSubscribers(pending.userId());
+        this.gateways.identityProvider().grantAccountAccess(pending.userId());
     }
 }

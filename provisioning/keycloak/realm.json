@@ -11,7 +11,8 @@
       { "name": "CODEFLIX_GENRES", "description": "Acesso aos gêneros" },
       { "name": "CODEFLIX_CAST_MEMBERS", "description": "Acesso aos membros de elenco" },
       { "name": "CODEFLIX_VIDEOS", "description": "Acesso aos vídeos" },
-      { "name": "CODEFLIX_SUBSCRIBER", "description": "Lê o catálogo servido pela videos-api-codeflix" }
+      { "name": "CODEFLIX_SUBSCRIBER", "description": "Lê o catálogo servido pela videos-api-codeflix" },
+      { "name": "CODEFLIX_ACCOUNT", "description": "Tem conta na subscription-api-codeflix e administra a própria assinatura" }
     ]
   },
 
@@ -140,6 +141,11 @@
       "name": "subscribers",
       "path": "/subscribers",
       "realmRoles": [ "CODEFLIX_SUBSCRIBER" ]
+    },
+    {
+      "name": "accounts",
+      "path": "/accounts",
+      "realmRoles": [ "CODEFLIX_ACCOUNT" ]
     }
   ]
 }

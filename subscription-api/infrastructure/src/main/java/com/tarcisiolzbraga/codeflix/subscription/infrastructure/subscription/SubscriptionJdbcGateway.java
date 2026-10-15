@@ -1,5 +1,6 @@
 package com.tarcisiolzbraga.codeflix.subscription.infrastructure.subscription;
 
+import com.tarcisiolzbraga.codeflix.subscription.domain.DomainEventPublisher;
 import com.tarcisiolzbraga.codeflix.subscription.domain.account.AccountId;
 import com.tarcisiolzbraga.codeflix.subscription.domain.exceptions.ConflictException;
 import com.tarcisiolzbraga.codeflix.subscription.domain.plan.PlanId;
@@ -18,6 +19,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class SubscriptionJdbcGateway implements SubscriptionGateway {
@@ -27,9 +29,11 @@ public class SubscriptionJdbcGateway implements SubscriptionGateway {
             created_at, updated_at""";
 
     private final DatabaseClient database;
+    private final DomainEventPublisher events;
 
-    public SubscriptionJdbcGateway(final DatabaseClient database) {
+    public SubscriptionJdbcGateway(final DatabaseClient database, final DomainEventPublisher events) {
         this.database = Objects.requireNonNull(database, "'database' should not be null");
+        this.events = Objects.requireNonNull(events, "'events' should not be null");
     }
 
     // A mais recente pela criação, e não pelo vencimento: reassinar depois de cancelar cria uma
@@ -47,13 +51,18 @@ public class SubscriptionJdbcGateway implements SubscriptionGateway {
                 sql, Map.of("accountId", anAccountId.getValue()), subscriptionMapper());
     }
 
+    // @Transactional porque são duas tabelas: a assinatura e a fila de saída. É isso que faz
+    // "gravou e avisou" ser atômico — sem a transação, o pool entrega a conexão com auto-commit
+    // ligado e a assinatura ficaria gravada com o evento perdido, ou o contrário.
     @Override
+    @Transactional
     public Subscription save(final Subscription aSubscription) {
         if (aSubscription.version() == 0) {
             insert(aSubscription);
         } else {
             update(aSubscription);
         }
+        aSubscription.publishDomainEvents(this.events);
         return aSubscription;
     }
 

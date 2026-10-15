@@ -130,12 +130,59 @@ class KeycloakIdentityProviderClientIT {
     // A asserção pergunta ao próprio Keycloak em quais grupos o usuário está: o gateway não expõe
     // isso, e não vai expor só para o teste — o que importa afirmar é o efeito no sistema de fora.
     @Test
-    void givenACreatedUser_whenAddsItToSubscribers_thenTheProviderPutsItInTheGroup() {
+    void givenACreatedUser_whenGrantsAccountAccess_thenTheProviderPutsItInTheAccountsGroup() {
         final var userId = gateway.create(newUserWith(anEmail()));
 
-        gateway.addToSubscribers(userId);
+        gateway.grantAccountAccess(userId);
 
-        assertEquals(List.of("subscribers"), groupsOf(userId));
+        assertEquals(List.of("accounts"), groupsOf(userId));
+    }
+
+    // Os dois acessos são independentes: ter conta não dá catálogo, e é exatamente isso que impede
+    // quem só confirmou um e-mail de assistir sem pagar.
+    @Test
+    void givenAUserWithAccountAccess_whenGrantsCatalogAccess_thenItIsInBothGroups() {
+        final var userId = gateway.create(newUserWith(anEmail()));
+        gateway.grantAccountAccess(userId);
+
+        gateway.grantCatalogAccess(userId);
+
+        assertEquals(List.of("accounts", "subscribers"), groupsOf(userId).stream().sorted().toList());
+    }
+
+    @Test
+    void givenAUserInBothGroups_whenRevokesCatalogAccess_thenOnlyTheAccountAccessRemains() {
+        final var userId = gateway.create(newUserWith(anEmail()));
+        gateway.grantAccountAccess(userId);
+        gateway.grantCatalogAccess(userId);
+
+        gateway.revokeCatalogAccess(userId);
+
+        assertEquals(List.of("accounts"), groupsOf(userId));
+    }
+
+    // Cancelar duas vezes, ou cancelar assinatura que nunca chegou a valer, não é erro: o Keycloak
+    // responde 204 ao tirar de um grupo em que a pessoa não está.
+    @Test
+    void givenAUserWithoutCatalogAccess_whenRevokesIt_thenNothingHappensAndItDoesNotFail() {
+        final var userId = gateway.create(newUserWith(anEmail()));
+        gateway.grantAccountAccess(userId);
+
+        gateway.revokeCatalogAccess(userId);
+
+        assertEquals(List.of("accounts"), groupsOf(userId));
+    }
+
+    // Conceder duas vezes também não é erro, e é o que permite a confirmação repetida consertar uma
+    // interrupção sem conferir antes.
+    @Test
+    void givenAUserAlreadyInTheGroup_whenGrantsAccountAccessAgain_thenItStaysInItOnce() {
+        final var userId = gateway.create(newUserWith(anEmail()));
+        gateway.grantAccountAccess(userId);
+
+        gateway.grantAccountAccess(userId);
+
+        assertEquals(List.of("accounts"), groupsOf(userId));
     }
 
     @Test
@@ -148,12 +195,21 @@ class KeycloakIdentityProviderClientIT {
     }
 
     @Test
-    void givenNoSuchUser_whenAddsItToSubscribers_thenTheFailureSurfaces() {
+    void givenNoSuchUser_whenGrantsAccountAccess_thenTheFailureSurfaces() {
         final var unknown = new UserId(UUID.randomUUID().toString());
 
-        final var actual = assertThrows(InternalErrorException.class, () -> gateway.addToSubscribers(unknown));
+        final var actual = assertThrows(InternalErrorException.class, () -> gateway.grantAccountAccess(unknown));
 
-        assertTrue(actual.getMessage().contains("add the user to the subscribers group"));
+        assertTrue(actual.getMessage().contains("add the user to the 'accounts' group"));
+    }
+
+    @Test
+    void givenNoSuchUser_whenRevokesCatalogAccess_thenTheFailureSurfaces() {
+        final var unknown = new UserId(UUID.randomUUID().toString());
+
+        final var actual = assertThrows(InternalErrorException.class, () -> gateway.revokeCatalogAccess(unknown));
+
+        assertTrue(actual.getMessage().contains("remove the user from the 'subscribers' group"));
     }
 
     private List<String> groupsOf(final UserId userId) {

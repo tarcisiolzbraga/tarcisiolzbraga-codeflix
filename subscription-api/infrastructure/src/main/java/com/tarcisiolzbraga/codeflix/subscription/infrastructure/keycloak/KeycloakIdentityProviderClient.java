@@ -108,12 +108,25 @@ public class KeycloakIdentityProviderClient implements IdentityProviderGateway {
         }
     }
 
-    // Resolve o id do grupo a cada chamada, sem guardar: o id nasce na importação do realm, e este
-    // realm é descartável — guardado, ele apontaria para nada depois de recriar o container. O custo
-    // é uma busca a mais numa operação que acontece uma vez por assinante.
     @Override
-    public void addToSubscribers(final UserId anUserId) {
-        final var groupId = subscribersGroupId();
+    public void grantAccountAccess(final UserId anUserId) {
+        join(anUserId, this.admin.accountsGroup());
+    }
+
+    @Override
+    public void grantCatalogAccess(final UserId anUserId) {
+        join(anUserId, this.admin.subscribersGroup());
+    }
+
+    @Override
+    public void revokeCatalogAccess(final UserId anUserId) {
+        leave(anUserId, this.admin.subscribersGroup());
+    }
+
+    // Pôr num grupo em que a pessoa já está devolve 204, e é o que permite chamar isto de dois
+    // caminhos da confirmação sem conferir antes.
+    private void join(final UserId anUserId, final String group) {
+        final var groupId = groupIdOf(group);
         try {
             this.restClient
                     .put()
@@ -121,14 +134,33 @@ public class KeycloakIdentityProviderClient implements IdentityProviderGateway {
                     .header(HttpHeaders.AUTHORIZATION, this.credentials.bearer())
                     .retrieve()
                     .toBodilessEntity();
-            LOG.debug("usuário {} entrou no grupo {}", anUserId.value(), this.admin.subscribersGroup());
+            LOG.debug("usuário {} entrou no grupo {}", anUserId.value(), group);
         } catch (final RestClientException exception) {
-            throw failure("add the user to the subscribers group", exception);
+            throw failure("add the user to the '%s' group".formatted(group), exception);
         }
     }
 
-    private String subscribersGroupId() {
-        final var name = this.admin.subscribersGroup();
+    // Tirar de um grupo em que a pessoa não está também devolve 204: cancelar duas vezes, ou
+    // cancelar assinatura que nunca chegou a valer, não é erro.
+    private void leave(final UserId anUserId, final String group) {
+        final var groupId = groupIdOf(group);
+        try {
+            this.restClient
+                    .delete()
+                    .uri(uri(USERS) + "/{id}/groups/{groupId}", anUserId.value(), groupId)
+                    .header(HttpHeaders.AUTHORIZATION, this.credentials.bearer())
+                    .retrieve()
+                    .toBodilessEntity();
+            LOG.debug("usuário {} saiu do grupo {}", anUserId.value(), group);
+        } catch (final RestClientException exception) {
+            throw failure("remove the user from the '%s' group".formatted(group), exception);
+        }
+    }
+
+    // Resolve o id do grupo a cada chamada, sem guardar: o id nasce na importação do realm, e este
+    // realm é descartável — guardado, ele apontaria para nada depois de recriar o container. O custo
+    // é uma busca a mais numa operação que acontece poucas vezes na vida de um assinante.
+    private String groupIdOf(final String name) {
         try {
             final var found = this.restClient
                     .get()
@@ -141,7 +173,7 @@ public class KeycloakIdentityProviderClient implements IdentityProviderGateway {
             }
             return String.valueOf(((Map<?, ?>) found.getFirst()).get("id"));
         } catch (final RestClientException exception) {
-            throw failure("look the subscribers group up", exception);
+            throw failure("look the '%s' group up".formatted(name), exception);
         }
     }
 

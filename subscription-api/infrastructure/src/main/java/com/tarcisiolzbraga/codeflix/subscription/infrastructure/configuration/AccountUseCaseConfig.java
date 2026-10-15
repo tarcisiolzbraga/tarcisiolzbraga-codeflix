@@ -1,5 +1,9 @@
 package com.tarcisiolzbraga.codeflix.subscription.infrastructure.configuration;
 
+import com.tarcisiolzbraga.codeflix.subscription.application.account.access.DefaultGrantCatalogAccessUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.account.access.DefaultRevokeCatalogAccessUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.account.access.GrantCatalogAccessUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.account.access.RevokeCatalogAccessUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.account.billing.ChangeBillingAddressUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.account.billing.DefaultChangeBillingAddressUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.account.get.DefaultGetMyAccountUseCase;
@@ -59,5 +63,19 @@ public class AccountUseCaseConfig {
     @Bean
     ChangeBillingAddressUseCase changeBillingAddressUseCase(final AccountGateway accounts) {
         return new DefaultChangeBillingAddressUseCase(accounts);
+    }
+
+    // Os dois acessos ao catálogo. Não têm rota: quem os chama é o consumidor dos eventos, porque
+    // eles são consequência de a assinatura começar ou acabar, não coisa que alguém pede.
+    @Bean
+    GrantCatalogAccessUseCase grantCatalogAccessUseCase(
+            final AccountGateway accounts, final IdentityProviderGateway identityProvider) {
+        return new DefaultGrantCatalogAccessUseCase(accounts, identityProvider);
+    }
+
+    @Bean
+    RevokeCatalogAccessUseCase revokeCatalogAccessUseCase(
+            final AccountGateway accounts, final IdentityProviderGateway identityProvider) {
+        return new DefaultRevokeCatalogAccessUseCase(accounts, identityProvider);
     }
 }

@@ -122,7 +122,7 @@ flowchart TD
     F --> G
     G --> H[202: 'a validation email is on its way']
     H --> I[a pessoa clica no link] --> J[POST /accounts/sign-up/confirm]
-    J --> K[a conta nasce, o e-mail vira conferido e a pessoa entra no grupo subscribers]
+    J --> K[a conta nasce, o e-mail vira conferido e a pessoa entra no grupo accounts]
 ```
 
 | Rota | Quem alcança | O que faz |
@@ -166,19 +166,18 @@ gasto, e a pessoa ficaria travada.
 Por isso não há transação envolvendo as duas escritas: ela também não cobriria a chamada ao
 Keycloak, que vem depois e não participa de transação de banco.
 
-### A role de assinante vem com a conta
+### A role de conta vem com a conta
 
-A confirmação põe a pessoa no grupo `subscribers` do Keycloak, que concede `CODEFLIX_SUBSCRIBER` —
-sem isso ela teria conta aqui e **nenhuma rota alcançável**, nem para ler a própria conta, nem para
+A confirmação põe a pessoa no grupo `accounts` do Keycloak, que concede `CODEFLIX_ACCOUNT` — sem
+isso ela teria conta aqui e **nenhuma rota alcançável**, nem para ler a própria conta, nem para
 assinar.
 
-É tentador amarrar a role a ter assinatura viva, mas isso faria um nó: as rotas de assinatura exigem
-a role, e sem a role não haveria como assinar. O que a role diz é "tem conta neste serviço"; quem
-tem direito ao catálogo é outra pergunta, decidida pelo estado da assinatura.
+O que ela **não** concede é acesso ao catálogo: isso é consequência de ter assinatura valendo, e vem
+pelos eventos de domínio. Ver "Autenticação" para por que os dois são separados.
 
-A concessão vem **depois** de a conta existir — na ordem inversa, uma interrupção deixaria alguém
-com role de assinante e sem conta aqui — e acontece também quando se clica no link de novo, que é o
-que faz a repetição consertar uma interrupção entre gravar a conta e falar com o Keycloak.
+A concessão vem **depois** de a conta existir — na ordem inversa, uma interrupção deixaria alguém com
+a role e sem conta aqui — e acontece também quando se clica no link de novo, que é o que faz a
+repetição consertar uma interrupção entre gravar a conta e falar com o Keycloak.
 
 ### A conta, depois de existir
 
@@ -308,7 +307,17 @@ virada do estado, a pasta `3. Assinatura` da coleção cobre as respostas, e a j
 ## Autenticação
 
 O realm é o mesmo dos outros serviços, em `../provisioning/keycloak/realm.json`, e as roles que
-importam aqui já existem lá: `CODEFLIX_ADMIN` e `CODEFLIX_SUBSCRIBER`.
+importam aqui são `CODEFLIX_ADMIN` e `CODEFLIX_ACCOUNT`.
+
+**`CODEFLIX_ACCOUNT` e `CODEFLIX_SUBSCRIBER` são coisas diferentes**, e confundi-las foi um defeito
+de verdade. A primeira diz "tem conta neste serviço" e é o que abre as rotas daqui; a segunda diz
+"pode assistir" e é o que a `videos-api` exige nas queries do catálogo.
+
+Enquanto as rotas daqui exigiam `CODEFLIX_SUBSCRIBER`, concedê-la na confirmação do cadastro era
+obrigatório — sem ela ninguém conseguiria nem assinar. E aí quem só confirmava um e-mail ganhava o
+catálogo inteiro, sem assinar e sem pagar, e cancelar não tirava nada. Agora a confirmação concede a
+de conta, e a do catálogo vem e sai com a assinatura, pelos eventos de domínio. Dois testes guardam
+isso: a role do catálogo não abre rota nenhuma daqui, e confirmar cadastro não a concede.
 
 A divisão das rotas é essa:
 
@@ -316,7 +325,7 @@ A divisão das rotas é essa:
 |---|---|
 | `POST /accounts/sign-up`, `POST /accounts/sign-up/confirm` | qualquer um, sem token |
 | `/plans/**` | `CODEFLIX_ADMIN` |
-| `/accounts/**`, `/subscriptions/**` | `CODEFLIX_ADMIN` ou `CODEFLIX_SUBSCRIBER` |
+| `/accounts/**`, `/subscriptions/**` | `CODEFLIX_ADMIN` ou `CODEFLIX_ACCOUNT` |
 | a documentação da API | qualquer um (e em produção ela está desligada) |
 
 Token válido de um client de **outro** serviço — o da `videos-api`, por exemplo — recebe `403`: ele
@@ -342,7 +351,69 @@ respondem `404` para ele. A jornada automatizada precisa de token de pessoa de v
 client só para isso **dentro do container de teste**; ele não existe em
 `../provisioning/keycloak/realm.json`.
 
-## Nota sobre o CDC
+## Os eventos, e como eles saem daqui
+
+Cada transição da assinatura registra um evento de domínio, e é por eles que o **acesso ao catálogo**
+é concedido e revogado. Esse acesso não vem do cadastro: quem confirma um e-mail recebe a role de
+**conta**, que só alcança as rotas daqui.
+
+```mermaid
+flowchart LR
+    A[agregado salvo] -->|mesma transação| B[(tabela event)]
+    B -->|binlog| C[Debezium]
+    C --> D[Kafka]
+    D --> E[EventCdcListener]
+    E -->|Created, Renewed| F[concede o catálogo]
+    E -->|Canceled| G[revoga o catálogo]
+```
+
+| Evento | O que acontece com o catálogo |
+|---|---|
+| `SubscriptionCreated` | concedido |
+| `SubscriptionRenewed` | concedido de novo — quem tinha perdido volta a ter, sem caso especial |
+| `SubscriptionIncomplete` | **nada**: a tolerância existe para a pessoa resolver o cartão |
+| `SubscriptionCanceled` | revogado |
+| `AccountCreated` | nada; ninguém o consome ainda |
+
+**A fila de saída é o que faz "gravou e avisou" ser atômico.** Publicar num broker depois do commit
+perde o evento se o processo morrer no meio; publicar antes avisa de algo que pode não ter
+acontecido. Gravando na tabela `event` dentro da mesma transação do agregado, ou as duas escritas
+acontecem ou nenhuma — e quem leva o evento adiante é o Debezium lendo o binlog, já depois de
+confirmado. Há teste provando a transação, e ele fica vermelho se o `@Transactional` sair.
+
+**Sem coluna de processado**, ao contrário da referência do curso. Lá o consumidor lê a linha de
+volta pelo id e a marca, o que custa uma ida ao banco por mensagem e abre uma corrida entre dois
+consumidores lendo a mesma linha. Aqui a mensagem do CDC já traz a linha inteira e o consumidor age
+direto; o que torna a repetição inofensiva é o handler ser **idempotente** — conceder ou revogar
+grupo no Keycloak pode acontecer duas vezes sem efeito. Quem guarda o progresso é o offset do Kafka.
+
+**Uma partição só**, como o `provisioning/cdc` já configura: é ela que garante a ordem dos eventos de
+uma mesma assinatura. Com duas, `canceled` poderia ser processado antes de `renewed` e o acesso
+ficaria errado.
+
+### Pôr o CDC de pé
+
+O conector não mora em arquivo da aplicação: é registrado na API do Kafka Connect, com a
+configuração versionada em `../provisioning/cdc/subscription-mysql-cdc.json`, cujos marcadores de
+usuário e senha são trocados na hora pelos valores do `.env`:
+
+```bash
+docker compose --profile cdc up -d kafka kafka-connect   # da raiz do monorepo
+
+CU=$(grep '^CDC_USER=' .env | cut -d= -f2-); CP=$(grep '^CDC_PASSWORD=' .env | cut -d= -f2-)
+python3 -c "
+import json
+cfg = json.load(open('provisioning/cdc/subscription-mysql-cdc.json'))
+cfg['database.user'] = '$CU'; cfg['database.password'] = '$CP'
+print(json.dumps(cfg))"   | curl -sS -X PUT http://localhost:8083/connectors/subscription-mysql-cdc/config       -H 'Content-Type: application/json' --data-binary @-
+
+curl -sS http://localhost:8083/connectors/subscription-mysql-cdc/status   # deve dizer RUNNING
+```
+
+O `database.server.id` é **10001**, diferente do 10000 do conector do admin: dois conectores com o
+mesmo id brigam pela mesma posição no binlog do servidor e um derruba o outro.
+
+### Nota sobre o CDC
 
 O usuário que o Debezium usa para ler o binlog nasce de `init/10-cdc-user.sh`, e o entrypoint da
 imagem do MySQL **só executa esse script na criação do volume**. Em banco que já existe ele não

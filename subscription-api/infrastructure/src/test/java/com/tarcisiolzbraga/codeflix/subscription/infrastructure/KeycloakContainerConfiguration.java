@@ -28,6 +28,7 @@ public class KeycloakContainerConfiguration {
     private static final String CLIENT_ID = "admin-codeflix";
     // O client com as roles do realm-management, com que o serviço administra os usuários.
     private static final String ADMIN_CLIENT_ID = "subscription-api-codeflix";
+    private static final String ACCOUNTS_GROUP = "accounts";
     private static final String SUBSCRIBERS_GROUP = "subscribers";
     private static final String CLIENT_SECRET = "segredo-de-teste";
     private static final String SECRET_PLACEHOLDER = "__KEYCLOAK_CLIENT_SECRET__";
@@ -55,6 +56,7 @@ public class KeycloakContainerConfiguration {
             registry.add("keycloak.issuer-uri", KeycloakContainerConfiguration::issuerUri);
             registry.add("keycloak.admin.client-id", () -> ADMIN_CLIENT_ID);
             registry.add("keycloak.admin.client-secret", () -> CLIENT_SECRET);
+            registry.add("keycloak.admin.accounts-group", () -> ACCOUNTS_GROUP);
             registry.add("keycloak.admin.subscribers-group", () -> SUBSCRIBERS_GROUP);
         };
     }

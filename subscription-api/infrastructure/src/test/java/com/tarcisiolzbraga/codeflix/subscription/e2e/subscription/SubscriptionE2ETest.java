@@ -29,7 +29,7 @@ import tools.jackson.databind.ObjectMapper;
 //
 // A pessoa nasce pelo próprio cadastro — e é por isso que esta jornada existe: ela prova que o
 // caminho inteiro fecha, do cadastro ao cancelamento, com um token de pessoa de verdade emitido pelo
-// Keycloak. Nada é semeado no banco por baixo, e a role de assinante é a que a confirmação concedeu.
+// Keycloak. Nada é semeado no banco por baixo, e a role de conta é a que a confirmação concedeu.
 //
 // Não repete asserção de contrato: status e corpo ficam no SubscriptionControllerTest e nos testes
 // de JSON, e o comportamento do SQL no SubscriptionJdbcGatewayIT.
@@ -92,8 +92,8 @@ class SubscriptionE2ETest implements SubscriptionE2EDsl {
         assertEquals(mySubscription(subscriber).id(), body.id());
     }
 
-    // O cadastro concede a role de assinante, e sem ela esta jornada toda responderia 403. É o que
-    // amarra a confirmação do cadastro às rotas de assinatura.
+    // O cadastro concede a role de **conta**, e sem ela esta jornada toda responderia 403. A role do
+    // catálogo é outra, e não vem daqui: vem com a assinatura.
     @Test
     void givenAPersonWhoNeverSubscribed_whenAsksForItsSubscription_thenAnswersNotFoundAndNotForbidden() {
         final var subscriber = aConfirmedSubscriber();
