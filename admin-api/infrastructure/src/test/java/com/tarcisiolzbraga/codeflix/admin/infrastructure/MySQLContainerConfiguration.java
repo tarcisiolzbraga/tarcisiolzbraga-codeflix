@@ -3,7 +3,7 @@ package com.tarcisiolzbraga.codeflix.admin.infrastructure;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.DynamicPropertyRegistrar;
-import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.mysql.MySQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 // A mesma versão do docker compose: o schema é validado contra o banco de verdade.
@@ -16,7 +16,7 @@ public class MySQLContainerConfiguration {
 
     private static final DockerImageName MYSQL_IMAGE = DockerImageName.parse("mysql:8.4");
 
-    private static final MySQLContainer<?> CONTAINER = startedContainer();
+    private static final MySQLContainer CONTAINER = startedContainer();
 
     @Bean
     DynamicPropertyRegistrar mysqlProperties() {
@@ -27,8 +27,8 @@ public class MySQLContainerConfiguration {
         };
     }
 
-    private static MySQLContainer<?> startedContainer() {
-        final MySQLContainer<?> container = new MySQLContainer<>(MYSQL_IMAGE);
+    private static MySQLContainer startedContainer() {
+        final var container = new MySQLContainer(MYSQL_IMAGE);
         container.withDatabaseName("adm_videos_test");
         container.start();
         return container;

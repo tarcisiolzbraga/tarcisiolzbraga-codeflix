@@ -37,11 +37,14 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-flyway-test'
-    testImplementation platform('org.testcontainers:testcontainers-bom:1.21.3')
+    // Testcontainers 2.x, como os outros dois serviços. Os artefatos ganharam o prefixo
+    // `testcontainers-` nesta linha, e os módulos de banco e broker mudaram de pacote — o que estava
+    // em org.testcontainers.containers foi depreciado lá.
+    testImplementation platform('org.testcontainers:testcontainers-bom:2.0.5')
     testImplementation 'org.springframework.boot:spring-boot-testcontainers'
-    testImplementation 'org.testcontainers:mysql'
-    testImplementation 'org.testcontainers:rabbitmq'
-    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-mysql'
+    testImplementation 'org.testcontainers:testcontainers-rabbitmq'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
 }
 
 tasks.named('bootRun') {

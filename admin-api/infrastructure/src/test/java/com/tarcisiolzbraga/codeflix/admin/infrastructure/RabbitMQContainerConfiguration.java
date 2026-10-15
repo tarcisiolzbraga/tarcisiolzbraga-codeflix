@@ -3,7 +3,7 @@ package com.tarcisiolzbraga.codeflix.admin.infrastructure;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.context.DynamicPropertyRegistrar;
-import org.testcontainers.containers.RabbitMQContainer;
+import org.testcontainers.rabbitmq.RabbitMQContainer;
 import org.testcontainers.utility.DockerImageName;
 
 // A mesma imagem do docker compose, como o MySQL e o Garage: o teste fala com um broker de verdade.
