@@ -13,6 +13,7 @@ porta **8084**.
 | Persistência | JDBC com SQL escrito à mão, sem ORM |
 | Autenticação | o mesmo realm do Keycloak dos outros serviços |
 | Eventos | fila de saída no banco, lida pelo Debezium |
+| Cobrança | **de mentira, sempre** — é prova de conceito, não há provedor real |
 
 ## O ciclo de vida de uma assinatura
 
@@ -290,9 +291,14 @@ exercitáveis à mão:
 | `tok_unreachable…` | recusado sem transação: o provedor não respondeu |
 | qualquer outro | aprovado |
 
-Ele avisa no log a cada cobrança que é de mentira, e **não sobe em produção**: sem provedor de
-verdade configurado, o perfil `production` não sobe. Não subir é melhor que subir aprovando toda
-cobrança em silêncio.
+Ele avisa no log a cada cobrança que é de mentira, e roda **em todos os perfis** — porque é assim
+que fica. Este é um projeto de prova de conceito e **não haverá cobrança real**: não existe conta em
+provedor, e o `FakePaymentGateway` é o provedor, não um substituto temporário.
+
+A versão anterior disto recusava subir no perfil `production`, para ninguém confundi-lo com um
+provedor de verdade. Com a decisão de não ter cobrança real, aquele guard deixou de proteger algo e
+passou a ser armadilha: o perfil nunca subiria, e a falha seria um bean faltando, sem explicação.
+Trocamos o guard por dizer a verdade — aqui, no `PaymentConfig` e no log de cada cobrança.
 
 O corpo da cobrança leva **só o token do cartão**. Número e CVV não têm campo onde entrar — quem os
 troca por um token é o provedor, direto com o navegador de quem assina —, e isso mantém o serviço
