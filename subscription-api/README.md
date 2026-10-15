@@ -12,6 +12,7 @@ porta **8084**.
 | Banco | MySQL 8.4 próprio, na porta 3307 |
 | Persistência | JDBC com SQL escrito à mão, sem ORM |
 | Autenticação | o mesmo realm do Keycloak dos outros serviços |
+| E-mail | publicado em fila; quem entrega é a `mail-api` |
 | Eventos | fila de saída no banco, lida pelo Debezium |
 | Cobrança | **de mentira, sempre** — é prova de conceito, não há provedor real |
 
@@ -205,13 +206,24 @@ endereço, não como um objeto de campos vazios — o front precisa distinguir "
 
 Não é este serviço. Ele publica o pedido em `mail.events` com a routing key
 `mail.signup.validation`, e a mensagem leva o endereço, o primeiro nome e o **link pronto**. Quem
-entrega é um serviço de e-mail próprio, que ainda não existe — então, hoje, a mensagem fica na fila.
+entrega é a [`mail-api`](../mail-api), um serviço próprio.
 
-Para experimentar à mão: suba o RabbitMQ, faça o cadastro, e pegue o link em
-`mail.signup.validation.queue` pelo painel do broker, na 15672.
+O link vai montado de propósito: a `mail-api` não sabe o que é um token, nem qual rota confirma o
+cadastro, nem que existe tabela de cadastro pendente. É o que permite mudar a rota de confirmação
+daqui sem tocar nela.
+
+Para experimentar à mão, suba o broker, o coletor de e-mail e o serviço:
+
+```bash
+docker compose up -d rabbitmq mailpit mail-api   # da raiz do monorepo
+```
+
+O e-mail aparece na caixa de entrada do Mailpit, em `http://localhost:${MAILPIT_UI_PORT}`, com o
+link clicável. **Enquanto a `mail-api` não estiver rodando, ninguém conclui um cadastro** — a
+mensagem espera na fila, e o link não chega a ninguém.
 
 O link aponta para a página do front (`SIGNUP_CONFIRMATION_URL`), não para uma rota desta API: é o
-front que chama o `POST` de confirmar com o token. Front também não existe ainda.
+front que chama o `POST` de confirmar com o token. Front ainda não existe.
 
 ### O meio de pagamento guardado
 
