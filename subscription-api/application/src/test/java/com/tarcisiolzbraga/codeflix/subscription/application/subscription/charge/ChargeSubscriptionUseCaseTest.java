@@ -1,6 +1,7 @@
 package com.tarcisiolzbraga.codeflix.subscription.application.subscription.charge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -8,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -131,7 +133,56 @@ class ChargeSubscriptionUseCaseTest {
         verify(paymentGateway).processPayment(sentPayment.capture());
         assertEquals(PlanFixture.price(), sentPayment.getValue().amount());
         assertEquals(AccountFixture.billingAddress(), sentPayment.getValue().billingAddress());
-        assertEquals(CARD, sentPayment.getValue().creditCardToken());
+        assertEquals(CARD, sentPayment.getValue().paymentToken());
+    }
+
+    // A chave de idempotência tem de ser a MESMA em duas tentativas da mesma cobrança: é por ela que
+    // o provedor não cobra em dobro. Era sorteada a cada chamada, e aí não era chave de nada — o job
+    // que varre as vencidas, e duas instâncias do serviço, cobrariam duas vezes.
+    @Test
+    void givenTheSameDueSubscription_whenChargesTwice_thenTheOrderIdIsTheSame() {
+        final var subscription = SubscriptionFixture.storedSubscription(SubscriptionStatus.TRAILING, DUE);
+        givenAnAccountAndASubscription(anAccountWithAddress(), subscription);
+        when(planGateway.planOfId(any())).thenReturn(Optional.of(PlanFixture.plan()));
+        when(paymentGateway.processPayment(any()))
+                .thenReturn(new Transaction.Failed("tx-1", "the card was refused"));
+        when(subscriptionGateway.save(any())).thenAnswer(returnsFirstArg());
+
+        useCaseOn(DUE).execute(command());
+        useCaseOn(DUE).execute(command());
+
+        verify(paymentGateway, times(2)).processPayment(sentPayment.capture());
+        assertEquals(
+                sentPayment.getAllValues().getFirst().orderId(),
+                sentPayment.getAllValues().getLast().orderId());
+    }
+
+    // E tem de MUDAR quando o período muda: renovar move o vencimento, e a cobrança do mês seguinte
+    // é outra cobrança. Com a chave presa só à assinatura, o provedor recusaria a segunda como
+    // repetida e o mês seguinte nunca seria cobrado.
+    //
+    // É a MESMA assinatura nos dois períodos, com o mesmo id. A primeira versão deste teste usava
+    // duas da fixture, que sorteia id, e aí as chaves diferiam de qualquer jeito: ele passava mesmo
+    // com a chave presa só à assinatura, e não provava nada.
+    @Test
+    void givenTwoBillingPeriodsOfTheSameSubscription_whenCharges_thenTheOrderIdDiffers() {
+        final var first = SubscriptionFixture.storedSubscription(SubscriptionStatus.TRAILING, DUE);
+        givenAnAccountAndASubscription(anAccountWithAddress(), first);
+        when(planGateway.planOfId(any())).thenReturn(Optional.of(PlanFixture.plan()));
+        when(paymentGateway.processPayment(any())).thenReturn(new Transaction.Succeeded("tx-ok"));
+        when(subscriptionGateway.save(any())).thenAnswer(returnsFirstArg());
+
+        useCaseOn(DUE).execute(command());
+
+        // A mesma assinatura depois da renovação: o vencimento andou, o id é o mesmo.
+        final var nextPeriod = first.dueDate();
+        givenAnAccountAndASubscription(anAccountWithAddress(), first);
+        useCaseOn(nextPeriod).execute(command());
+
+        verify(paymentGateway, times(2)).processPayment(sentPayment.capture());
+        assertNotEquals(
+                sentPayment.getAllValues().getFirst().orderId(),
+                sentPayment.getAllValues().getLast().orderId());
     }
 
     @Test

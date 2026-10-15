@@ -2,6 +2,7 @@ package com.tarcisiolzbraga.codeflix.subscription.domain.account;
 
 import com.tarcisiolzbraga.codeflix.subscription.domain.AggregateRoot;
 import com.tarcisiolzbraga.codeflix.subscription.domain.account.idp.UserId;
+import com.tarcisiolzbraga.codeflix.subscription.domain.payment.PaymentMethod;
 import com.tarcisiolzbraga.codeflix.subscription.domain.person.Address;
 import com.tarcisiolzbraga.codeflix.subscription.domain.person.Document;
 import com.tarcisiolzbraga.codeflix.subscription.domain.person.Email;
@@ -22,6 +23,7 @@ public class Account extends AggregateRoot<AccountId> {
     private Name name;
     private Document document;
     private Address billingAddress;
+    private PaymentMethod paymentMethod;
 
     private Account(
             final AccountId anId,
@@ -30,13 +32,15 @@ public class Account extends AggregateRoot<AccountId> {
             final Email anEmail,
             final Name aName,
             final Document aDocument,
-            final Address billingAddress) {
+            final Address billingAddress,
+            final PaymentMethod paymentMethod) {
         super(anId, version);
         this.setUserId(anUserId);
         this.setEmail(anEmail);
         this.setName(aName);
         this.setDocument(aDocument);
         this.setBillingAddress(billingAddress);
+        this.setPaymentMethod(paymentMethod);
     }
 
     // A conta nasce sem endereço de cobrança: ele é pedido na hora de cobrar, não no cadastro.
@@ -46,7 +50,7 @@ public class Account extends AggregateRoot<AccountId> {
             final Email anEmail,
             final Name aName,
             final Document aDocument) {
-        final var anAccount = new Account(anId, 0, anUserId, anEmail, aName, aDocument, null);
+        final var anAccount = new Account(anId, 0, anUserId, anEmail, aName, aDocument, null, null);
         anAccount.registerEvent(AccountCreated.from(anAccount));
         return anAccount;
     }
@@ -58,8 +62,9 @@ public class Account extends AggregateRoot<AccountId> {
             final Email anEmail,
             final Name aName,
             final Document aDocument,
-            final Address billingAddress) {
-        return new Account(anId, version, anUserId, anEmail, aName, aDocument, billingAddress);
+            final Address billingAddress,
+            final PaymentMethod paymentMethod) {
+        return new Account(anId, version, anUserId, anEmail, aName, aDocument, billingAddress, paymentMethod);
     }
 
     // Não toca na versão: ela é do lock otimista, e quem a incrementa é o UPDATE do repositório.
@@ -74,6 +79,7 @@ public class Account extends AggregateRoot<AccountId> {
                 case AccountCommand.ChangeEmail c -> this.setEmail(c.email());
                 case AccountCommand.ChangeDocument c -> this.setDocument(c.document());
                 case AccountCommand.ChangeBillingAddress c -> this.setBillingAddress(c.billingAddress());
+                case AccountCommand.ChangePaymentMethod c -> this.setPaymentMethod(c.paymentMethod());
             }
         }
     }
@@ -98,6 +104,12 @@ public class Account extends AggregateRoot<AccountId> {
         return this.billingAddress;
     }
 
+    // Nulo quando a pessoa nunca gravou um meio de pagamento. É o que a cobrança automática consulta
+    // para saber se tem como cobrar sem ninguém presente.
+    public PaymentMethod paymentMethod() {
+        return this.paymentMethod;
+    }
+
     private void setUserId(final UserId userId) {
         this.userId = this.assertArgumentNotNull(userId, "'userId' should not be null");
     }
@@ -114,8 +126,14 @@ public class Account extends AggregateRoot<AccountId> {
         this.document = this.assertArgumentNotNull(document, "'document' should not be null");
     }
 
-    // O único que aceita nulo: a conta nasce sem endereço de cobrança.
+    // Aceita nulo: a conta nasce sem endereço de cobrança.
     private void setBillingAddress(final Address billingAddress) {
         this.billingAddress = billingAddress;
+    }
+
+    // Aceita nulo pelo mesmo motivo: a conta nasce sem meio de pagamento guardado, e sem ele a
+    // cobrança automática não tem como acontecer — ela confere antes de tentar.
+    private void setPaymentMethod(final PaymentMethod paymentMethod) {
+        this.paymentMethod = paymentMethod;
     }
 }

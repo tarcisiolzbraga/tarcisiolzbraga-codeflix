@@ -2,7 +2,9 @@ package com.tarcisiolzbraga.codeflix.subscription.infrastructure.payment;
 
 import com.tarcisiolzbraga.codeflix.subscription.domain.payment.Payment;
 import com.tarcisiolzbraga.codeflix.subscription.domain.payment.PaymentGateway;
+import com.tarcisiolzbraga.codeflix.subscription.domain.payment.PaymentMethod;
 import com.tarcisiolzbraga.codeflix.subscription.domain.payment.Transaction;
+import java.util.Objects;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +36,7 @@ public class FakePaymentGateway implements PaymentGateway {
                 aPayment.amount().currencyCode(),
                 aPayment.amount().amount());
 
-        final var token = aPayment.creditCardToken();
+        final var token = aPayment.paymentToken();
         if (token.startsWith(UNREACHABLE_PREFIX)) {
             return new Transaction.Failed(null, "the payment provider could not be reached");
         }
@@ -42,6 +44,16 @@ public class FakePaymentGateway implements PaymentGateway {
             return new Transaction.Failed(transactionId(), "the card was refused");
         }
         return new Transaction.Succeeded(transactionId());
+    }
+
+    // Guarda o cartão devolvendo uma referência que **carrega o prefixo do token original**. É o que
+    // mantém os três caminhos exercitáveis na cobrança automática: um cartão recusado guardado segue
+    // recusando quando o job o usar.
+    @Override
+    public PaymentMethod storeCard(final String aCreditCardToken) {
+        Objects.requireNonNull(aCreditCardToken, "'aCreditCardToken' should not be null");
+        LOG.warn("cartão guardado por provedor DE MENTIRA; nenhum dado de cartão existe de verdade");
+        return new PaymentMethod(aCreditCardToken + "/stored");
     }
 
     private static String transactionId() {

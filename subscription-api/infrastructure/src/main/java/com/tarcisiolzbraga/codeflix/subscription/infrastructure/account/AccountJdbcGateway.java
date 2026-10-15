@@ -6,6 +6,7 @@ import com.tarcisiolzbraga.codeflix.subscription.domain.account.AccountGateway;
 import com.tarcisiolzbraga.codeflix.subscription.domain.account.AccountId;
 import com.tarcisiolzbraga.codeflix.subscription.domain.account.idp.UserId;
 import com.tarcisiolzbraga.codeflix.subscription.domain.exceptions.ConflictException;
+import com.tarcisiolzbraga.codeflix.subscription.domain.payment.PaymentMethod;
 import com.tarcisiolzbraga.codeflix.subscription.domain.person.Address;
 import com.tarcisiolzbraga.codeflix.subscription.domain.person.Document;
 import com.tarcisiolzbraga.codeflix.subscription.domain.person.Email;
@@ -27,7 +28,8 @@ public class AccountJdbcGateway implements AccountGateway {
 
     private static final String COLUMNS = """
             id, version, idp_user_id, email, firstname, lastname, document_number, document_type,
-            address_zipcode, address_number, address_complement, address_country""";
+            address_zipcode, address_number, address_complement, address_country,
+            payment_method_ref""";
 
     private final DatabaseClient database;
     private final DomainEventPublisher events;
@@ -73,7 +75,7 @@ public class AccountJdbcGateway implements AccountGateway {
         final var sql = """
                 INSERT INTO account (%s)
                 VALUES (:id, 1, :userId, :email, :firstname, :lastname, :documentNumber, :documentType,
-                        :zipcode, :number, :complement, :country)
+                        :zipcode, :number, :complement, :country, :paymentMethodRef)
                 """
                 .formatted(COLUMNS);
         this.database.update(sql, paramsOf(anAccount));
@@ -92,7 +94,8 @@ public class AccountJdbcGateway implements AccountGateway {
                     address_zipcode = :zipcode,
                     address_number = :number,
                     address_complement = :complement,
-                    address_country = :country
+                    address_country = :country,
+                    payment_method_ref = :paymentMethodRef
                 WHERE id = :id AND version = :version
                 """;
         if (this.database.update(sql, paramsOf(anAccount)) == 0) {
@@ -111,6 +114,8 @@ public class AccountJdbcGateway implements AccountGateway {
         params.put("documentNumber", anAccount.document().value());
         params.put("documentType", anAccount.document().type());
         params.putAll(addressParamsOf(anAccount.billingAddress()));
+        final var paymentMethod = anAccount.paymentMethod();
+        params.put("paymentMethodRef", paymentMethod == null ? null : paymentMethod.providerRef());
         return params;
     }
 
@@ -133,7 +138,14 @@ public class AccountJdbcGateway implements AccountGateway {
                 new Email(rs.getString("email")),
                 new Name(rs.getString("firstname"), rs.getString("lastname")),
                 Document.create(rs.getString("document_number"), rs.getString("document_type")),
-                addressOf(rs));
+                addressOf(rs),
+                paymentMethodOf(rs));
+    }
+
+    // Conta que nunca gravou meio de pagamento volta com nulo.
+    private static PaymentMethod paymentMethodOf(final ResultSet rs) throws SQLException {
+        final var ref = rs.getString("payment_method_ref");
+        return ref == null ? null : new PaymentMethod(ref);
     }
 
     // Conta sem endereço de cobrança volta com nulo, não com um Address de campos vazios.

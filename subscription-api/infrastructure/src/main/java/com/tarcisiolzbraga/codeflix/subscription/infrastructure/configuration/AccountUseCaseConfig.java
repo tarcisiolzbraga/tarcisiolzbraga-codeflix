@@ -14,7 +14,10 @@ import com.tarcisiolzbraga.codeflix.subscription.application.account.signup.Defa
 import com.tarcisiolzbraga.codeflix.subscription.application.account.signup.DefaultSignUpUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.account.signup.SignUpGateways;
 import com.tarcisiolzbraga.codeflix.subscription.application.account.signup.SignUpUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.account.paymentmethod.DefaultStorePaymentMethodUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.account.paymentmethod.StorePaymentMethodUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.domain.account.AccountGateway;
+import com.tarcisiolzbraga.codeflix.subscription.domain.payment.PaymentGateway;
 import com.tarcisiolzbraga.codeflix.subscription.domain.account.idp.IdentityProviderGateway;
 import com.tarcisiolzbraga.codeflix.subscription.domain.account.signup.PendingSignUpGateway;
 import com.tarcisiolzbraga.codeflix.subscription.domain.account.signup.SignUpNotifier;
@@ -63,6 +66,12 @@ public class AccountUseCaseConfig {
     @Bean
     ChangeBillingAddressUseCase changeBillingAddressUseCase(final AccountGateway accounts) {
         return new DefaultChangeBillingAddressUseCase(accounts);
+    }
+
+    @Bean
+    StorePaymentMethodUseCase storePaymentMethodUseCase(
+            final AccountGateway accounts, final PaymentGateway payments) {
+        return new DefaultStorePaymentMethodUseCase(accounts, payments);
     }
 
     // Os dois acessos ao catálogo. Não têm rota: quem os chama é o consumidor dos eventos, porque

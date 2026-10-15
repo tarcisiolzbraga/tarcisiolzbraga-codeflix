@@ -21,7 +21,14 @@ import tools.jackson.databind.ObjectMapper;
 class AccountResponseTest {
 
     private static final Set<String> EXPECTED_FIELDS = Set.of(
-            "id", "email", "firstname", "lastname", "documentNumber", "documentType", "billingAddress");
+            "id",
+            "email",
+            "firstname",
+            "lastname",
+            "documentNumber",
+            "documentType",
+            "billingAddress",
+            "hasPaymentMethod");
     private static final Set<String> EXPECTED_ADDRESS_FIELDS =
             Set.of("zipcode", "number", "complement", "country");
 
@@ -87,7 +94,26 @@ class AccountResponseTest {
         assertTrue(!actual.contains("password") && !actual.contains("userId") && !actual.contains("idp"));
     }
 
+    // O front precisa saber se tem de pedir cartão, e é só isso que sai: **a referência do meio de
+    // pagamento não aparece no JSON**. Ela é um identificador do provedor e não serve a quem chama.
+    @Test
+    void givenAnAccountWithAStoredPaymentMethod_whenSerializes_thenOnlyTheFlagComesOut() throws IOException {
+        final var response = responseWith(anAddress(), true);
+
+        final var json = this.json.write(response).getJson();
+
+        assertEquals(Boolean.TRUE, fieldsOf(json).get("hasPaymentMethod"));
+        assertTrue(
+                !json.contains("providerRef") && !json.contains("paymentMethodRef") && !json.contains("pm_"),
+                "a referência do provedor não deveria sair no corpo: " + json);
+    }
+
     private static AccountResponse responseWith(final BillingAddressResponse address) {
+        return responseWith(address, false);
+    }
+
+    private static AccountResponse responseWith(
+            final BillingAddressResponse address, final boolean hasPaymentMethod) {
         return new AccountResponse(
                 "11111111-1111-1111-1111-111111111111",
                 "assinante@codeflix.com.br",
@@ -95,7 +121,8 @@ class AccountResponseTest {
                 "Braga",
                 "11144477735",
                 "cpf",
-                address);
+                address,
+                hasPaymentMethod);
     }
 
     private static BillingAddressResponse anAddress() {

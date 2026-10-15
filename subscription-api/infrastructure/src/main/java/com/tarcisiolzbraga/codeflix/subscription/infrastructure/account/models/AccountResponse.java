@@ -11,7 +11,8 @@ public record AccountResponse(
         String lastname,
         String documentNumber,
         String documentType,
-        BillingAddressResponse billingAddress) {
+        BillingAddressResponse billingAddress,
+        boolean hasPaymentMethod) {
 
     public static AccountResponse from(final AccountOutput output) {
         return new AccountResponse(
@@ -21,8 +22,12 @@ public record AccountResponse(
                 output.lastname(),
                 output.documentNumber(),
                 output.documentType(),
-                BillingAddressResponse.from(output.billingAddress()));
+                BillingAddressResponse.from(output.billingAddress()),
+                output.hasPaymentMethod());
     }
+
+    // `hasPaymentMethod` é booleano e não a referência do provedor: o front só precisa saber se tem
+    // de pedir um cartão, e a referência não serve a quem chama.
 
     // Nulo no JSON quando a conta não tem endereço de cobrança: a ausência é informação, e um
     // objeto de campos vazios a esconderia.

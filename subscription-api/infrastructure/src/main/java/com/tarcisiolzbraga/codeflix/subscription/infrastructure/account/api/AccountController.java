@@ -11,6 +11,9 @@ import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.A
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.BillingAddressRequest;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.ConfirmSignUpRequest;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.ConfirmSignUpResponse;
+import com.tarcisiolzbraga.codeflix.subscription.application.account.paymentmethod.StorePaymentMethodCommand;
+import com.tarcisiolzbraga.codeflix.subscription.application.account.paymentmethod.StorePaymentMethodUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.PaymentMethodRequest;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.SignUpRequest;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.SignUpResponse;
 import java.security.Principal;
@@ -24,16 +27,19 @@ public class AccountController implements AccountAPI {
     private final ConfirmSignUpUseCase confirmSignUpUseCase;
     private final GetMyAccountUseCase getMyAccountUseCase;
     private final ChangeBillingAddressUseCase changeBillingAddressUseCase;
+    private final StorePaymentMethodUseCase storePaymentMethodUseCase;
 
     public AccountController(
             final SignUpUseCase signUpUseCase,
             final ConfirmSignUpUseCase confirmSignUpUseCase,
             final GetMyAccountUseCase getMyAccountUseCase,
-            final ChangeBillingAddressUseCase changeBillingAddressUseCase) {
+            final ChangeBillingAddressUseCase changeBillingAddressUseCase,
+            final StorePaymentMethodUseCase storePaymentMethodUseCase) {
         this.signUpUseCase = Objects.requireNonNull(signUpUseCase);
         this.confirmSignUpUseCase = Objects.requireNonNull(confirmSignUpUseCase);
         this.getMyAccountUseCase = Objects.requireNonNull(getMyAccountUseCase);
         this.changeBillingAddressUseCase = Objects.requireNonNull(changeBillingAddressUseCase);
+        this.storePaymentMethodUseCase = Objects.requireNonNull(storePaymentMethodUseCase);
     }
 
     // A resposta é montada aqui e não vem do caso de uso, que não devolve nada: assim o controller
@@ -68,5 +74,11 @@ public class AccountController implements AccountAPI {
         final var command = ChangeBillingAddressCommand.with(
                 caller.getName(), request.zipcode(), request.number(), request.complement(), request.country());
         return AccountResponse.from(this.changeBillingAddressUseCase.execute(command));
+    }
+
+    @Override
+    public AccountResponse storePaymentMethod(final Principal caller, final PaymentMethodRequest request) {
+        final var command = new StorePaymentMethodCommand(caller.getName(), request.creditCardToken());
+        return AccountResponse.from(this.storePaymentMethodUseCase.execute(command));
     }
 }

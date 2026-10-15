@@ -7,6 +7,8 @@ import com.tarcisiolzbraga.codeflix.subscription.application.subscription.charge
 import com.tarcisiolzbraga.codeflix.subscription.application.subscription.charge.DefaultChargeSubscriptionUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.subscription.get.DefaultGetMySubscriptionUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.subscription.get.GetMySubscriptionUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.subscription.overdue.ChargeOverdueSubscriptionsUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.subscription.overdue.DefaultChargeOverdueSubscriptionsUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.subscription.subscribe.DefaultSubscribeUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.subscription.subscribe.SubscribeUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.domain.account.AccountGateway;
@@ -50,5 +52,17 @@ public class SubscriptionUseCaseConfig {
     @Bean
     CancelSubscriptionUseCase cancelSubscriptionUseCase(final SubscriptionGateways gateways) {
         return new DefaultCancelSubscriptionUseCase(gateways);
+    }
+
+    // A varredura das vencidas. Recebe o caso de uso de cobrar, e não os gateways de pagamento: ela
+    // não cobra por conta própria, ela decide quem cobrar.
+    @Bean
+    ChargeOverdueSubscriptionsUseCase chargeOverdueSubscriptionsUseCase(
+            final SubscriptionGateways gateways,
+            final ChargeSubscriptionUseCase chargeSubscriptionUseCase,
+            final Clock clock,
+            final SubscriptionProperties properties) {
+        return new DefaultChargeOverdueSubscriptionsUseCase(
+                gateways, chargeSubscriptionUseCase, clock, properties.chargeJob().batchSize());
     }
 }

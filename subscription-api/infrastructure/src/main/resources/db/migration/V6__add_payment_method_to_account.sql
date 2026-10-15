@@ -1,0 +1,13 @@
+-- A referência do meio de pagamento guardado no provedor.
+--
+-- É o que permite cobrar sem a pessoa presente com o cartão na mão, e portanto é o que permite
+-- existir cobrança automática. Antes disto, o token do cartão só existia no corpo da requisição.
+--
+-- **Nenhum dado de cartão nesta coluna**: número, CVV e validade ficam no provedor, que devolve
+-- esta referência opaca ao tokenizar. Vazada, ela não compra nada em lugar nenhum — e é por isso
+-- que guardá-la é aceitável onde guardar o cartão não seria.
+--
+-- Anulável: a conta nasce sem meio de pagamento, como nasce sem endereço de cobrança. Diferente do
+-- endereço, que tem CHECK de tudo-ou-nada por ser composto, aqui é uma coluna só e não há
+-- combinação parcial possível.
+ALTER TABLE account ADD COLUMN payment_method_ref VARCHAR(255) NULL;

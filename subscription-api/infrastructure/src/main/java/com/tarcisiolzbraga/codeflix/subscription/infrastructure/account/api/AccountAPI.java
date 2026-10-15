@@ -11,6 +11,7 @@ import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.A
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.BillingAddressRequest;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.ConfirmSignUpRequest;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.ConfirmSignUpResponse;
+import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.PaymentMethodRequest;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.SignUpRequest;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.models.SignUpResponse;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.api.ApiError;
@@ -105,4 +106,26 @@ public interface AccountAPI {
             description = UNPROCESSABLE_DESCRIPTION,
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     AccountResponse changeBillingAddress(Principal caller, @RequestBody BillingAddressRequest request);
+
+    // É esta rota que torna a cobrança automática possível: sem meio de pagamento guardado, só se
+    // cobra quem está presente com o cartão na mão.
+    @PutMapping("/me/payment-method")
+    @Operation(
+            summary = "Guarda o meio de pagamento",
+            description = "Recebe o token de uso único que o navegador obteve do provedor, troca por uma "
+                    + "referência durável e guarda **só a referência**. Nenhum dado de cartão, nem o token de "
+                    + "uso único, fica neste serviço. Chamar de novo substitui o meio guardado.")
+    @ApiResponse(
+            responseCode = OK,
+            description = "A conta, já com o meio de pagamento guardado",
+            content = @Content(schema = @Schema(implementation = AccountResponse.class)))
+    @ApiResponse(
+            responseCode = NOT_FOUND,
+            description = "O token é válido, mas quem o apresenta não tem conta aqui",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(
+            responseCode = UNPROCESSABLE,
+            description = "Falta o token do cartão, ou o provedor o recusou",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    AccountResponse storePaymentMethod(Principal caller, @RequestBody PaymentMethodRequest request);
 }

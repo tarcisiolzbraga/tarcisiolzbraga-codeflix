@@ -65,6 +65,37 @@ class FakePaymentGatewayTest {
         assertTrue(!first.transactionId().equals(second.transactionId()));
     }
 
+    // A referência guardada carrega o prefixo do token original, e isso não é enfeite: é o que
+    // mantém os três caminhos exercitáveis quando a cobrança automática usa o meio guardado — um
+    // cartão recusado, guardado, segue recusando.
+    @Test
+    void givenACardToken_whenStoresIt_thenTheReferenceKeepsThePrefixSoTheOutcomeSurvives() {
+        final var stored = gateway.storeCard("tok_refused_card");
+
+        final var actual = gateway.processPayment(paymentWith(stored.providerRef()));
+
+        final var failed = assertInstanceOf(Transaction.Failed.class, actual);
+        assertEquals("the card was refused", failed.reason());
+    }
+
+    @Test
+    void givenAGoodCardToken_whenStoredAndCharged_thenItIsApproved() {
+        final var stored = gateway.storeCard("tok_visa_4242");
+
+        final var actual = gateway.processPayment(paymentWith(stored.providerRef()));
+
+        assertInstanceOf(Transaction.Succeeded.class, actual);
+    }
+
+    @Test
+    void givenACardToken_whenStoresIt_thenTheReferenceIsNotTheTokenItself() {
+        final var actual = gateway.storeCard("tok_visa_4242");
+
+        assertTrue(
+                !"tok_visa_4242".equals(actual.providerRef()),
+                "a referência guardada não deveria ser o token de uso único");
+    }
+
     private static Payment paymentWith(final String creditCardToken) {
         return new Payment(
                 "11111111-1111-1111-1111-111111111111",

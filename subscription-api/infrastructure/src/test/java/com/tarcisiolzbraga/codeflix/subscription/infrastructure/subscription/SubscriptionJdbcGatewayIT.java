@@ -17,6 +17,7 @@ import com.tarcisiolzbraga.codeflix.subscription.domain.subscription.Subscriptio
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.IntegrationTest;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.account.AccountJdbcGateway;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.plan.PlanJdbcGateway;
+import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -156,6 +157,94 @@ class SubscriptionJdbcGatewayIT {
                 Subscription.newSubscription(SubscriptionId.unique(), savedAccountId(), PlanId.unique());
 
         assertThrows(DataIntegrityViolationException.class, () -> gateway.save(orphan));
+    }
+
+    // A consulta da varredura, contra o banco: é onde o SQL do filtro, da ordem e do limite vale.
+    @Test
+    void givenSubscriptionsDueAndNotDue_whenAsksForTheChargeable_thenOnlyTheDueComeBack() {
+        final var accountId = savedAccountId();
+        final var planId = savedPlanId();
+        final var due = savedWithDueDate(accountId, planId, LocalDate.now().minusDays(1));
+        savedWithDueDate(savedUniqueAccountId(), planId, LocalDate.now().plusDays(1));
+
+        final var actual = gateway.chargeableSubscriptionsDueBy(LocalDate.now(), 10, 0);
+
+        assertEquals(1, actual.size());
+        assertEquals(due.id(), actual.getFirst().id());
+    }
+
+    // Cancelada nunca volta a ser cobrável, e a consulta a deixa de fora. Trazê-la só para o
+    // chamador descartar faria cada página render menos trabalho útil.
+    @Test
+    void givenACanceledSubscriptionLongOverdue_whenAsksForTheChargeable_thenItIsNotThere() {
+        final var accountId = savedAccountId();
+        final var stored = savedWithDueDate(accountId, savedPlanId(), LocalDate.now().minusDays(30));
+        final var reread = gateway.latestSubscriptionOfAccount(accountId).orElseThrow();
+        reread.execute(new SubscriptionCommand.Cancel());
+        gateway.save(reread);
+
+        final var actual = gateway.chargeableSubscriptionsDueBy(LocalDate.now(), 10, 0);
+
+        assertTrue(
+                actual.stream().noneMatch(it -> it.id().equals(stored.id())),
+                "a cancelada não deveria estar entre as cobráveis");
+    }
+
+    // Do vencimento mais antigo para o mais novo: quem está vencido há mais tempo é cobrado
+    // primeiro, e é quem está mais perto de ser cancelado pelo fim da tolerância.
+    @Test
+    void givenSeveralOverdue_whenAsksForTheChargeable_thenTheOldestDueComesFirst() {
+        final var planId = savedPlanId();
+        savedWithDueDate(savedUniqueAccountId(), planId, LocalDate.now().minusDays(1));
+        final var oldest = savedWithDueDate(savedUniqueAccountId(), planId, LocalDate.now().minusDays(10));
+        savedWithDueDate(savedUniqueAccountId(), planId, LocalDate.now().minusDays(5));
+
+        final var actual = gateway.chargeableSubscriptionsDueBy(LocalDate.now(), 10, 0);
+
+        assertEquals(3, actual.size());
+        assertEquals(oldest.id(), actual.getFirst().id());
+    }
+
+    @Test
+    void givenMoreOverdueThanTheLimit_whenAsksWithAnOffset_thenThePagesDoNotOverlap() {
+        final var planId = savedPlanId();
+        for (var i = 0; i < 5; i++) {
+            savedWithDueDate(savedUniqueAccountId(), planId, LocalDate.now().minusDays(i + 1L));
+        }
+
+        final var first = gateway.chargeableSubscriptionsDueBy(LocalDate.now(), 2, 0);
+        final var second = gateway.chargeableSubscriptionsDueBy(LocalDate.now(), 2, 2);
+
+        assertEquals(2, first.size());
+        assertEquals(2, second.size());
+        assertTrue(
+                first.stream().noneMatch(a -> second.stream().anyMatch(b -> b.id().equals(a.id()))),
+                "as duas páginas não deveriam repetir ninguém");
+    }
+
+    // Conta sorteada: estes testes criam várias, e a conta da fixture tem e-mail e id de provedor
+    // fixos, com índice único nos dois.
+    private AccountId savedUniqueAccountId() {
+        final var account = AccountFixture.uniqueAccount();
+        this.accounts.save(account);
+        return account.id();
+    }
+
+    private Subscription savedWithDueDate(
+            final AccountId accountId, final PlanId planId, final LocalDate dueDate) {
+        final var subscription = Subscription.with(
+                SubscriptionId.unique(),
+                0,
+                accountId,
+                planId,
+                SubscriptionStatus.TRAILING,
+                dueDate,
+                null,
+                null,
+                java.time.Instant.now(),
+                java.time.Instant.now());
+        gateway.save(subscription);
+        return subscription;
     }
 
     private Subscription aSubscription() {
