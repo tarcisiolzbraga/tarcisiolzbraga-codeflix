@@ -1063,12 +1063,124 @@
               }
             }
           ]
+        },
+        {
+          "name": "[pessoa] Guarda o meio de pagamento",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me/payment-method",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me",
+                "payment-method"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDeAssinante}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"creditCardToken\": \"tok_visa_4242\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"tokenDeAssinante\")) {",
+                  "    pm.test.skip(\"tokenDeAssinante vazio: veja a descricao da pasta 5\", () => {});",
+                  "} else {",
+                  "    pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "    const corpo = pm.response.json();",
+                  "    pm.test(\"a conta passa a ter meio de pagamento\",",
+                  "        () => pm.expect(corpo.hasPaymentMethod).to.be.true);",
+                  "    // A referencia e do provedor e nao serve a quem chama: o corpo traz so o booleano.",
+                  "    pm.test(\"a referencia do provedor nao sai no corpo\",",
+                  "        () => pm.expect(JSON.stringify(corpo)).to.not.include(\"tok_visa_4242\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sem token do cartao, guardar recusa",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me/payment-method",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me",
+                "payment-method"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDeAssinante}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"tokenDeAssinante\")) {",
+                  "    pm.test.skip(\"tokenDeAssinante vazio: veja a descricao da pasta 5\", () => {});",
+                  "} else {",
+                  "    pm.test(\"responde 422\", () => pm.response.to.have.status(422));",
+                  "    pm.test(\"diz o que falta\",",
+                  "        () => pm.expect(pm.response.json().message).to.include(\"creditCardToken\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     {
       "name": "5. Assinatura",
-      "description": "Todas as rotas aqui respondem sobre a assinatura de **quem apresenta o token**, pelo `sub` dele. O token da pasta 0 e de um service account, que nao tem conta neste servico: com ele o que da para afirmar e o 404, e os tres primeiros pedidos fazem exatamente isso — eles rodam sempre.\n\nOs marcados com [pessoa] precisam de um token de uma PESSOA, e nenhum client aceita usuario e senha (fluxo depreciado no OAuth 2.1). Para obter um:\n\n1. Cadastre-se pela pasta 3 e confirme o e-mail — e a confirmacao que poe a pessoa no grupo `accounts`, que concede CODEFLIX_ACCOUNT; sem ela nenhuma destas rotas e alcancavel.\n2. Na aba Authorization desta pasta, escolha OAuth 2.0 e preencha:\n   - Grant Type: Authorization Code (With PKCE), Code Challenge Method: SHA-256\n   - Callback URL: https://oauth.pstmn.io/v1/callback\n   - Auth URL: {{keycloakUrl}}/realms/{{keycloakRealm}}/protocol/openid-connect/auth\n   - Access Token URL: {{keycloakUrl}}/realms/{{keycloakRealm}}/protocol/openid-connect/token\n   - Client ID: front-codeflix (publico, sem segredo), Scope: openid\n3. Get New Access Token, entre com o e-mail e a senha do cadastro, e guarde o token em `tokenDeAssinante`.\n\nO mesmo client serve ao front, que e para quem ele existe. Rode a pasta 1 antes: o `planoId` sai dela, e o plano precisa estar a venda.\n\nO que NAO da para ver a mao: a assinatura nasce vencendo em um mes, e cobranca so acontece depois do vencimento — a cobranca daqui responde `charged: false` sem chamar o provedor. A virada para ativa, incompleta e cancelada esta na jornada automatizada, que adianta o relogio.\n\nO acesso ao CATALOGO (CODEFLIX_SUBSCRIBER, que a videos-api exige) nao vem destas rotas: ele e concedido e revogado pelos eventos de dominio, pelo CDC. Assinar poe a pessoa no grupo `subscribers` e cancelar a tira — em segundos, se o Kafka Connect estiver de pe. Para conferir, veja os grupos da pessoa no painel do Keycloak depois de assinar e depois de cancelar; o README explica como registrar o conector.",
+      "description": "Todas as rotas aqui respondem sobre a assinatura de **quem apresenta o token**, pelo `sub` dele. O token da pasta 0 e de um service account, que nao tem conta neste servico: com ele o que da para afirmar e o 404, e os tres primeiros pedidos fazem exatamente isso — eles rodam sempre.\n\nOs marcados com [pessoa] precisam de um token de uma PESSOA, e nenhum client aceita usuario e senha (fluxo depreciado no OAuth 2.1). Para obter um:\n\n1. Cadastre-se pela pasta 3 e confirme o e-mail — e a confirmacao que poe a pessoa no grupo `accounts`, que concede CODEFLIX_ACCOUNT; sem ela nenhuma destas rotas e alcancavel.\n2. Na aba Authorization desta pasta, escolha OAuth 2.0 e preencha:\n   - Grant Type: Authorization Code (With PKCE), Code Challenge Method: SHA-256\n   - Callback URL: https://oauth.pstmn.io/v1/callback\n   - Auth URL: {{keycloakUrl}}/realms/{{keycloakRealm}}/protocol/openid-connect/auth\n   - Access Token URL: {{keycloakUrl}}/realms/{{keycloakRealm}}/protocol/openid-connect/token\n   - Client ID: front-codeflix (publico, sem segredo), Scope: openid\n3. Get New Access Token, entre com o e-mail e a senha do cadastro, e guarde o token em `tokenDeAssinante`.\n\nO mesmo client serve ao front, que e para quem ele existe. Rode a pasta 1 antes: o `planoId` sai dela, e o plano precisa estar a venda.\n\nA cobranca automatica (o job das vencidas) roda as 3h UTC e cobra pelo meio guardado — para ve-la agir sem esperar, mude `subscription.charge-job.cron`. Guarde um meio de pagamento pela pasta 4 antes, senao a varredura conta a assinatura como falha.\n\nO que NAO da para ver a mao: a assinatura nasce vencendo em um mes, e cobranca so acontece depois do vencimento — a cobranca daqui responde `charged: false` sem chamar o provedor. A virada para ativa, incompleta e cancelada esta na jornada automatizada, que adianta o relogio.\n\nO acesso ao CATALOGO (CODEFLIX_SUBSCRIBER, que a videos-api exige) nao vem destas rotas: ele e concedido e revogado pelos eventos de dominio, pelo CDC. Assinar poe a pessoa no grupo `subscribers` e cancelar a tira — em segundos, se o Kafka Connect estiver de pe. Para conferir, veja os grupos da pessoa no painel do Keycloak depois de assinar e depois de cancelar; o README explica como registrar o conector.",
       "item": [
         {
           "name": "Sem token, assinar recusa",
@@ -1531,6 +1643,64 @@
                   "        () => pm.response.to.have.status(201));",
                   "    pm.test(\"e outra assinatura\",",
                   "        () => pm.expect(pm.response.json().id).to.not.eql(pm.collectionVariables.get(\"assinaturaId\")));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[pessoa] Cobrar sem token usa o meio guardado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/me/charge",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "me",
+                "charge"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDeAssinante}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"tokenDeAssinante\")) {",
+                  "    pm.test.skip(\"tokenDeAssinante vazio: veja a descricao da pasta 5\", () => {});",
+                  "} else {",
+                  "    // Corpo vazio de proposito: e assim que o job cobra, pelo meio de pagamento guardado.",
+                  "    // Antes do vencimento o provedor nem e chamado, entao o que isto prova e que a rota",
+                  "    // aceita a cobranca sem token quando a conta tem um meio guardado.",
+                  "    pm.test(\"responde 200, e nao 422 por falta de token\",",
+                  "        () => pm.response.to.have.status(200));",
+                  "    pm.test(\"nada foi cobrado: nao venceu\",",
+                  "        () => pm.expect(pm.response.json().charged).to.be.false);",
                   "}"
                 ]
               }

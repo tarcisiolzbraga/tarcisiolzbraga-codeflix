@@ -186,6 +186,7 @@ repetição consertar uma interrupção entre gravar a conta e falar com o Keycl
 |---|---|---|
 | `GET /accounts/me` | assinante ou administrador | a conta de **quem está chamando** |
 | `PUT /accounts/me/billing-address` | assinante ou administrador | troca o endereço de cobrança |
+| `PUT /accounts/me/payment-method` | assinante ou administrador | guarda o meio de pagamento |
 
 **`/me`, e não `/{id}`.** Com id no caminho, um assinante poderia pedir a conta de outro, e toda
 rota daqui teria de conferir propriedade — uma checagem fácil de esquecer na rota seguinte. A conta
@@ -211,6 +212,24 @@ Para experimentar à mão: suba o RabbitMQ, faça o cadastro, e pegue o link em
 
 O link aponta para a página do front (`SIGNUP_CONFIRMATION_URL`), não para uma rota desta API: é o
 front que chama o `POST` de confirmar com o token. Front também não existe ainda.
+
+### O meio de pagamento guardado
+
+É o que torna a cobrança automática possível. Sem ele, só se cobra quem está presente com o cartão
+na mão — e era esse o limite antes desta rota existir, o mesmo da referência do curso, que por isso
+não tem job de cobrança.
+
+**O que fica no banco é uma referência opaca**, que o provedor devolve ao tokenizar o cartão. Número,
+CVV e validade seguem no provedor; a referência vazada não compra nada em lugar nenhum, e é isso que
+torna guardá-la aceitável onde guardar o cartão não seria. O token de uso único que o navegador
+manda **não** é persistido: ele vai ao provedor e só a referência volta.
+
+A resposta da conta traz `hasPaymentMethod`, um booleano — e **não** a referência. O front só precisa
+saber se tem de pedir um cartão.
+
+Sem bandeira nem últimos quatro dígitos, que um provedor de verdade devolveria para a tela mostrar
+"Visa •••• 4242": o provedor aqui é de mentira e não os devolve, e campo que ninguém preenche é
+exatamente o erro do `deletedAt` da referência.
 
 ## As rotas do plano
 
@@ -300,9 +319,41 @@ provedor de verdade. Com a decisão de não ter cobrança real, aquele guard dei
 passou a ser armadilha: o perfil nunca subiria, e a falha seria um bean faltando, sem explicação.
 Trocamos o guard por dizer a verdade — aqui, no `PaymentConfig` e no log de cada cobrança.
 
-O corpo da cobrança leva **só o token do cartão**. Número e CVV não têm campo onde entrar — quem os
-troca por um token é o provedor, direto com o navegador de quem assina —, e isso mantém o serviço
-fora do escopo do PCI DSS.
+O corpo da cobrança leva **só o token do cartão**, e ele é **opcional**: sem ele, a cobrança usa o
+meio de pagamento que a conta guardou. O token da requisição vence quando os dois existem, porque é
+a escolha explícita de quem está ali agora — é como alguém troca de cartão depois de uma recusa, sem
+ter de gravar o meio primeiro. Sem token e sem meio guardado, a resposta é `422` dizendo o que falta.
+
+Número e CVV não têm campo onde entrar — quem os troca por um token é o provedor, direto com o
+navegador de quem assina —, e isso mantém o serviço fora do escopo do PCI DSS.
+
+### A varredura das vencidas
+
+Uma assinatura vence e **a cobrança acontece sozinha**: um job varre as vencidas e cobra cada uma
+pelo meio de pagamento guardado. Sem ele, nada acontecia até alguém chamar a rota.
+
+```
+subscription.charge-job.cron        0 0 3 * * *   (UTC)
+subscription.charge-job.batch-size  100
+```
+
+Em lotes, porque a varredura passa pela base inteira. O detalhe que erra em silêncio é o
+deslocamento: **ele anda só pelas que continuam vencidas.** Cobrar move o vencimento, então a cobrada
+sai do resultado da consulta — avançar por página faria a varredura pular tantas quantas tivesse
+cobrado. Recusada não sai, e sem avançar nada o laço não terminaria. Há teste nas duas direções.
+
+**Uma assinatura que falha não para a varredura.** O motivo mais comum é conta sem meio de pagamento
+guardado, que não é defeito do sistema; o job registra em log e segue. O contador de falhas vai no
+resumo, e até dez motivos vão junto — contador sem motivo é impossível de diagnosticar num processo
+que roda sozinho.
+
+**Duas instâncias rodam o job duas vezes**, e isso é aceitável sem lock distribuído porque as duas
+defesas já existem: o `orderId` da cobrança é estável — assinatura mais vencimento —, então o
+provedor reconhece a repetição e não cobra em dobro, e o lock otimista faz a segunda gravação da
+mesma assinatura perder a corrida.
+
+O cron é em UTC, o mesmo fuso do vencimento: a varredura compara datas, e rodar perto da virada do
+dia num fuso diferente faria o resultado depender de minutos.
 
 ### Para ver o ciclo inteiro à mão
 
