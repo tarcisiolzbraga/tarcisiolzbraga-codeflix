@@ -117,23 +117,30 @@ jobs:
           push: false
           tags: ${{ matrix.service }}:${{ github.sha }}
 
-  # O encoder tem job próprio, e não entra na matriz dos dois de cima: a cadeia é outra — Go, com o
-  # seu cache e o seu jeito de rodar teste. Não depende do job unit porque não compartilha nada com
-  # os serviços Java; o que os liga é o contrato das filas, e esse quem exercita é o teste de cada
-  # lado.
-  encoder:
-    name: Encoder (Go)
+  # Os serviços em Go têm job próprio, e não entram nas matrizes dos de cima: a cadeia é outra —
+  # Go, com o seu cache e o seu jeito de rodar teste. Não dependem do job unit porque não
+  # compartilham nada com os serviços Java; o que os liga é o contrato das filas, e esse quem
+  # exercita é o teste de cada lado.
+  #
+  # Numa matriz, e não um job por serviço: o passo é idêntico nos dois, e `make check` é a porta de
+  # entrada de cada um.
+  go-services:
+    name: ${{ matrix.service }} (Go)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [encoder-api, mail-api]
     defaults:
       run:
-        working-directory: encoder-api
+        working-directory: ${{ matrix.service }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: encoder-api/go.mod
-          cache-dependency-path: encoder-api/go.sum
+          go-version-file: ${{ matrix.service }}/go.mod
+          cache-dependency-path: ${{ matrix.service }}/go.sum
 
       # O mesmo alvo que se usa na mão antes de commitar: vet e depois os testes com -race.
       - name: Verificação

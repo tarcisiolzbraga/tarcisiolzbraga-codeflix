@@ -1,0 +1,49 @@
+# O serviço de e-mail e o coletor que recebe o que ele manda.
+#
+# O coletor existe porque **não há provedor de e-mail de verdade**: é prova de conceito, como a
+# cobrança. O Mailpit fica no lugar de um provedor, aceita qualquer mensagem sem autenticar e mostra
+# o que chegou numa página web — é onde se lê o link de validação em desenvolvimento, em vez de
+# pescá-lo na fila do broker à mão.
+# Teto do log de cada container. Sem isto o Docker guarda o json-file sem limite nenhum, e um
+# serviço em laço enche o disco.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
+services:
+  mail-api:
+    logging: *logging
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: adm_videos_mail
+    env_file:
+      - ../.env
+    environment:
+      # Dentro da rede do compose os serviços se acham pelo nome; o .env traz os valores de quem
+      # roda no host, e estas linhas os substituem.
+      AMQP_URL: amqp://${AMQP_USER}:${AMQP_PASSWORD}@rabbitmq:5672/
+      SMTP_ADDR: mailpit:1025
+    depends_on:
+      rabbitmq:
+        condition: service_started
+      mailpit:
+        condition: service_started
+    labels:
+      filebeat_collector: "true"
+
+  mailpit:
+    logging: *logging
+    image: axllent/mailpit:v1.21
+    container_name: adm_videos_mailpit
+    environment:
+      # Guarda as mensagens em memória: é coletor de desenvolvimento, e perder o que recebeu ao
+      # reiniciar não custa nada.
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    ports:
+      - "${MAILPIT_SMTP_PORT}:1025"
+      - "${MAILPIT_UI_PORT}:8025"

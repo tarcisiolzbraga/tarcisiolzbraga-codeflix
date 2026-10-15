@@ -51,10 +51,10 @@ func (h *ecsHandler) Handle(_ context.Context, registro slog.Record) error {
 		"ecs":        map[string]any{"version": Version},
 	}
 	for _, a := range h.fixos {
-		documento[a.Key] = a.Value.Any()
+		documento[a.Key] = valorDe(a.Value.Any())
 	}
 	registro.Attrs(func(a slog.Attr) bool {
-		documento[a.Key] = a.Value.Any()
+		documento[a.Key] = valorDe(a.Value.Any())
 		return true
 	})
 
@@ -66,6 +66,21 @@ func (h *ecsHandler) Handle(_ context.Context, registro slog.Record) error {
 	defer h.mutex.Unlock()
 	_, err = h.saida.Write(append(linha, '\n'))
 	return err
+}
+
+// valorDe converte o que o json.Marshal não representa de um jeito útil.
+//
+// O caso que importa é o erro: um error quase nunca tem campo exportado, então o Marshal o escreve
+// como `{}` — e o log fica com o campo presente e a mensagem perdida. Foi assim que descobri, com
+// um `"erro":{}` no lugar do motivo de o serviço não subir.
+//
+// Só error, e não todo Stringer: time.Time é Stringer e já é serializado em RFC3339, e convertê-lo
+// pelo String() mudaria o formato que a pilha de observabilidade espera.
+func valorDe(valor any) any {
+	if err, ok := valor.(error); ok {
+		return err.Error()
+	}
+	return valor
 }
 
 func (h *ecsHandler) WithAttrs(atributos []slog.Attr) slog.Handler {

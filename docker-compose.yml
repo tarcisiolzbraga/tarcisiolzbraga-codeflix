@@ -4,11 +4,12 @@
 #
 # Os profiles mantêm o `docker compose up -d` do dia a dia enxuto:
 #   (sem profile)            MySQL, RabbitMQ, Garage, Keycloak, o Elasticsearch do catálogo, o
-#                            MySQL da assinatura e as aplicações
+#                            MySQL da assinatura, o coletor de e-mail e as aplicações
 #   --profile cdc            Kafka e Kafka Connect, que alimentam o catálogo
 #   --profile observability  Elasticsearch de log, Kibana, Logstash e Filebeat
 #
-# As três aplicações Java empacotam o jar no host, então antes de subi-las rode o bootJar da pasta
+# O serviço de e-mail e o encoder são em Go e compilam dentro da própria imagem; só as três
+# aplicações Java empacotam o jar no host, então antes de subi-las rode o bootJar da pasta
 # de cada uma. Para subir só a infraestrutura, nomeie os serviços:
 #   docker compose up -d mysql rabbitmq garage keycloak catalog-elasticsearch
 include:
@@ -20,3 +21,4 @@ include:
   - path: videos-api/docker-compose.yml
   - path: encoder-api/docker-compose.yml
   - path: subscription-api/docker-compose.yml
+  - path: mail-api/docker-compose.yml
