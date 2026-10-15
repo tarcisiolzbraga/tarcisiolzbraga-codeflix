@@ -94,6 +94,53 @@ class ConfirmSignUpUseCaseTest {
         verify(identityProviderGateway).markEmailVerified(AccountFixture.userId());
     }
 
+    // A role de assinante vem com a conta, não com a assinatura: as rotas de assinatura a exigem, e
+    // sem ela não haveria como assinar — quem confirma o cadastro ficaria trancado para fora.
+    @Test
+    void givenAValidToken_whenConfirms_thenTheProviderGrantsSubscriberAccess() {
+        final var token = SignUpToken.generate();
+        when(pendingSignUpGateway.pendingSignUpOfToken(any())).thenReturn(Optional.of(pendingFor(token)));
+        when(accountGateway.accountOfEmail(any())).thenReturn(Optional.empty());
+        when(accountGateway.save(any())).thenAnswer(returnsFirstArg());
+        when(pendingSignUpGateway.save(any())).thenAnswer(returnsFirstArg());
+
+        useCase().execute(new ConfirmSignUpCommand(token.value()));
+
+        verify(identityProviderGateway).addToSubscribers(AccountFixture.userId());
+    }
+
+    // O acesso é concedido depois de a conta existir: conceder antes deixaria, numa interrupção,
+    // alguém com role de assinante e sem conta neste serviço.
+    @Test
+    void givenAValidToken_whenConfirms_thenTheAccountIsStoredBeforeTheProviderIsTold() {
+        final var token = SignUpToken.generate();
+        when(pendingSignUpGateway.pendingSignUpOfToken(any())).thenReturn(Optional.of(pendingFor(token)));
+        when(accountGateway.accountOfEmail(any())).thenReturn(Optional.empty());
+        when(accountGateway.save(any())).thenAnswer(returnsFirstArg());
+        when(pendingSignUpGateway.save(any())).thenAnswer(returnsFirstArg());
+
+        useCase().execute(new ConfirmSignUpCommand(token.value()));
+
+        final var order = inOrder(accountGateway, identityProviderGateway);
+        order.verify(accountGateway).save(any());
+        order.verify(identityProviderGateway).addToSubscribers(AccountFixture.userId());
+    }
+
+    // O estado que uma interrupção entre gravar a conta e falar com o provedor deixa: conta criada
+    // e nenhum acesso. Repetir conserta, e é por isso que a concessão está nos dois caminhos.
+    @Test
+    void givenAnInterruptionBeforeTheProviderWasTold_whenConfirmsAgain_thenGrantsTheAccess() {
+        final var token = SignUpToken.generate();
+        when(pendingSignUpGateway.pendingSignUpOfToken(any())).thenReturn(Optional.of(pendingFor(token)));
+        when(accountGateway.accountOfEmail(any())).thenReturn(Optional.of(AccountFixture.account()));
+        when(pendingSignUpGateway.save(any())).thenAnswer(returnsFirstArg());
+
+        useCase().execute(new ConfirmSignUpCommand(token.value()));
+
+        verify(accountGateway, never()).save(any());
+        verify(identityProviderGateway).addToSubscribers(AccountFixture.userId());
+    }
+
     @Test
     void givenAValidToken_whenConfirms_thenThePendingIsStoredAsConfirmed() {
         final var token = SignUpToken.generate();

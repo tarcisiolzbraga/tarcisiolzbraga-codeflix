@@ -54,6 +54,14 @@
     {
       "key": "contaId",
       "value": ""
+    },
+    {
+      "key": "tokenDeAssinante",
+      "value": ""
+    },
+    {
+      "key": "assinaturaId",
+      "value": ""
     }
   ],
   "item": [
@@ -948,7 +956,7 @@
     },
     {
       "name": "4. A conta de quem chama",
-      "description": "Estas rotas respondem sobre a conta de quem apresenta o token, pelo `sub` dele. O token desta coleção é de um service account (admin-codeflix), que não tem conta aqui — então o que dá para afirmar é o 404, que é o comportamento correto para token válido sem conta. Exercitá-las com uma conta de verdade pede um token de pessoa, e o realm não permite o fluxo de senha em nenhum client; é decisão em aberto.",
+      "description": "Estas rotas respondem sobre a conta de quem apresenta o token, pelo `sub` dele. O token desta colecao e de um service account (admin-codeflix), que nao tem conta aqui — entao o que da para afirmar e o 404, que e o comportamento correto para token valido sem conta. Para exercita-las com uma conta de verdade, pegue um token de pessoa como a pasta 5 descreve e troque o bearer destes pedidos.",
       "item": [
         {
           "name": "A conta de quem chama: 404 para quem nao tem",
@@ -1051,6 +1059,479 @@
                   "pm.test(\"responde 401\", () => pm.response.to.have.status(401));",
                   "pm.test(\"e 401, nao 404: sem token nao se descobre se a conta existe\",",
                   "    () => pm.expect(pm.response.code).to.not.eql(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Assinatura",
+      "description": "Todas as rotas aqui respondem sobre a assinatura de **quem apresenta o token**, pelo `sub` dele. O token da pasta 0 e de um service account, que nao tem conta neste servico: com ele o que da para afirmar e o 404, e os tres primeiros pedidos fazem exatamente isso — eles rodam sempre.\n\nOs marcados com [pessoa] precisam de um token de uma PESSOA, e nenhum client aceita usuario e senha (fluxo depreciado no OAuth 2.1). Para obter um:\n\n1. Cadastre-se pela pasta 3 e confirme o e-mail — e a confirmacao que poe a pessoa no grupo `subscribers`, sem o qual nenhuma destas rotas e alcancavel.\n2. Na aba Authorization desta pasta, escolha OAuth 2.0 e preencha:\n   - Grant Type: Authorization Code (With PKCE), Code Challenge Method: SHA-256\n   - Callback URL: https://oauth.pstmn.io/v1/callback\n   - Auth URL: {{keycloakUrl}}/realms/{{keycloakRealm}}/protocol/openid-connect/auth\n   - Access Token URL: {{keycloakUrl}}/realms/{{keycloakRealm}}/protocol/openid-connect/token\n   - Client ID: front-codeflix (publico, sem segredo), Scope: openid\n3. Get New Access Token, entre com o e-mail e a senha do cadastro, e guarde o token em `tokenDeAssinante`.\n\nO mesmo client serve ao front, que e para quem ele existe. Rode a pasta 1 antes: o `planoId` sai dela, e o plano precisa estar a venda.\n\nO que NAO da para ver a mao: a assinatura nasce vencendo em um mes, e cobranca so acontece depois do vencimento — a cobranca daqui responde `charged: false` sem chamar o provedor. A virada para ativa, incompleta e cancelada esta na jornada automatizada, que adianta o relogio.",
+      "item": [
+        {
+          "name": "Sem token, assinar recusa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"{{planoId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"e 401, nao 404: sem token nao se descobre nada\",",
+                  "    () => pm.expect(pm.response.code).to.not.eql(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token sem conta: assinar responde 404",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"{{planoId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 404, nao 401: o token e valido, conta e que nao ha\",",
+                  "    () => pm.response.to.have.status(404));",
+                  "pm.test(\"a mesma mensagem das rotas de conta\",",
+                  "    () => pm.expect(pm.response.json().message).to.eql(\"there is no account for whoever is calling\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token sem conta: ler a propria assinatura responde 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"nao ecoa o id de quem chamou\",",
+                  "    () => pm.expect(pm.response.json().message).to.eql(\"there is no account for whoever is calling\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[pessoa] Assina o plano da pasta 1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDeAssinante}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"{{planoId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"tokenDeAssinante\")) {",
+                  "    pm.test.skip(\"tokenDeAssinante vazio: veja a descricao da pasta\", () => {});",
+                  "} else {",
+                  "    pm.test(\"responde 201\", () => pm.response.to.have.status(201));",
+                  "    pm.test(\"o Location aponta para /subscriptions/me, que e a URL que existe\",",
+                  "        () => pm.expect(pm.response.headers.get(\"Location\")).to.eql(\"/subscriptions/me\"));",
+                  "    const corpo = pm.response.json();",
+                  "    pm.collectionVariables.set(\"assinaturaId\", corpo.id);",
+                  "    pm.test(\"nasce em trial: assinar nao cobra\", () => pm.expect(corpo.status).to.eql(\"trailing\"));",
+                  "    pm.test(\"nunca renovada\", () => pm.expect(corpo.lastRenewDate).to.be.null);",
+                  "    pm.test(\"o corpo nao traz versao nem id de conta\",",
+                  "        () => pm.expect(Object.keys(corpo)).to.have.members(",
+                  "            [\"id\", \"planId\", \"status\", \"dueDate\", \"lastRenewDate\", \"createdAt\"]));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[pessoa] A propria assinatura",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDeAssinante}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"tokenDeAssinante\")) {",
+                  "    pm.test.skip(\"tokenDeAssinante vazio: veja a descricao da pasta\", () => {});",
+                  "} else {",
+                  "    pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "    pm.test(\"e a mesma que acabou de nascer\",",
+                  "        () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"assinaturaId\")));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[pessoa] Assinar de novo com assinatura viva recusa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDeAssinante}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"{{planoId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"tokenDeAssinante\")) {",
+                  "    pm.test.skip(\"tokenDeAssinante vazio: veja a descricao da pasta\", () => {});",
+                  "} else {",
+                  "    pm.test(\"responde 409: uma conta assina uma vez por vez\",",
+                  "        () => pm.response.to.have.status(409));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[pessoa] Cobrar antes do vencimento nao cobra nada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/me/charge",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "me",
+                "charge"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDeAssinante}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"creditCardToken\": \"tok_visa_4242\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"tokenDeAssinante\")) {",
+                  "    pm.test.skip(\"tokenDeAssinante vazio: veja a descricao da pasta\", () => {});",
+                  "} else {",
+                  "    pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "    const corpo = pm.response.json();",
+                  "    pm.test(\"nada foi cobrado\", () => pm.expect(corpo.charged).to.be.false);",
+                  "    pm.test(\"o provedor nem foi chamado: sem transacao\",",
+                  "        () => pm.expect(corpo.transactionId).to.be.null);",
+                  "    pm.test(\"e nada mudou na assinatura\",",
+                  "        () => pm.expect(corpo.subscription.status).to.eql(\"trailing\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[pessoa] Cancela a assinatura",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/me/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "me",
+                "cancel"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDeAssinante}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"tokenDeAssinante\")) {",
+                  "    pm.test.skip(\"tokenDeAssinante vazio: veja a descricao da pasta\", () => {});",
+                  "} else {",
+                  "    pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "    pm.test(\"fica cancelada\", () => pm.expect(pm.response.json().status).to.eql(\"canceled\"));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[pessoa] Cancelar de novo nao e erro",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/me/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "me",
+                "cancel"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDeAssinante}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"tokenDeAssinante\")) {",
+                  "    pm.test.skip(\"tokenDeAssinante vazio: veja a descricao da pasta\", () => {});",
+                  "} else {",
+                  "    pm.test(\"responde 200: o fim e o mesmo, e o pedido ja foi atendido\",",
+                  "        () => pm.response.to.have.status(200));",
+                  "    const corpo = pm.response.json();",
+                  "    pm.test(\"segue cancelada\", () => pm.expect(corpo.status).to.eql(\"canceled\"));",
+                  "    pm.test(\"e a mesma assinatura\",",
+                  "        () => pm.expect(corpo.id).to.eql(pm.collectionVariables.get(\"assinaturaId\")));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[pessoa] Depois de cancelar, assinar de novo cria outra",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenDeAssinante}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"{{planoId}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"tokenDeAssinante\")) {",
+                  "    pm.test.skip(\"tokenDeAssinante vazio: veja a descricao da pasta\", () => {});",
+                  "} else {",
+                  "    pm.test(\"responde 201: cancelada nao tranca a conta\",",
+                  "        () => pm.response.to.have.status(201));",
+                  "    pm.test(\"e outra assinatura\",",
+                  "        () => pm.expect(pm.response.json().id).to.not.eql(pm.collectionVariables.get(\"assinaturaId\")));",
+                  "}"
                 ]
               }
             }

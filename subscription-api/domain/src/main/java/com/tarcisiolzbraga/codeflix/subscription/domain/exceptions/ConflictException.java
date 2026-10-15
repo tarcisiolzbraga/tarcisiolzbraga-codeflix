@@ -31,6 +31,11 @@ public class ConflictException extends DomainException {
         return new ConflictException("this sign-up was already confirmed");
     }
 
+    // Uma conta assina uma vez por vez. Cancelada não conta: reassinar é legítimo.
+    public static ConflictException alreadySubscribed() {
+        return new ConflictException("this account already has a subscription");
+    }
+
     public static ConflictException staleVersion(
             final Class<? extends AggregateRoot<?>> aggregate, final Identifier id) {
         return new ConflictException(MESSAGE_TEMPLATE.formatted(aggregate.getSimpleName(), id.getValue()));
