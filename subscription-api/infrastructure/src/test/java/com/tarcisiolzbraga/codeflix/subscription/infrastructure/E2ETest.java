@@ -19,5 +19,6 @@ import org.springframework.context.annotation.Import;
 @Tag("e2eTest")
 @SpringBootTest(classes = Main.class, webEnvironment = WebEnvironment.RANDOM_PORT)
 @Import({MySQLContainerConfiguration.class, KeycloakContainerConfiguration.class,
-        RabbitMQContainerConfiguration.class, JourneyClockConfiguration.class})
+        RabbitMQContainerConfiguration.class,
+        KafkaContainerConfiguration.class, JourneyClockConfiguration.class})
 public @interface E2ETest {}

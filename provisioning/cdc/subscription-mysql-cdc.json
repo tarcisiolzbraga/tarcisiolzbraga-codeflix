@@ -1,0 +1,30 @@
+{
+  "name": "subscription-mysql-cdc",
+  "connector.class": "io.debezium.connector.mysql.MySqlConnector",
+  "tasks.max": "1",
+
+  "database.hostname": "subscription-mysql",
+  "database.port": "3306",
+  "database.user": "__CDC_USER__",
+  "database.password": "__CDC_PASSWORD__",
+
+  "database.server.id": "10001",
+  "topic.prefix": "subscription_mysql",
+  "database.allowPublicKeyRetrieval": "true",
+
+  "database.include.list": "subscription",
+  "table.include.list": "subscription.event",
+
+  "schema.history.internal.kafka.bootstrap.servers": "kafka:9092",
+  "schema.history.internal.kafka.topic": "subscription.dbhistory",
+  "include.schema.changes": "false",
+
+  "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+  "key.converter.schemas.enable": "true",
+  "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+  "value.converter.schemas.enable": "true",
+
+  "topic.creation.enable": "true",
+  "topic.creation.default.replication.factor": "1",
+  "topic.creation.default.partitions": "1"
+}
