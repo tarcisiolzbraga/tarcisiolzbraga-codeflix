@@ -12,7 +12,6 @@ import com.tarcisiolzbraga.codeflix.admin.domain.genre.GenreGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.Notification;
 import io.vavr.control.Either;
 import java.util.Objects;
-import java.util.Set;
 
 public class DefaultCreateGenreUseCase extends CreateGenreUseCase {
 
