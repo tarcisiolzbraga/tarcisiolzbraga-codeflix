@@ -13,6 +13,8 @@ import com.tarcisiolzbraga.codeflix.subscription.domain.plan.PlanFixture;
 import com.tarcisiolzbraga.codeflix.subscription.domain.plan.PlanId;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.IntegrationTest;
 import java.math.BigDecimal;
+import com.tarcisiolzbraga.codeflix.subscription.domain.pagination.PageRequest;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -21,6 +23,81 @@ class PlanJdbcGatewayIT {
 
     @Autowired
     private PlanJdbcGateway gateway;
+
+    // O catálogo aberto mostra só o que está à venda. Um plano fora de venda aparecendo ali seria
+    // oferecer o que não se pode assinar.
+    @Test
+    void givenActiveAndInactivePlans_whenAsksForTheOnesOnSale_thenOnlyTheActiveComeBack() {
+        gateway.save(PlanFixture.planWithName("A venda"));
+        gateway.save(PlanFixture.activePlanWithName("A venda tambem"));
+        final var actual = gateway.activePlansOfPage(new PageRequest(0, 10));
+
+        assertEquals(1, actual.total());
+        assertEquals("A venda tambem", actual.items().getFirst().name());
+    }
+
+    @Test
+    void givenActiveAndInactivePlans_whenTheOperatorLists_thenBothComeBack() {
+        gateway.save(PlanFixture.planWithName("Fora de venda"));
+        gateway.save(PlanFixture.activePlanWithName("A venda"));
+
+        final var actual = gateway.plansOfPage(new PageRequest(0, 10));
+
+        assertEquals(2, actual.total());
+    }
+
+    // O total é o de registros que casam, não o da página: é dele que sai o número de páginas, e sem
+    // ele o cliente não sabe se há mais.
+    @Test
+    void givenMorePlansThanThePage_whenLists_thenTheTotalCountsAllAndThePageHoldsThePerPage() {
+        for (var i = 0; i < 5; i++) {
+            gateway.save(PlanFixture.activePlanWithName("Plano " + i));
+        }
+
+        final var actual = gateway.plansOfPage(new PageRequest(0, 2));
+
+        assertEquals(5, actual.total());
+        assertEquals(2, actual.items().size());
+        assertEquals(0, actual.currentPage());
+        assertEquals(2, actual.perPage());
+    }
+
+    @Test
+    void givenSeveralPlans_whenAsksForTheSecondPage_thenItDoesNotRepeatTheFirst() {
+        for (var i = 0; i < 5; i++) {
+            gateway.save(PlanFixture.activePlanWithName("Plano " + i));
+        }
+
+        final var first = gateway.plansOfPage(new PageRequest(0, 2));
+        final var second = gateway.plansOfPage(new PageRequest(1, 2));
+
+        assertTrue(
+                first.items().stream()
+                        .noneMatch(a -> second.items().stream().anyMatch(b -> b.id().equals(a.id()))),
+                "as duas páginas não deveriam repetir ninguém");
+    }
+
+    // Ordenada pelo nome: é a ordem que uma tela de escolha mostra, e é o que torna a paginação
+    // estável entre consultas.
+    @Test
+    void givenPlansOutOfOrder_whenLists_thenTheyComeSortedByName() {
+        gateway.save(PlanFixture.activePlanWithName("Zeta"));
+        gateway.save(PlanFixture.activePlanWithName("Alfa"));
+        gateway.save(PlanFixture.activePlanWithName("Meio"));
+
+        final var actual = gateway.plansOfPage(new PageRequest(0, 10));
+
+        assertEquals(
+                List.of("Alfa", "Meio", "Zeta"), actual.items().stream().map(it -> it.name()).toList());
+    }
+
+    @Test
+    void givenNoPlans_whenLists_thenThePageIsEmptyAndTheTotalIsZero() {
+        final var actual = gateway.plansOfPage(new PageRequest(0, 10));
+
+        assertEquals(0, actual.total());
+        assertTrue(actual.items().isEmpty());
+    }
 
     @Test
     void givenANewPlan_whenSavesIt_thenItCanBeReadBackWithTheSameValues() {

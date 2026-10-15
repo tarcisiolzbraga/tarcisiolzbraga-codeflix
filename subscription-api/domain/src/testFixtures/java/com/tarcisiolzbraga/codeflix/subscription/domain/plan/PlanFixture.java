@@ -25,6 +25,15 @@ public final class PlanFixture {
         return Plan.newPlan(PlanId.unique(), NAME, DESCRIPTION, true, price());
     }
 
+    // Nome próprio, para o teste de listagem poder afirmar sobre a ordem e sobre quem veio.
+    public static Plan activePlanWithName(final String aName) {
+        return Plan.newPlan(PlanId.unique(), aName, DESCRIPTION, true, price());
+    }
+
+    public static Plan planWithName(final String aName) {
+        return Plan.newPlan(PlanId.unique(), aName, DESCRIPTION, false, price());
+    }
+
     public static Plan inactivePlan() {
         return Plan.newPlan(PlanId.unique(), NAME, DESCRIPTION, false, price());
     }

@@ -5,6 +5,12 @@ import com.tarcisiolzbraga.codeflix.subscription.application.plan.change.ChangeP
 import com.tarcisiolzbraga.codeflix.subscription.application.plan.change.ChangePlanUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.plan.create.CreatePlanCommand;
 import com.tarcisiolzbraga.codeflix.subscription.application.plan.create.CreatePlanUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.plan.list.ListPlansOnSaleUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.plan.list.ListPlansUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.domain.pagination.Pagination;
+import com.tarcisiolzbraga.codeflix.subscription.infrastructure.api.PageQuery;
+import com.tarcisiolzbraga.codeflix.subscription.infrastructure.plan.models.PlanListResponse;
+import com.tarcisiolzbraga.codeflix.subscription.infrastructure.plan.models.PlanOnSaleResponse;
 import com.tarcisiolzbraga.codeflix.subscription.application.plan.deactivate.DeactivatePlanUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.plan.get.GetPlanByIdUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.plan.models.ChangePlanRequest;
@@ -23,6 +29,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class PlanController implements PlanAPI {
 
     private final CreatePlanUseCase createPlanUseCase;
+    private final ListPlansOnSaleUseCase listPlansOnSaleUseCase;
+    private final ListPlansUseCase listPlansUseCase;
     private final ChangePlanUseCase changePlanUseCase;
     private final ActivatePlanUseCase activatePlanUseCase;
     private final DeactivatePlanUseCase deactivatePlanUseCase;
@@ -30,11 +38,15 @@ public class PlanController implements PlanAPI {
 
     public PlanController(
             final CreatePlanUseCase createPlanUseCase,
+            final ListPlansOnSaleUseCase listPlansOnSaleUseCase,
+            final ListPlansUseCase listPlansUseCase,
             final ChangePlanUseCase changePlanUseCase,
             final ActivatePlanUseCase activatePlanUseCase,
             final DeactivatePlanUseCase deactivatePlanUseCase,
             final GetPlanByIdUseCase getPlanByIdUseCase) {
         this.createPlanUseCase = Objects.requireNonNull(createPlanUseCase);
+        this.listPlansOnSaleUseCase = Objects.requireNonNull(listPlansOnSaleUseCase);
+        this.listPlansUseCase = Objects.requireNonNull(listPlansUseCase);
         this.changePlanUseCase = Objects.requireNonNull(changePlanUseCase);
         this.activatePlanUseCase = Objects.requireNonNull(activatePlanUseCase);
         this.deactivatePlanUseCase = Objects.requireNonNull(deactivatePlanUseCase);
@@ -47,6 +59,16 @@ public class PlanController implements PlanAPI {
                 request.name(), request.description(), request.isActive(), request.currency(), request.price());
         final var response = CreatePlanResponse.from(this.createPlanUseCase.execute(command));
         return ResponseEntity.created(URI.create("/plans/" + response.id())).body(response);
+    }
+
+    @Override
+    public Pagination<PlanOnSaleResponse> listOnSale(final PageQuery query) {
+        return this.listPlansOnSaleUseCase.execute(query.toPageRequest()).map(PlanOnSaleResponse::from);
+    }
+
+    @Override
+    public Pagination<PlanListResponse> list(final PageQuery query) {
+        return this.listPlansUseCase.execute(query.toPageRequest()).map(PlanListResponse::from);
     }
 
     @Override

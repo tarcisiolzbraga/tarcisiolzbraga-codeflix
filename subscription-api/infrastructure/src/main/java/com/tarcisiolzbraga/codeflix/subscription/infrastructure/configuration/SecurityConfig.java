@@ -56,6 +56,15 @@ public class SecurityConfig {
     // curinga, qualquer rota futura embaixo desse caminho nasceria aberta sem ninguém decidir.
     private static final String[] SIGN_UP_PATHS = {"/accounts/sign-up", "/accounts/sign-up/confirm"};
 
+    // O catálogo de planos à venda, aberto: preço é informação pública, e é o que uma tela de
+    // escolha mostra antes de alguém se cadastrar.
+    //
+    // Listado um a um e **só no GET**, em vez de /plans/on-sale/**: com curinga, qualquer rota futura
+    // embaixo desse caminho nasceria aberta sem ninguém decidir, e sem fixar o método um POST para
+    // cá também passaria. Vem ANTES da regra de /plans/**, que exige ADMIN — a primeira que casa
+    // vence.
+    private static final String[] CATALOG_PATHS = {"/plans/on-sale"};
+
     private static final String[] DOCS_PATHS = {
         "/v3/api-docs/**", "/v3/api-docs", "/swagger-ui/**", "/swagger-ui.html"
     };
@@ -77,6 +86,8 @@ public class SecurityConfig {
                 .requestMatchers(DOCS_PATHS)
                 .permitAll()
                 .requestMatchers(HttpMethod.POST, SIGN_UP_PATHS)
+                .permitAll()
+                .requestMatchers(HttpMethod.GET, CATALOG_PATHS)
                 .permitAll()
                 .requestMatchers("/plans/**")
                 .hasRole(ROLE_ADMIN)

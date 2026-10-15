@@ -15,6 +15,8 @@ import com.tarcisiolzbraga.codeflix.subscription.domain.account.AccountId;
 import com.tarcisiolzbraga.codeflix.subscription.domain.account.idp.UserId;
 import com.tarcisiolzbraga.codeflix.subscription.domain.exceptions.DomainException;
 import com.tarcisiolzbraga.codeflix.subscription.domain.person.Email;
+import com.tarcisiolzbraga.codeflix.subscription.domain.pagination.PageRequest;
+import com.tarcisiolzbraga.codeflix.subscription.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.subscription.domain.plan.Plan;
 import com.tarcisiolzbraga.codeflix.subscription.domain.plan.PlanGateway;
 import com.tarcisiolzbraga.codeflix.subscription.domain.plan.PlanId;
@@ -242,6 +244,16 @@ class ChargeOverdueSubscriptionsUseCaseTest {
         @Override
         public Plan save(final Plan aPlan) {
             throw new AssertionError("a varredura não deveria gravar plano");
+        }
+
+        @Override
+        public Pagination<Plan> activePlansOfPage(final PageRequest aPage) {
+            throw new AssertionError("a varredura não deveria listar plano");
+        }
+
+        @Override
+        public Pagination<Plan> plansOfPage(final PageRequest aPage) {
+            throw new AssertionError("a varredura não deveria listar plano");
         }
     }
 

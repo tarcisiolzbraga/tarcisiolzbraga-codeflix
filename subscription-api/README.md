@@ -237,11 +237,27 @@ O plano é administração: quem o cria e altera é o operador do catálogo.
 
 | Rota | O que faz |
 |---|---|
+| `GET /plans/on-sale` | **aberta, sem token**: o catálogo de quem vai escolher, só o que está à venda |
+| `GET /plans` | lista tudo, paginado, inclusive o que está fora de venda |
 | `POST /plans` | cria. Sem o campo `active`, o plano nasce **fora de venda** |
 | `GET /plans/{id}` | busca pelo id, inclusive fora de venda |
 | `PUT /plans/{id}` | troca nome, descrição e preço. **Não aceita `active`** |
 | `PUT /plans/{id}/activate` | põe à venda. Idempotente |
 | `PUT /plans/{id}/deactivate` | tira de venda. Não apaga nada |
+
+**As duas listagens são rotas separadas porque são dois públicos.** Preço é informação pública, e é
+o que uma tela de escolha mostra antes de alguém se cadastrar — por isso `GET /plans/on-sale` não
+pede token e devolve só o que está à venda. `GET /plans` exige `CODEFLIX_ADMIN` e traz também o que
+foi tirado de venda, que é justamente o que o operador precisa ver para pôr de volta.
+
+O catálogo aberto **não devolve `active`**: ali todos estão à venda, então o campo seria sempre
+`true`, e campo que nunca varia é ruído que o cliente aprende a ignorar. A listagem do operador
+devolve, porque ali ele varia.
+
+As duas são paginadas no formato do monorepo — `currentPage`, `perPage`, `total`, `items` —, com
+`page` começando em 0 e `perPage` limitado a 100: ninguém pede a base inteira numa página. A ordem é
+sempre pelo nome. Sem busca nem ordenação configurável, que a `admin-api` tem: são poucos planos, e
+parâmetro que ninguém usa é o erro do `deletedAt`.
 
 Três decisões aí dentro que divergem da referência do curso:
 

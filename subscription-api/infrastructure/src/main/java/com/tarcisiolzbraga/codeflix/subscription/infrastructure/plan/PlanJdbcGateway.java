@@ -2,6 +2,8 @@ package com.tarcisiolzbraga.codeflix.subscription.infrastructure.plan;
 
 import com.tarcisiolzbraga.codeflix.subscription.domain.exceptions.ConflictException;
 import com.tarcisiolzbraga.codeflix.subscription.domain.money.Money;
+import com.tarcisiolzbraga.codeflix.subscription.domain.pagination.PageRequest;
+import com.tarcisiolzbraga.codeflix.subscription.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.subscription.domain.plan.Plan;
 import com.tarcisiolzbraga.codeflix.subscription.domain.plan.PlanGateway;
 import com.tarcisiolzbraga.codeflix.subscription.domain.plan.PlanId;
@@ -27,6 +29,36 @@ public class PlanJdbcGateway implements PlanGateway {
 
     public PlanJdbcGateway(final DatabaseClient database) {
         this.database = Objects.requireNonNull(database, "'database' should not be null");
+    }
+
+    // Só os que estão à venda: é o que o catálogo aberto mostra. Ordenado pelo nome, com o id como
+    // desempate — sem ordem total, duas páginas podem repetir ou pular linhas entre consultas.
+    @Override
+    public Pagination<Plan> activePlansOfPage(final PageRequest aPage) {
+        return pageOf(aPage, "WHERE active = TRUE");
+    }
+
+    @Override
+    public Pagination<Plan> plansOfPage(final PageRequest aPage) {
+        return pageOf(aPage, "");
+    }
+
+    // Duas consultas, e é o preço de a página saber quantos existem: sem o total, o cliente não sabe
+    // se há mais. O `where` vem de dentro desta classe, nunca de fora — não há parâmetro de usuário
+    // nessa string.
+    private Pagination<Plan> pageOf(final PageRequest aPage, final String where) {
+        final var total = this.database
+                .queryOne("SELECT COUNT(*) AS total FROM plan %s".formatted(where), Map.of(), rs -> rs.getLong("total"))
+                .orElse(0L);
+        final var sql = """
+                SELECT %s FROM plan %s
+                ORDER BY name, id
+                LIMIT :limit OFFSET :offset
+                """
+                .formatted(COLUMNS, where);
+        final var items = this.database.query(
+                sql, Map.of("limit", aPage.perPage(), "offset", aPage.offset()), planMapper());
+        return new Pagination<>(aPage.page(), aPage.perPage(), total, items);
     }
 
     @Override

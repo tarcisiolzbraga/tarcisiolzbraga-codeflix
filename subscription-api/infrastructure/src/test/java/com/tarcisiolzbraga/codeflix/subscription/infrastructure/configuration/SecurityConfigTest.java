@@ -7,6 +7,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.tarcisiolzbraga.codeflix.subscription.domain.pagination.Pagination;
+import java.util.List;
+import com.tarcisiolzbraga.codeflix.subscription.application.plan.list.ListPlansOnSaleUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.plan.list.ListPlansUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.plan.PlanOutput;
 import com.tarcisiolzbraga.codeflix.subscription.application.plan.activate.ActivatePlanUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.plan.change.ChangePlanUseCase;
@@ -55,6 +59,12 @@ class SecurityConfigTest {
     private CreatePlanUseCase createPlanUseCase;
 
     @MockitoBean
+    private ListPlansOnSaleUseCase listPlansOnSaleUseCase;
+
+    @MockitoBean
+    private ListPlansUseCase listPlansUseCase;
+
+    @MockitoBean
     private ChangePlanUseCase changePlanUseCase;
 
     @MockitoBean
@@ -93,6 +103,44 @@ class SecurityConfigTest {
         final var actual = mvc.perform(request);
 
         actual.andExpect(status().isOk());
+    }
+
+    // O catálogo de planos à venda é aberto: preço é informação pública, e é o que uma tela de
+    // escolha mostra antes de alguém se cadastrar.
+    //
+    // Afirma 200, e não 404 como os caminhos de conta e assinatura: o PlanController é o que entra
+    // nesta fatia, então esta rota tem handler de verdade — por isso o caso de uso é dublado.
+    @Test
+    void givenNoToken_whenCallsTheCatalogOfPlansOnSale_thenIsLetThrough() throws Exception {
+        when(listPlansOnSaleUseCase.execute(any())).thenReturn(new Pagination<>(0, 20, 0, List.of()));
+
+        final var actual = mvc.perform(get("/plans/on-sale"));
+
+        actual.andExpect(status().isOk());
+    }
+
+    // E a listagem do operador não é: ela mostra o que foi tirado de venda.
+    @Test
+    void givenNoToken_whenCallsTheOperatorListing_thenIsUnauthorized() throws Exception {
+        final var actual = mvc.perform(get("/plans"));
+
+        actual.andExpect(status().isUnauthorized());
+    }
+
+    // Só o GET é liberado no catálogo: sem fixar o método, um POST para o mesmo caminho passaria.
+    @Test
+    void givenNoToken_whenPostsToTheCatalogPath_thenIsUnauthorized() throws Exception {
+        final var actual = mvc.perform(post("/plans/on-sale"));
+
+        actual.andExpect(status().isUnauthorized());
+    }
+
+    // Sem curinga: uma rota futura embaixo do caminho do catálogo não nasce aberta.
+    @Test
+    void givenNoToken_whenCallsSomethingUnderTheCatalogPath_thenIsUnauthorized() throws Exception {
+        final var actual = mvc.perform(get("/plans/on-sale/qualquer-coisa"));
+
+        actual.andExpect(status().isUnauthorized());
     }
 
     @Test
