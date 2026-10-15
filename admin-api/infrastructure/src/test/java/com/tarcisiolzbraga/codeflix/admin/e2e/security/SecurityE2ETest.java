@@ -78,6 +78,26 @@ class SecurityE2ETest {
         assertEquals(HttpStatus.OK, actualStatus);
     }
 
+    // Erro em rota LIBERADA tem de chegar com o status dele, e não com o da autorização.
+    //
+    // Quando não existe handler, o container encaminha para /error, e esse encaminhamento passa
+    // pelas regras de acesso de novo: com `anyRequest().hasRole(ADMIN)` e sem liberar o despacho de
+    // erro, o /error é recusado e o 404 vira 401. Um caminho embaixo da documentação serve de sonda
+    // porque ele é liberado — assim o 401 só pode ter vindo do encaminhamento, e não da requisição.
+    //
+    // É o mesmo defeito que a subscription-api tinha, corrigido lá liberando ERROR e ASYNC antes de
+    // qualquer regra.
+    @Test
+    void givenAPermittedPathWithNoHandler_whenCalled_thenReturnNotFoundAndNotUnauthorized() {
+        final var client = clientWithout();
+
+        final var actualException = assertThrows(
+                HttpClientErrorException.class,
+                () -> client.get().uri("/swagger-ui/nao-existe.js").retrieve().toBodilessEntity());
+
+        assertEquals(HttpStatus.NOT_FOUND, actualException.getStatusCode());
+    }
+
     @Test
     void givenNoToken_whenCallTheApiDocs_thenBeAllowed() {
         final var client = clientWithout();

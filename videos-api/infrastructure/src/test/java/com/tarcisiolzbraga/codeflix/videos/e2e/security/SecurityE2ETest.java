@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.web.client.RestClient;
 
@@ -92,6 +93,24 @@ class SecurityE2ETest {
 
         assertNull(actualResponse.get("errors"), String.valueOf(actualResponse.get("errors")));
         assertNotNull(actualResponse.get("data"));
+    }
+
+    // Erro em caminho sem handler tem de chegar com o status dele.
+    //
+    // O Spring Security filtra todos os tipos de despacho, então quando o container encaminha para
+    // /error esse encaminhamento passa pelas regras de acesso de novo — e numa configuração que
+    // protege `anyRequest()` o 404 vira 401. Aqui não protege: a decisão é do @Secured de cada
+    // método, e o filtro libera tudo, então o despacho passa. O teste existe para travar isso: se
+    // alguém trocar o permitAll por uma regra por caminho, precisa liberar ERROR e ASYNC junto —
+    // é o defeito que a admin-api e a subscription-api tiveram.
+    @Test
+    void givenAPathWithNoHandler_whenCalled_thenReturnNotFoundAndNotUnauthorized() {
+        final var actual = clientWith(null)
+                .get()
+                .uri("/nao-existe")
+                .exchange((request, response) -> response.getStatusCode());
+
+        assertEquals(HttpStatus.NOT_FOUND, actual);
     }
 
     @SuppressWarnings("unchecked")

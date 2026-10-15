@@ -1,6 +1,7 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.configuration;
 
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.security.KeycloakJwtConverter;
+import jakarta.servlet.DispatcherType;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -44,7 +45,15 @@ public class SecurityConfig {
 
     private static void routeRules(
             final AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry rules) {
-        rules.requestMatchers(DOCS_PATHS).permitAll()
+        // O despacho de erro é liberado, e isto não é folga: o Spring Security filtra todos os tipos
+        // de despacho, então com `anyRequest()` protegido o encaminhamento para /error entra sem
+        // autenticação e é recusado — e o cliente recebe 401 no lugar do 404 ou do 422 de verdade.
+        // Liberar o despacho, e não o caminho /error, mantém um GET direto nele fora do ar. A
+        // requisição original já passou pela autorização antes de falhar.
+        rules.dispatcherTypeMatchers(DispatcherType.ERROR, DispatcherType.ASYNC)
+                .permitAll()
+                .requestMatchers(DOCS_PATHS)
+                .permitAll()
                 .requestMatchers("/categories/**").hasAnyRole(ROLE_ADMIN, ROLE_CATEGORIES)
                 .requestMatchers("/genres/**").hasAnyRole(ROLE_ADMIN, ROLE_GENRES)
                 .requestMatchers("/cast-members/**").hasAnyRole(ROLE_ADMIN, ROLE_CAST_MEMBERS)
