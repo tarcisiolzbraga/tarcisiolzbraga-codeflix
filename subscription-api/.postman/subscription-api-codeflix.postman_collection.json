@@ -394,8 +394,172 @@
               }
             }
           ]
+        },
+        {
+          "name": "Catalogo aberto: lista os planos a venda SEM token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/plans/on-sale",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans",
+                "on-sale"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200 sem token: preco e informacao publica\",",
+                  "    () => pm.response.to.have.status(200));",
+                  "const corpo = pm.response.json();",
+                  "pm.test(\"o corpo tem o contrato de paginacao do monorepo\",",
+                  "    () => pm.expect(Object.keys(corpo)).to.have.members([\"currentPage\",\"perPage\",\"total\",\"items\"]));",
+                  "// Ali todos estao a venda, entao o campo seria sempre true: campo que nunca varia e ruido.",
+                  "if (corpo.items.length > 0) {",
+                  "    pm.test(\"os itens NAO trazem active\",",
+                  "        () => pm.expect(corpo.items[0]).to.not.have.property(\"active\"));",
+                  "    pm.test(\"e trazem o que uma tela de escolha precisa\",",
+                  "        () => pm.expect(Object.keys(corpo.items[0])).to.have.members(",
+                  "            [\"id\",\"name\",\"description\",\"currency\",\"price\"]));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Catalogo aberto: respeita page e perPage",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/plans/on-sale?page=0&perPage=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans",
+                "on-sale"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "perPage",
+                  "value": "2"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const corpo = pm.response.json();",
+                  "pm.test(\"a pagina pedida volta\", () => pm.expect(corpo.currentPage).to.eql(0));",
+                  "pm.test(\"o tamanho pedido volta\", () => pm.expect(corpo.perPage).to.eql(2));",
+                  "pm.test(\"a pagina nao passa do tamanho\",",
+                  "    () => pm.expect(corpo.items.length).to.be.at.most(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Catalogo aberto: o teto de 100 por pagina",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/plans/on-sale?perPage=5000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans",
+                "on-sale"
+              ],
+              "query": [
+                {
+                  "key": "perPage",
+                  "value": "5000"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Ninguem pede a base inteira numa pagina.",
+                  "pm.test(\"o tamanho e limitado a 100\",",
+                  "    () => pm.expect(pm.response.json().perPage).to.eql(100));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listagem do operador: traz tambem o que esta fora de venda",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));",
+                  "const corpo = pm.response.json();",
+                  "// Aqui o active varia: e esta rota que mostra o que foi tirado de venda.",
+                  "if (corpo.items.length > 0) {",
+                  "    pm.test(\"os itens trazem active\",",
+                  "        () => pm.expect(corpo.items[0]).to.have.property(\"active\"));",
+                  "}",
+                  "pm.test(\"o total conta todos, nao os da pagina\",",
+                  "    () => pm.expect(corpo.total).to.be.at.least(corpo.items.length));"
+                ]
+              }
+            }
+          ]
         }
-      ]
+      ],
+      "description": "Duas listagens, porque sao dois publicos: `GET /plans/on-sale` e aberta e mostra so o que esta a venda, para a tela de escolha; `GET /plans` exige ADMIN e mostra tambem o que foi tirado de venda, que e o que o operador precisa ver para por de volta."
     },
     {
       "name": "2. O que a API recusa",
@@ -640,6 +804,70 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"responde 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sem token, a listagem do operador recusa",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// O catalogo aberto mostra o que esta a venda; a listagem do operador mostra o que ele",
+                  "// tirou de venda, e isso nao e publico.",
+                  "pm.test(\"responde 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sem token, POST no caminho do catalogo recusa",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/plans/on-sale",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans",
+                "on-sale"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// So o GET e liberado: sem fixar o metodo, um POST para o mesmo caminho passaria.",
+                  "pm.test(\"responde 401\", () => pm.response.to.have.status(401));"
                 ]
               }
             }
