@@ -1,6 +1,7 @@
 package com.tarcisiolzbraga.codeflix.subscription.infrastructure.plan.api;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -13,6 +14,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.tarcisiolzbraga.codeflix.subscription.application.plan.list.PlanListOutput;
+import com.tarcisiolzbraga.codeflix.subscription.domain.pagination.Pagination;
+import java.util.List;
+import com.tarcisiolzbraga.codeflix.subscription.application.plan.list.ListPlansOnSaleUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.plan.list.ListPlansUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.plan.PlanOutput;
 import com.tarcisiolzbraga.codeflix.subscription.application.plan.activate.ActivatePlanUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.plan.change.ChangePlanOutput;
@@ -54,6 +60,12 @@ class PlanControllerTest {
     private CreatePlanUseCase createPlanUseCase;
 
     @MockitoBean
+    private ListPlansOnSaleUseCase listPlansOnSaleUseCase;
+
+    @MockitoBean
+    private ListPlansUseCase listPlansUseCase;
+
+    @MockitoBean
     private ChangePlanUseCase changePlanUseCase;
 
     @MockitoBean
@@ -64,6 +76,96 @@ class PlanControllerTest {
 
     @MockitoBean
     private GetPlanByIdUseCase getPlanByIdUseCase;
+
+    // O caminho literal tem de vencer o de template: sem isso, `/plans/on-sale` cairia no
+    // `/plans/{id}` com id "on-sale", e o catálogo responderia 422 por id mal formado. O Spring
+    // prefere o literal, e este teste fixa isso — é o tipo de coisa que uma versão nova poderia
+    // mudar sem avisar.
+    @Test
+    void givenTheCatalogPath_whenCalled_thenItDoesNotFallIntoTheGetByIdRoute() throws Exception {
+        when(listPlansOnSaleUseCase.execute(any())).thenReturn(emptyPage());
+
+        final var actual = mvc.perform(get(PLANS_PATH + "/on-sale"));
+
+        actual.andExpect(status().isOk());
+        verify(getPlanByIdUseCase, never()).execute(any());
+    }
+
+    // Os parâmetros da query chegam ao caso de uso. Sem este teste, trocar o nome de um deles faria
+    // a paginação voltar ao padrão em silêncio.
+    @Test
+    void givenPageAndPerPage_whenListsTheCatalog_thenTheyReachTheUseCase() throws Exception {
+        when(listPlansOnSaleUseCase.execute(any())).thenReturn(emptyPage());
+
+        mvc.perform(get(PLANS_PATH + "/on-sale").param("page", "2").param("perPage", "5"));
+
+        verify(listPlansOnSaleUseCase).execute(argThat(page -> page.page() == 2 && page.perPage() == 5));
+    }
+
+    // Sem parâmetro nenhum a rota funciona: página zero, tamanho padrão.
+    @Test
+    void givenNoParameters_whenListsTheCatalog_thenTheFirstPageIsAsked() throws Exception {
+        when(listPlansOnSaleUseCase.execute(any())).thenReturn(emptyPage());
+
+        mvc.perform(get(PLANS_PATH + "/on-sale"));
+
+        verify(listPlansOnSaleUseCase).execute(argThat(page -> page.page() == 0 && page.perPage() == 20));
+    }
+
+    // Teto do tamanho da página: um cliente não pede a base inteira numa página.
+    @Test
+    void givenAPerPageAboveTheCap_whenListsTheCatalog_thenItIsCappedBeforeTheUseCase() throws Exception {
+        when(listPlansOnSaleUseCase.execute(any())).thenReturn(emptyPage());
+
+        mvc.perform(get(PLANS_PATH + "/on-sale").param("perPage", "5000"));
+
+        verify(listPlansOnSaleUseCase).execute(argThat(page -> page.perPage() == 100));
+    }
+
+    @Test
+    void givenPlansOnSale_whenListsTheCatalog_thenTheBodyCarriesThePageAndTheItems() throws Exception {
+        when(listPlansOnSaleUseCase.execute(any()))
+                .thenReturn(new Pagination<>(0, 20, 3, List.of(anOutput(true))));
+
+        final var actual = mvc.perform(get(PLANS_PATH + "/on-sale"));
+
+        actual.andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentPage").value(0))
+                .andExpect(jsonPath("$.perPage").value(20))
+                .andExpect(jsonPath("$.total").value(3))
+                .andExpect(jsonPath("$.items[0].name").value("Plus"))
+                .andExpect(jsonPath("$.items[0].price").value(49.90));
+    }
+
+    // O catálogo aberto não diz `active`: todos ali estão à venda, e campo que nunca varia é ruído.
+    @Test
+    void givenPlansOnSale_whenListsTheCatalog_thenTheItemsDoNotCarryActive() throws Exception {
+        when(listPlansOnSaleUseCase.execute(any()))
+                .thenReturn(new Pagination<>(0, 20, 1, List.of(anOutput(true))));
+
+        final var actual = mvc.perform(get(PLANS_PATH + "/on-sale"));
+
+        actual.andExpect(jsonPath("$.items[0].active").doesNotExist());
+    }
+
+    // A listagem do operador diz, porque ali ele varia.
+    @Test
+    void givenAPlanOutOfSale_whenTheOperatorLists_thenTheItemSaysItIsNotActive() throws Exception {
+        when(listPlansUseCase.execute(any())).thenReturn(new Pagination<>(0, 20, 1, List.of(anOutput(false))));
+
+        final var actual = mvc.perform(get(PLANS_PATH));
+
+        actual.andExpect(status().isOk()).andExpect(jsonPath("$.items[0].active").value(false));
+    }
+
+    private static Pagination<PlanListOutput> emptyPage() {
+        return new Pagination<>(0, 20, 0, List.of());
+    }
+
+    private static PlanListOutput anOutput(final boolean active) {
+        return new PlanListOutput(
+                EXPECTED_ID, "Plus", "Quatro telas", "BRL", new java.math.BigDecimal("49.90"), active);
+    }
 
     @Test
     void givenAValidBody_whenCreates_thenAnswersCreatedWithTheLocation() throws Exception {

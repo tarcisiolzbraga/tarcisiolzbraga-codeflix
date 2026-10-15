@@ -10,6 +10,10 @@ import com.tarcisiolzbraga.codeflix.subscription.application.plan.deactivate.Dea
 import com.tarcisiolzbraga.codeflix.subscription.application.plan.deactivate.DefaultDeactivatePlanUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.plan.get.DefaultGetPlanByIdUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.plan.get.GetPlanByIdUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.plan.list.DefaultListPlansOnSaleUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.plan.list.DefaultListPlansUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.plan.list.ListPlansOnSaleUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.plan.list.ListPlansUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.domain.plan.PlanGateway;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -42,5 +46,15 @@ public class PlanUseCaseConfig {
     @Bean
     DeactivatePlanUseCase deactivatePlanUseCase(final PlanGateway planGateway) {
         return new DefaultDeactivatePlanUseCase(planGateway);
+    }
+
+    @Bean
+    ListPlansOnSaleUseCase listPlansOnSaleUseCase(final PlanGateway plans) {
+        return new DefaultListPlansOnSaleUseCase(plans);
+    }
+
+    @Bean
+    ListPlansUseCase listPlansUseCase(final PlanGateway plans) {
+        return new DefaultListPlansUseCase(plans);
     }
 }
