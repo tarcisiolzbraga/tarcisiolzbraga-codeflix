@@ -41,7 +41,14 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     private static final String ROLE_ADMIN = "CODEFLIX_ADMIN";
-    private static final String ROLE_SUBSCRIBER = "CODEFLIX_SUBSCRIBER";
+
+    // A role que estas rotas exigem é a de **conta**, não a de assinante.
+    //
+    // CODEFLIX_SUBSCRIBER é o que a videos-api exige para servir o catálogo, e exigi-la aqui obrigou,
+    // na primeira versão, a concedê-la na confirmação do cadastro — e aí quem só confirmava um
+    // e-mail passava a poder assistir sem pagar. São dois acessos diferentes: ter conta aqui, que
+    // vem com o cadastro, e poder assistir, que vem e sai com a assinatura.
+    private static final String ROLE_ACCOUNT = "CODEFLIX_ACCOUNT";
 
     // As duas rotas do cadastro, e só elas. Quem se cadastra ainda não tem usuário no Keycloak para
     // pedir token, e quem clica no link de validação também não — é justamente a confirmação que
@@ -74,7 +81,7 @@ public class SecurityConfig {
                 .requestMatchers("/plans/**")
                 .hasRole(ROLE_ADMIN)
                 .requestMatchers("/accounts/**", "/subscriptions/**")
-                .hasAnyRole(ROLE_ADMIN, ROLE_SUBSCRIBER)
+                .hasAnyRole(ROLE_ADMIN, ROLE_ACCOUNT)
                 .anyRequest()
                 .hasRole(ROLE_ADMIN);
     }

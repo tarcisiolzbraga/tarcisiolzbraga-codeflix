@@ -43,6 +43,8 @@ import org.springframework.test.web.servlet.MockMvc;
 class SecurityConfigTest {
 
     private static final String ROLE_ADMIN = "ROLE_CODEFLIX_ADMIN";
+    private static final String ROLE_ACCOUNT = "ROLE_CODEFLIX_ACCOUNT";
+    // A role do catálogo, que a videos-api exige. Aqui ela não abre nada, e há teste provando.
     private static final String ROLE_SUBSCRIBER = "ROLE_CODEFLIX_SUBSCRIBER";
     private static final String A_PLAN = "/plans/11111111-1111-1111-1111-111111111111";
 
@@ -94,13 +96,37 @@ class SecurityConfigTest {
     }
 
     @Test
-    void givenSubscriberToken_whenCallsSubscriptions_thenIsLetThrough() throws Exception {
+    void givenAccountToken_whenCallsSubscriptions_thenIsLetThrough() throws Exception {
+        final var request =
+                get("/subscriptions").with(jwt().authorities(new SimpleGrantedAuthority(ROLE_ACCOUNT)));
+
+        final var actual = mvc.perform(request);
+
+        actual.andExpect(status().isNotFound());
+    }
+
+    // O teste que guarda o furo que havia aqui: a role do catálogo **não** abre as rotas deste
+    // serviço. Enquanto ela abria, concedê-la era obrigatório para alguém conseguir assinar, e a
+    // confirmação do cadastro a dava — e aí quem só confirmava um e-mail passava a poder assistir
+    // sem pagar, porque é ela que a videos-api exige nas queries do catálogo.
+    @Test
+    void givenOnlyTheCatalogRole_whenCallsSubscriptions_thenIsForbidden() throws Exception {
         final var request =
                 get("/subscriptions").with(jwt().authorities(new SimpleGrantedAuthority(ROLE_SUBSCRIBER)));
 
         final var actual = mvc.perform(request);
 
-        actual.andExpect(status().isNotFound());
+        actual.andExpect(status().isForbidden());
+    }
+
+    @Test
+    void givenOnlyTheCatalogRole_whenCallsItsOwnAccount_thenIsForbidden() throws Exception {
+        final var request =
+                get("/accounts/me").with(jwt().authorities(new SimpleGrantedAuthority(ROLE_SUBSCRIBER)));
+
+        final var actual = mvc.perform(request);
+
+        actual.andExpect(status().isForbidden());
     }
 
     @Test

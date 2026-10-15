@@ -53,7 +53,7 @@ class SubscriptionControllerTest {
     private static final String ID = "11111111-1111-1111-1111-111111111111";
     private static final String PLAN_ID = "22222222-2222-2222-2222-222222222222";
     private static final String PROVIDER_ID = "f81d4fae-7dec-11d0-a765-00a0c91e6bf6";
-    private static final String ROLE_SUBSCRIBER = "ROLE_CODEFLIX_SUBSCRIBER";
+    private static final String ROLE_ACCOUNT = "ROLE_CODEFLIX_ACCOUNT";
     private static final String SUBSCRIBE_BODY = "{\"planId\":\"22222222-2222-2222-2222-222222222222\"}";
     private static final String CHARGE_BODY = "{\"creditCardToken\":\"tok_visa_4242\"}";
 
@@ -237,7 +237,7 @@ class SubscriptionControllerTest {
     }
 
     private static MockHttpServletRequestBuilder asSubscriber(final MockHttpServletRequestBuilder request) {
-        return request.with(jwt().authorities(new SimpleGrantedAuthority(ROLE_SUBSCRIBER))
+        return request.with(jwt().authorities(new SimpleGrantedAuthority(ROLE_ACCOUNT))
                         .jwt(it -> it.subject(PROVIDER_ID)))
                 .contentType(MediaType.APPLICATION_JSON);
     }

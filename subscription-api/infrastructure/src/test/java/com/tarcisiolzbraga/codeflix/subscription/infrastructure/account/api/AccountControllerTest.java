@@ -52,7 +52,7 @@ class AccountControllerTest {
     private static final String EXPECTED_ID = "11111111-1111-1111-1111-111111111111";
     private static final String PROVIDER_ID = "f81d4fae-7dec-11d0-a765-00a0c91e6bf6";
     private static final String EMAIL = "assinante@codeflix.com.br";
-    private static final String ROLE_SUBSCRIBER = "ROLE_CODEFLIX_SUBSCRIBER";
+    private static final String ROLE_ACCOUNT = "ROLE_CODEFLIX_ACCOUNT";
     private static final String TOKEN_BODY = "{\"token\":\"um-token\"}";
     private static final String SIGN_UP_BODY =
             """
@@ -167,7 +167,7 @@ class AccountControllerTest {
     void givenATokenWithASubject_whenAsksForItsOwnAccount_thenTheUseCaseGetsThatSubject() throws Exception {
         when(getMyAccountUseCase.execute(any())).thenReturn(anAccountOutput(null));
 
-        mvc.perform(get(ME_PATH).with(jwt().authorities(new SimpleGrantedAuthority(ROLE_SUBSCRIBER)).jwt(it -> it.subject(PROVIDER_ID))));
+        mvc.perform(get(ME_PATH).with(jwt().authorities(new SimpleGrantedAuthority(ROLE_ACCOUNT)).jwt(it -> it.subject(PROVIDER_ID))));
 
         verify(getMyAccountUseCase).execute(PROVIDER_ID);
     }
@@ -176,7 +176,7 @@ class AccountControllerTest {
     void givenAnAccountWithoutBillingAddress_whenAsksForIt_thenTheFieldComesNull() throws Exception {
         when(getMyAccountUseCase.execute(any())).thenReturn(anAccountOutput(null));
 
-        final var actual = mvc.perform(get(ME_PATH).with(jwt().authorities(new SimpleGrantedAuthority(ROLE_SUBSCRIBER)).jwt(it -> it.subject(PROVIDER_ID))));
+        final var actual = mvc.perform(get(ME_PATH).with(jwt().authorities(new SimpleGrantedAuthority(ROLE_ACCOUNT)).jwt(it -> it.subject(PROVIDER_ID))));
 
         actual.andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value(EMAIL))
@@ -187,7 +187,7 @@ class AccountControllerTest {
     void givenAnAccountWithBillingAddress_whenAsksForIt_thenTheAddressComesAlong() throws Exception {
         when(getMyAccountUseCase.execute(any())).thenReturn(anAccountOutput(anAddress()));
 
-        final var actual = mvc.perform(get(ME_PATH).with(jwt().authorities(new SimpleGrantedAuthority(ROLE_SUBSCRIBER)).jwt(it -> it.subject(PROVIDER_ID))));
+        final var actual = mvc.perform(get(ME_PATH).with(jwt().authorities(new SimpleGrantedAuthority(ROLE_ACCOUNT)).jwt(it -> it.subject(PROVIDER_ID))));
 
         actual.andExpect(status().isOk())
                 .andExpect(jsonPath("$.billingAddress.zipcode").value("01310930"))
@@ -198,7 +198,7 @@ class AccountControllerTest {
     void givenSomeoneWithoutAnAccount_whenAsksForIt_thenAnswersNotFound() throws Exception {
         doThrow(NotFoundException.callerAccount()).when(getMyAccountUseCase).execute(any());
 
-        final var actual = mvc.perform(get(ME_PATH).with(jwt().authorities(new SimpleGrantedAuthority(ROLE_SUBSCRIBER)).jwt(it -> it.subject(PROVIDER_ID))));
+        final var actual = mvc.perform(get(ME_PATH).with(jwt().authorities(new SimpleGrantedAuthority(ROLE_ACCOUNT)).jwt(it -> it.subject(PROVIDER_ID))));
 
         actual.andExpect(status().isNotFound());
     }
@@ -208,7 +208,7 @@ class AccountControllerTest {
         when(changeBillingAddressUseCase.execute(any())).thenReturn(anAccountOutput(anAddress()));
 
         mvc.perform(put(BILLING_PATH)
-                .with(jwt().authorities(new SimpleGrantedAuthority(ROLE_SUBSCRIBER)).jwt(it -> it.subject(PROVIDER_ID)))
+                .with(jwt().authorities(new SimpleGrantedAuthority(ROLE_ACCOUNT)).jwt(it -> it.subject(PROVIDER_ID)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(ADDRESS_BODY));
 
@@ -224,7 +224,7 @@ class AccountControllerTest {
         when(changeBillingAddressUseCase.execute(any())).thenReturn(anAccountOutput(anAddress()));
 
         final var actual = mvc.perform(put(BILLING_PATH)
-                .with(jwt().authorities(new SimpleGrantedAuthority(ROLE_SUBSCRIBER)).jwt(it -> it.subject(PROVIDER_ID)))
+                .with(jwt().authorities(new SimpleGrantedAuthority(ROLE_ACCOUNT)).jwt(it -> it.subject(PROVIDER_ID)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(ADDRESS_BODY));
 
@@ -238,7 +238,7 @@ class AccountControllerTest {
                 .execute(any());
 
         final var actual = mvc.perform(put(BILLING_PATH)
-                .with(jwt().authorities(new SimpleGrantedAuthority(ROLE_SUBSCRIBER)).jwt(it -> it.subject(PROVIDER_ID)))
+                .with(jwt().authorities(new SimpleGrantedAuthority(ROLE_ACCOUNT)).jwt(it -> it.subject(PROVIDER_ID)))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(ADDRESS_BODY));
 
