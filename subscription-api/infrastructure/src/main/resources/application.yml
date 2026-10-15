@@ -94,6 +94,16 @@ amqp:
   # leva até lá, e é o front que chama o POST de confirmar com o token.
   confirmation-url: ${SIGNUP_CONFIRMATION_URL}
 
+# A assinatura: a tolerância antes do cancelamento e a varredura das vencidas.
+#
+# O cron é em UTC, o mesmo fuso do vencimento: a varredura compara datas, e rodar perto da virada do
+# dia num fuso diferente faria o resultado depender de minutos.
+subscription:
+  tolerance-days: ${SUBSCRIPTION_TOLERANCE_DAYS:2}
+  charge-job:
+    cron: ${SUBSCRIPTION_CHARGE_JOB_CRON:0 0 3 * * *}
+    batch-size: ${SUBSCRIPTION_CHARGE_JOB_BATCH_SIZE:100}
+
 # O que entra neste serviço pelo CDC: a própria fila de saída, lida de volta do binlog.
 #
 # O nome do tópico é <topic.prefix>.<banco>.<tabela>, e tem de casar com o

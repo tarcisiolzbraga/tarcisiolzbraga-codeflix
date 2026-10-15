@@ -15,6 +15,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -54,6 +55,31 @@ public class SubscriptionJdbcGateway implements SubscriptionGateway {
     // @Transactional porque são duas tabelas: a assinatura e a fila de saída. É isso que faz
     // "gravou e avisou" ser atômico — sem a transação, o pool entrega a conexão com auto-commit
     // ligado e a assinatura ficaria gravada com o evento perdido, ou o contrário.
+    // Ordenada pelo vencimento, do mais antigo: quem está vencido há mais tempo é cobrado primeiro,
+    // e é quem está mais perto de ser cancelado pelo fim da tolerância.
+    //
+    // O id entra no ORDER BY como desempate, e isso não é enfeite: sem ordem total, duas páginas com
+    // o mesmo vencimento podem repetir ou pular linhas entre uma consulta e a seguinte.
+    @Override
+    public List<Subscription> chargeableSubscriptionsDueBy(
+            final LocalDate aDate, final int limit, final int offset) {
+        final var sql = """
+                SELECT %s FROM subscription
+                WHERE due_date <= :dueDate AND status <> :canceled
+                ORDER BY due_date, id
+                LIMIT :limit OFFSET :offset
+                """
+                .formatted(COLUMNS);
+        return this.database.query(
+                sql,
+                Map.of(
+                        "dueDate", aDate,
+                        "canceled", SubscriptionStatus.CANCELED.value(),
+                        "limit", limit,
+                        "offset", offset),
+                subscriptionMapper());
+    }
+
     @Override
     @Transactional
     public Subscription save(final Subscription aSubscription) {
