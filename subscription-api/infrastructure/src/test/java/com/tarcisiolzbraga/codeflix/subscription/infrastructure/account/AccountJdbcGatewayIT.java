@@ -32,6 +32,27 @@ class AccountJdbcGatewayIT {
     @Autowired
     private JdbcClient jdbcClient;
 
+    // O meio de pagamento vai e volta pelo banco, e conta que nunca gravou um volta com nulo.
+    @Test
+    void givenAnAccountWithAPaymentMethod_whenSavedAndReadBack_thenTheReferenceSurvives() {
+        final var account = AccountFixture.account();
+        account.execute(new AccountCommand.ChangePaymentMethod(AccountFixture.paymentMethod()));
+
+        gateway.save(account);
+
+        final var actual = gateway.accountOfId(account.id()).orElseThrow();
+        assertEquals(AccountFixture.paymentMethod(), actual.paymentMethod());
+    }
+
+    @Test
+    void givenAnAccountWithoutAPaymentMethod_whenReadBack_thenTheFieldComesNull() {
+        final var account = AccountFixture.account();
+
+        gateway.save(account);
+
+        assertNull(gateway.accountOfId(account.id()).orElseThrow().paymentMethod());
+    }
+
     @Test
     void givenANewAccount_whenSavesIt_thenItCanBeReadBackWithTheSameValues() {
         final var account = AccountFixture.account();

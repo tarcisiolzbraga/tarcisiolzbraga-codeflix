@@ -1,5 +1,6 @@
 package com.tarcisiolzbraga.codeflix.subscription.domain.account;
 
+import com.tarcisiolzbraga.codeflix.subscription.domain.payment.PaymentMethod;
 import com.tarcisiolzbraga.codeflix.subscription.domain.person.Address;
 import com.tarcisiolzbraga.codeflix.subscription.domain.person.Document;
 import com.tarcisiolzbraga.codeflix.subscription.domain.person.Email;
@@ -16,4 +17,8 @@ public sealed interface AccountCommand {
     record ChangeDocument(Document document) implements AccountCommand {}
 
     record ChangeBillingAddress(Address billingAddress) implements AccountCommand {}
+
+    // O meio de pagamento guardado no provedor. É o que permite cobrar sem a pessoa estar presente
+    // com o cartão na mão, que é a condição para existir cobrança automática.
+    record ChangePaymentMethod(PaymentMethod paymentMethod) implements AccountCommand {}
 }

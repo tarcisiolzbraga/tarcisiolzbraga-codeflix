@@ -28,7 +28,7 @@ class PaymentTest {
 
         assertEquals(ORDER_ID, actual.orderId());
         assertEquals(amount(), actual.amount());
-        assertEquals(CARD_TOKEN, actual.creditCardToken());
+        assertEquals(CARD_TOKEN, actual.paymentToken());
     }
 
     @Test
@@ -61,6 +61,6 @@ class PaymentTest {
         final var actual =
                 assertThrows(DomainException.class, () -> new Payment(ORDER_ID, amount(), address(), null));
 
-        assertEquals("'creditCardToken' should not be empty", actual.getMessage());
+        assertEquals("'paymentToken' should not be empty", actual.getMessage());
     }
 }

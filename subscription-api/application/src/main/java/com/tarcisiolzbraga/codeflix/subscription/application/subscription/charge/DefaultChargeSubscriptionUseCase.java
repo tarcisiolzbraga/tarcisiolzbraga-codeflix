@@ -2,6 +2,7 @@ package com.tarcisiolzbraga.codeflix.subscription.application.subscription.charg
 
 import com.tarcisiolzbraga.codeflix.subscription.application.subscription.CallerSubscription;
 import com.tarcisiolzbraga.codeflix.subscription.application.subscription.SubscriptionGateways;
+import com.tarcisiolzbraga.codeflix.subscription.domain.account.Account;
 import com.tarcisiolzbraga.codeflix.subscription.domain.exceptions.DomainException;
 import com.tarcisiolzbraga.codeflix.subscription.domain.exceptions.NotFoundException;
 import com.tarcisiolzbraga.codeflix.subscription.domain.payment.Payment;
@@ -69,12 +70,30 @@ public class DefaultChargeSubscriptionUseCase extends ChargeSubscriptionUseCase 
                 .orElseThrow(() -> NotFoundException.with(Plan.class, planId));
 
         final var payment = new Payment(
-                orderIdOf(subscription), plan.price(), account.billingAddress(), command.creditCardToken());
+                orderIdOf(subscription), plan.price(), account.billingAddress(), tokenFor(command, account));
 
         return switch (this.payments.processPayment(payment)) {
             case Transaction.Succeeded success -> renew(subscription, success);
             case Transaction.Failed failure -> refuse(subscription, failure, today);
         };
+    }
+
+    // De onde sai o que vai ao provedor: o token da requisição, quando há, ou a referência do meio
+    // de pagamento que a conta guardou.
+    //
+    // A ordem importa. O token da requisição vence porque ele é a escolha explícita de quem está ali
+    // agora — é como alguém troca de cartão depois de uma recusa, sem ter de gravar o meio primeiro.
+    //
+    // Sem os dois é recusa de entrada, com mensagem dizendo o que falta, em vez de uma tentativa que
+    // falharia no provedor. É o caminho do job quando a conta nunca gravou um cartão.
+    private static String tokenFor(final ChargeSubscriptionCommand command, final Account account) {
+        if (command.creditCardToken() != null && !command.creditCardToken().isBlank()) {
+            return command.creditCardToken();
+        }
+        if (account.paymentMethod() == null) {
+            throw DomainException.with("the account has no stored payment method; send a credit card token");
+        }
+        return account.paymentMethod().providerRef();
     }
 
     // A chave de idempotência da cobrança, e ela precisa ser **estável**: é por ela que o provedor

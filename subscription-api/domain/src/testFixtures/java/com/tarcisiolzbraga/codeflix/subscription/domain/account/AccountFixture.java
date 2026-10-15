@@ -1,7 +1,9 @@
 package com.tarcisiolzbraga.codeflix.subscription.domain.account;
 
 import com.tarcisiolzbraga.codeflix.subscription.domain.account.idp.UserId;
+import com.tarcisiolzbraga.codeflix.subscription.domain.payment.PaymentMethod;
 import com.tarcisiolzbraga.codeflix.subscription.domain.person.Address;
+import java.util.UUID;
 import com.tarcisiolzbraga.codeflix.subscription.domain.person.Document;
 import com.tarcisiolzbraga.codeflix.subscription.domain.person.Email;
 import com.tarcisiolzbraga.codeflix.subscription.domain.person.Name;
@@ -68,6 +70,24 @@ public final class AccountFixture {
     }
 
     public static Account storedAccount(final int version) {
-        return Account.with(AccountId.unique(), version, userId(), email(), name(), document(), null);
+        return Account.with(AccountId.unique(), version, userId(), email(), name(), document(), null, null);
+    }
+
+    public static PaymentMethod paymentMethod() {
+        return new PaymentMethod("pm_fake_4242");
+    }
+
+    // Uma conta com e-mail e id de provedor sorteados, para teste que cria mais de uma.
+    //
+    // A `account()` traz os dois fixos, e as tabelas têm índice único nos dois: a segunda conta de um
+    // mesmo teste batia no índice. Aconteceu duas vezes, uma no e-mail e outra no idp_user_id, e é
+    // por isso que isto mora aqui e não no teste.
+    public static Account uniqueAccount() {
+        return Account.newAccount(
+                AccountId.unique(),
+                new UserId(UUID.randomUUID().toString()),
+                new Email("assinante-%s@codeflix.com.br".formatted(UUID.randomUUID())),
+                name(),
+                document());
     }
 }

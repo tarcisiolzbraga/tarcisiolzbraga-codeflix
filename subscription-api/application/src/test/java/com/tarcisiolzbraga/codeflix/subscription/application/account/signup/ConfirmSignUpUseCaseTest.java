@@ -282,6 +282,7 @@ class ConfirmSignUpUseCaseTest {
                 new Email(AccountFixture.EMAIL),
                 AccountFixture.name(),
                 AccountFixture.document(),
+                null,
                 null);
     }
 }

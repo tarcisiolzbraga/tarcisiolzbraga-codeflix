@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.tarcisiolzbraga.codeflix.subscription.application.account.AccountOutput;
 import com.tarcisiolzbraga.codeflix.subscription.application.account.billing.ChangeBillingAddressUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.account.get.GetMyAccountUseCase;
+import com.tarcisiolzbraga.codeflix.subscription.application.account.paymentmethod.StorePaymentMethodUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.account.signup.ConfirmSignUpOutput;
 import com.tarcisiolzbraga.codeflix.subscription.application.account.signup.ConfirmSignUpUseCase;
 import com.tarcisiolzbraga.codeflix.subscription.application.account.signup.SignUpUseCase;
@@ -32,6 +33,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 // Importa a configuração de segurança, diferente do PlanControllerTest: as rotas de
 // autoatendimento recebem o `Principal`, e quem o põe na requisição é a cadeia de filtros do Spring
@@ -49,6 +51,7 @@ class AccountControllerTest {
     private static final String CONFIRM_PATH = "/accounts/sign-up/confirm";
     private static final String ME_PATH = "/accounts/me";
     private static final String BILLING_PATH = "/accounts/me/billing-address";
+    private static final String PAYMENT_METHOD_PATH = "/accounts/me/payment-method";
     private static final String EXPECTED_ID = "11111111-1111-1111-1111-111111111111";
     private static final String PROVIDER_ID = "f81d4fae-7dec-11d0-a765-00a0c91e6bf6";
     private static final String EMAIL = "assinante@codeflix.com.br";
@@ -76,6 +79,9 @@ class AccountControllerTest {
 
     @MockitoBean
     private ChangeBillingAddressUseCase changeBillingAddressUseCase;
+
+    @MockitoBean
+    private StorePaymentMethodUseCase storePaymentMethodUseCase;
 
     @Test
     void givenAValidBody_whenSignsUp_thenAnswersAcceptedWithTheGenericMessage() throws Exception {
@@ -246,8 +252,57 @@ class AccountControllerTest {
                 .andExpect(jsonPath("$.message").value("'number' should not be empty"));
     }
 
+    // Monta a requisição como quem tem conta: token com a role de conta e o `sub` da pessoa, mais o
+    // Content-Type. Os testes acima montam isso inline; os novos usam o atalho.
+    private static MockHttpServletRequestBuilder asAccount(final MockHttpServletRequestBuilder request) {
+        return request.with(jwt().authorities(new SimpleGrantedAuthority(ROLE_ACCOUNT))
+                        .jwt(it -> it.subject(PROVIDER_ID)))
+                .contentType(MediaType.APPLICATION_JSON);
+    }
+
+    // O token do cartão é de uso único e **não** é guardado: ele vai ao provedor, que devolve uma
+    // referência. O que o teste afirma é que o token chega ao caso de uso, e nada mais do cartão.
+    @Test
+    void givenACardToken_whenStoresThePaymentMethod_thenTheCommandCarriesTheSubjectAndTheToken() throws Exception {
+        when(storePaymentMethodUseCase.execute(any())).thenReturn(anAccountOutput(anAddress(), true));
+
+        mvc.perform(asAccount(put(PAYMENT_METHOD_PATH)).content("{\"creditCardToken\":\"tok_visa_4242\"}"));
+
+        verify(storePaymentMethodUseCase)
+                .execute(argThat(command -> PROVIDER_ID.equals(command.userId())
+                        && "tok_visa_4242".equals(command.creditCardToken())));
+    }
+
+    @Test
+    void givenAStoredPaymentMethod_whenStoresIt_thenTheAnswerSaysTheAccountHasOne() throws Exception {
+        when(storePaymentMethodUseCase.execute(any())).thenReturn(anAccountOutput(anAddress(), true));
+
+        final var actual =
+                mvc.perform(asAccount(put(PAYMENT_METHOD_PATH)).content("{\"creditCardToken\":\"tok_visa_4242\"}"));
+
+        actual.andExpect(status().isOk()).andExpect(jsonPath("$.hasPaymentMethod").value(true));
+    }
+
+    @Test
+    void givenNoCardToken_whenStoresThePaymentMethod_thenAnswersUnprocessableWithTheReason() throws Exception {
+        doThrow(DomainException.with("'creditCardToken' should not be empty"))
+                .when(storePaymentMethodUseCase)
+                .execute(any());
+
+        final var actual = mvc.perform(asAccount(put(PAYMENT_METHOD_PATH)).content("{}"));
+
+        actual.andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.message").value("'creditCardToken' should not be empty"));
+    }
+
     private static AccountOutput anAccountOutput(final AccountOutput.AddressOutput address) {
-        return new AccountOutput(EXPECTED_ID, EMAIL, "Tarcisio", "Braga", "11144477735", "cpf", address);
+        return anAccountOutput(address, false);
+    }
+
+    private static AccountOutput anAccountOutput(
+            final AccountOutput.AddressOutput address, final boolean hasPaymentMethod) {
+        return new AccountOutput(
+                EXPECTED_ID, EMAIL, "Tarcisio", "Braga", "11144477735", "cpf", address, hasPaymentMethod);
     }
 
     private static AccountOutput.AddressOutput anAddress() {

@@ -9,4 +9,11 @@ package com.tarcisiolzbraga.codeflix.subscription.domain.payment;
 public interface PaymentGateway {
 
     Transaction processPayment(Payment aPayment);
+
+    // Troca um token de uso único, que o navegador obteve do provedor, por uma referência durável
+    // que o provedor guarda. É ela que a cobrança automática envia depois, e é o que permite cobrar
+    // sem a pessoa presente com o cartão na mão.
+    //
+    // O dado do cartão não passa por aqui nem numa direção: entra um token, sai uma referência.
+    PaymentMethod storeCard(String aCreditCardToken);
 }

@@ -133,7 +133,7 @@ class ChargeSubscriptionUseCaseTest {
         verify(paymentGateway).processPayment(sentPayment.capture());
         assertEquals(PlanFixture.price(), sentPayment.getValue().amount());
         assertEquals(AccountFixture.billingAddress(), sentPayment.getValue().billingAddress());
-        assertEquals(CARD, sentPayment.getValue().creditCardToken());
+        assertEquals(CARD, sentPayment.getValue().paymentToken());
     }
 
     // A chave de idempotência tem de ser a MESMA em duas tentativas da mesma cobrança: é por ela que
