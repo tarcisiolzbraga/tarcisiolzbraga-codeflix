@@ -3,7 +3,10 @@ package logging_test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 
@@ -141,4 +144,36 @@ func (s *seguro) conteudo() []byte {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return append([]byte{}, s.buf.Bytes()...)
+}
+
+// Um erro registrado tem de chegar ao log COM a mensagem.
+//
+// O json.Marshal de um error sem campo exportado dá `{}`: o campo aparece e o motivo se perde, que
+// é o pior jeito de falhar num log. Aconteceu de verdade — um "erro":{} no lugar do motivo de um
+// serviço não subir.
+func TestErroVaiComMensagem(t *testing.T) {
+	var saida strings.Builder
+	log := logging.New(&saida, slog.LevelInfo, "teste")
+
+	log.Error("falhou", "erro", errors.New("a porta 1025 recusou conexão"))
+
+	if !strings.Contains(saida.String(), "a porta 1025 recusou conexão") {
+		t.Errorf("a mensagem do erro deveria estar no log: %s", saida.String())
+	}
+	if strings.Contains(saida.String(), `"erro":{}`) {
+		t.Errorf("o erro não deveria sair vazio: %s", saida.String())
+	}
+}
+
+// Erro embrulhado também: é a forma que o %w produz, e a que mais aparece no código.
+func TestErroEmbrulhadoVaiComACadeiaInteira(t *testing.T) {
+	var saida strings.Builder
+	log := logging.New(&saida, slog.LevelInfo, "teste")
+	raiz := errors.New("conexão recusada")
+
+	log.Error("falhou", "erro", fmt.Errorf("conectar: %w", raiz))
+
+	if !strings.Contains(saida.String(), "conectar: conexão recusada") {
+		t.Errorf("a cadeia inteira deveria estar no log: %s", saida.String())
+	}
 }
