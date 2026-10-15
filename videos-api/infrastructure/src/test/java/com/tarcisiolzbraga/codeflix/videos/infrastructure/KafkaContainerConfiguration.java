@@ -25,7 +25,14 @@ public class KafkaContainerConfiguration {
 
     private static final KafkaContainer CONTAINER = startedContainer();
 
-    private static final List<String> CONSUMERS = List.of("category");
+    // **Os quatro**, com os nomes exatos das chaves do application.yml. A lista tinha só "category",
+    // e por isso o sorteio de grupo abaixo nunca valeu para os outros três: eles seguiam no grupo da
+    // aplicação, que é justamente o cenário que o comentário seguinte descreve como quebrado.
+    //
+    // Custou duas PRs reprovadas pelo CastMemberE2ETest, com "esperava 1, veio 0" — a mensagem foi
+    // entregue ao listener de um contexto antigo, cujo mock não tinha resposta para aquele id, e o
+    // dado nunca chegou ao catálogo. Consumidor novo entra nesta lista.
+    private static final List<String> CONSUMERS = List.of("category", "cast-member", "genre", "video");
 
     // Um grupo por contexto, e é o que mantém os testes de CDC determinísticos. Com o group-id da
     // aplicação, os contextos que o Spring guarda em cache depois de cada classe continuam vivos e
@@ -38,13 +45,31 @@ public class KafkaContainerConfiguration {
     // disputa entre contextos, que é artefato da suíte. O auto-offset-reset continua earliest,
     // também como em produção, e é ele que impede a mensagem de se perder quando a partição é
     // atribuída depois de o teste já ter publicado.
+
+    // Duas tentativas em teste, contra as sete de produção, e isto não é economia de tempo: é o que
+    // tira a suíte de um lugar em que ela falhava de vez em quando sem ninguém ter mudado nada.
+    //
+    // O @RetryableTopic cria um tópico por degrau mais a fila morta, então sete tentativas dão oito
+    // consumidores por listener — com quatro listeners, **trinta e dois por contexto**. Essa
+    // quantidade de consumidor entrando e saindo de grupo faz o broker passar o tempo rebalanceando,
+    // e a entrega para além dos 40s que o teste espera: foi assim que o teste de busca por nome
+    // derrubou duas PRs, com "esperava 1, veio 0", enquanto o teste ao lado, que lê os mesmos
+    // registros, passava em menos de um segundo.
+    //
+    // Duas tentativas dão três consumidores por listener, doze no total. Nenhuma cobertura se perde:
+    // teste nenhum afirma sobre retentativa ou fila morta — o que a escada protege é o admin fora do
+    // ar em produção, não o que a suíte exercita.
+    private static final int TEST_MAX_ATTEMPTS = 2;
+
     @Bean
     DynamicPropertyRegistrar kafkaProperties() {
         final var group = "test-" + UUID.randomUUID();
         return registry -> {
             registry.add("spring.kafka.bootstrap-servers", CONTAINER::getBootstrapServers);
-            CONSUMERS.forEach(
-                    consumer -> registry.add("kafka.consumers.%s.group-id".formatted(consumer), () -> group));
+            CONSUMERS.forEach(consumer -> {
+                registry.add("kafka.consumers.%s.group-id".formatted(consumer), () -> group);
+                registry.add("kafka.consumers.%s.max-attempts".formatted(consumer), () -> TEST_MAX_ATTEMPTS);
+            });
         };
     }
 
