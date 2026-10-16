@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import Link from "next/link";
+import { AuthProvider } from "@/auth/AuthProvider";
+import { SignInButton } from "@/auth/SignInButton";
 import "./globals.css";
 
 const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -16,17 +18,24 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="pt-BR" className={`${geist.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-neutral-950 text-neutral-100">
-        <header className="border-b border-neutral-800">
-          <nav className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-            <Link href="/" className="text-xl font-bold tracking-tight text-red-600">
-              CODEFLIX
-            </Link>
-            <Link href="/planos" className="text-sm text-neutral-300 hover:text-neutral-50">
-              Planos
-            </Link>
-          </nav>
-        </header>
-        <main className="mx-auto w-full max-w-5xl grow px-4 py-10">{children}</main>
+        {/* O provedor envolve a árvore toda, mas o layout segue sendo componente de servidor: só o
+            AuthProvider é cliente, e é ele que carrega o estado do login. */}
+        <AuthProvider>
+          <header className="border-b border-neutral-800">
+            <nav className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4">
+              <Link href="/" className="text-xl font-bold tracking-tight text-red-600">
+                CODEFLIX
+              </Link>
+              <div className="flex items-center gap-6">
+                <Link href="/planos" className="text-sm text-neutral-300 hover:text-neutral-50">
+                  Planos
+                </Link>
+                <SignInButton />
+              </div>
+            </nav>
+          </header>
+          <main className="mx-auto w-full max-w-5xl grow px-4 py-10">{children}</main>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -61,13 +61,61 @@ Não é gosto: a `subscription-api` **já manda** o link de validação do cadas
 `/cadastro/confirmar` (veja `amqp.confirmation-url`). O idioma das rotas estava decidido antes do
 portal existir, e divergir dele quebraria o e-mail que já é enviado.
 
+## O login
+
+Authorization code + PKCE S256, contra o client público `front-codeflix` do
+[realm](../../provisioning/keycloak/realm.json). O emissor e o nome do client vêm do **mesmo `.env`**
+que os três serviços usam, montados das mesmas variáveis que o `keycloak.issuer-uri` deles — divergir
+aqui faria o token do portal ser recusado pelo `iss`, que é justamente o defeito que o `.env` único
+existe para evitar.
+
+**`oidc-client-ts` + `react-oidc-context`, e não `next-auth` nem `keycloak-js`.** O motivo é
+versão, e está medido:
+
+| Biblioteca | Situação |
+|---|---|
+| `next-auth` v5 (o de App Router) | em **beta** há muito tempo |
+| `next-auth` v4 | estável, mas é a API antiga |
+| `keycloak-js` | 26.2.4, **atrás** do servidor do compose (26.8.0), e sem binding de React |
+| `oidc-client-ts` 3.5.0 + `react-oidc-context` 3.3.1 | estáveis, padrão OIDC, hooks de React |
+
+O token fica em **`sessionStorage`**, não em `localStorage`: ele morre quando a aba fecha, o que em
+máquina compartilhada é a diferença entre sair e continuar logado para o próximo que abrir o browser.
+
+`automaticSilentRenew` está ligado — sem ele, uma aba aberta por mais tempo que a validade do token
+começa a receber 401 no meio da navegação.
+
+### A renovação não é detalhe aqui
+
+**O papel do catálogo só entra no token depois de renovar.** A assinatura concede
+`CODEFLIX_SUBSCRIBER` por evento, alguns segundos depois do pagamento; o token que o portal tem na
+mão foi assinado antes disso e não muda. Quando a tela de assinatura existir, ela vai precisar pedir
+a renovação explicitamente depois de assinar — e é por ter esse controle explícito que a escolha foi
+uma biblioteca OIDC, e não uma sessão de servidor.
+
+## O que dá para verificar sem browser, e o que não dá
+
+O login interativo não é automatizável aqui (não há browser de verdade na verificação), então o que
+foi conferido contra a pilha no ar foi o que costuma estar errado:
+
+- **o realm aceita o `redirect_uri` do portal com PKCE** — a chamada ao `authorization_endpoint` com
+  `code_challenge_method=S256` devolve 200 e a tela de login, não "Invalid parameter: redirect_uri";
+- **a verificação prévia de `GET /accounts/me` com o cabeçalho `Authorization` passa** — 200 com
+  `Access-Control-Allow-Origin: http://localhost:3000`;
+- **um 401 chega com cabeçalho de CORS**, então o front lê a recusa em vez de ver "erro de rede",
+  que é o que acontece quando o CORS falta no caminho de erro.
+
+O que **não** foi conferido de ponta a ponta: a volta do Keycloak com o código, a troca por token, e
+a tela da conta com dados de verdade. Isso pede um browser, e está dito aqui em vez de subentendido.
+
 ## O que está pronto, e o que não está
 
 Pronto: a tela de planos, lendo `GET /plans/on-sale`, que é **aberta** — quem está escolhendo plano
-ainda não tem token, e é por isso que essa rota não pede um.
+ainda não tem token, e é por isso que essa rota não pede um. E o login por Keycloak, com a tela da
+conta lendo `GET /accounts/me` **com** token, que é a primeira que exercita o CORS de verdade.
 
-A seguir, nesta ordem: o login por Keycloak (authorization code + PKCE), o cadastro com confirmação
-por e-mail, a assinatura, e o acervo pela `videos-api`.
+A seguir, nesta ordem: o cadastro com confirmação por e-mail (a rota `/cadastro/confirmar` já é
+esperada pela API), a assinatura, e o acervo pela `videos-api`.
 
 ## Duas coisas que vão morder quem continuar
 
