@@ -30,6 +30,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 <Link href="/planos" className="text-sm text-neutral-300 hover:text-neutral-50">
                   Planos
                 </Link>
+                <Link href="/cadastro" className="text-sm text-neutral-300 hover:text-neutral-50">
+                  Criar conta
+                </Link>
                 <SignInButton />
               </div>
             </nav>
