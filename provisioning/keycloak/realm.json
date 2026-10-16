@@ -86,6 +86,8 @@
         "post.logout.redirect.uris": "+"
       },
       "redirectUris": [
+        "https://tarcisiolzbraga.codeflix.com/*",
+        "https://h.tarcisiolzbraga.codeflix.com/*",
         "http://localhost:3000/*",
         "http://localhost:8080/*",
         "https://oauth.pstmn.io/v1/callback"

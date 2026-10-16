@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
@@ -22,6 +23,9 @@ class SecurityE2ETest {
     private static final String CATEGORIES_PATH = "/categories";
     private static final String VIDEOS_PATH = "/videos";
     private static final String RESTRICTED_CLIENT = "categories-codeflix";
+
+    // A origem do front no perfil development, que é o que vale nos testes.
+    private static final String FRONT_ORIGIN = "http://localhost:3000";
 
     @Value("${local.server.port}")
     private int port;
@@ -106,6 +110,31 @@ class SecurityE2ETest {
                 client.get().uri("/v3/api-docs").retrieve().toBodilessEntity().getStatusCode();
 
         assertEquals(HttpStatus.OK, actualStatus);
+    }
+
+    // A verificação prévia do browser: o primeiro contato de um front de outra origem com esta API.
+    //
+    // Passa **sem token**, e tem de passar: ela sai antes de qualquer tela ter um. Quem responde é o
+    // filtro de CORS, antes da autorização, e é por isso que nenhuma regra de rota precisou liberar
+    // OPTIONS.
+    //
+    // A política mora no CorsConfig, que é a mesma classe nos três serviços — o CopiedSourcesTest
+    // prova que continua sendo, e o CorsConfigTest da subscription-api exercita a política inteira. O
+    // que este teste prova é a **ligação** dela na cadeia de filtros deste serviço, com Tomcat de
+    // verdade: é a linha que se esquece de repetir ao configurar o terceiro serviço.
+    @Test
+    void givenTheFrontOrigin_whenAskPreflightWithoutToken_thenBeAllowed() {
+        final var client = clientWithout();
+
+        final var actualHeaders = client.method(HttpMethod.OPTIONS)
+                .uri(VIDEOS_PATH)
+                .header(HttpHeaders.ORIGIN, FRONT_ORIGIN)
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET")
+                .retrieve()
+                .toBodilessEntity()
+                .getHeaders();
+
+        assertEquals(FRONT_ORIGIN, actualHeaders.getFirst(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
     }
 
     private RestClient clientWithout() {

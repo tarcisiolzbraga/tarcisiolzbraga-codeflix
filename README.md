@@ -83,6 +83,51 @@ lados, e era a divergência dele que fazia o admin recusar o token do catálogo 
 > container do Elasticsearch tem o mesmo nome nos dois. O índice replicado nasce vazio no volume
 > novo, e o Debezium refaz o snapshot — é réplica, não fonte.
 
+## O front, e o CORS
+
+Os três serviços aceitam requisição de browser vinda de outra origem. **Isso não é segurança da
+API**: quem autoriza é o token de cada requisição, e recusar uma origem não impede chamada nenhuma
+de fora do browser — `curl`, Postman e outro serviço ignoram CORS inteiro. O que a configuração faz
+é parar de o browser **esconder** a resposta de um front legítimo.
+
+A lista é por perfil, no `application-{perfil}.yml` de cada serviço:
+
+| Perfil | Origens aceitas |
+|---|---|
+| `development` | `http://localhost:3000` |
+| `homolog` | `https://h.tarcisiolzbraga.codeflix.com`, `http://localhost:3000` |
+| `production` | `https://tarcisiolzbraga.codeflix.com` |
+
+Não há implantação ainda: as duas URLs são o endereço **pretendido** de cada ambiente, não um
+endereço no ar. Elas estão no arquivo para a lista ser revisável em PR, e é só trocar quando o
+endereço de verdade existir.
+
+`CORS_ALLOWED_ORIGINS` sobrescreve qualquer uma delas, separando por vírgula — e, como o `.env` é um
+só, o valor vale para os três serviços de uma vez. Variável vazia **derruba a subida**, em vez de a
+aplicação subir recusando o front inteiro e falhar só no browser de quem for usar.
+
+**O `localhost` está em homologação e não está em produção**, e a diferença é deliberada: apontar um
+front rodando na máquina para a API de homologação é justamente o teste local que se quer poder
+fazer; em produção, a mesma linha deixaria uma página servida da máquina de qualquer pessoa ler
+resposta de produção com o token de quem a abriu. Se isso for desejado algum dia, é uma origem a mais
+na lista de `application-production.yml` — e aí é decisão tomada, não descuido.
+
+**Front que chama a API pelo servidor não precisa de nada disto.** Next.js com server components,
+route handlers ou um proxy fazem a requisição de servidor para servidor, onde CORS não existe. A
+configuração serve a quem chama do browser.
+
+### Duas listas, não uma
+
+O CORS e o Keycloak decidem coisas diferentes, e as duas listas precisam estar certas:
+
+- **`cors.allowed-origins`**, em cada serviço: de onde o browser pode **ler a resposta** da API;
+- **`redirectUris` do client `front-codeflix`**, no [realm](provisioning/keycloak/realm.json): para
+  onde o Keycloak pode **devolver a pessoa** depois do login. É o `webOrigins: "+"` do client que
+  libera o browser a falar com o Keycloak, e ele deriva dessa mesma lista.
+
+Esquecer a segunda dá erro na tela de login do Keycloak; esquecer a primeira dá uma chamada que
+chegou, respondeu, e o front não pode ler.
+
 ## Integração contínua
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) é um workflow só, com os dois serviços Java

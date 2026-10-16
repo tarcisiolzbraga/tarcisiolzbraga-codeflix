@@ -86,6 +86,16 @@ O emissor é configurado por `keycloak.issuer-uri` (`KEYCLOAK_ISSUER_URI` fora d
 construído do endereço das chaves, e não do emissor, de propósito: pelo emissor o Spring buscaria os metadados
 na subida, e a aplicação deixaria de subir sem o Keycloak no ar.
 
+### O front noutra origem
+
+Requisição de browser vinda de outra origem é aceita por perfil: `localhost` no `development`,
+`h.tarcisiolzbraga.codeflix.com` na homologação e `tarcisiolzbraga.codeflix.com` na produção, sobrescrevendo com
+`CORS_ALLOWED_ORIGINS`. Não é segurança desta API — quem autoriza é o token; o que isso muda é o
+browser deixar o front **ler** a resposta.
+
+A decisão, e por que o `localhost` está na homologação e não na produção, está no
+[README da raiz](../README.md#o-front-e-o-cors): vale igual nos três serviços.
+
 ### Mídias dos vídeos
 
 Cada vídeo aceita cinco arquivos — `VIDEO`, `TRAILER`, `BANNER`, `THUMBNAIL` e `THUMBNAIL_HALF` — em

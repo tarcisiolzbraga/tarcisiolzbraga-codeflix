@@ -12,3 +12,8 @@ logging:
         environment: homolog
   level:
     com.tarcisiolzbraga.codeflix.admin: info
+
+# As origens do front que o browser confere. O localhost continua na lista de propósito: é aqui que
+# se aponta um front rodando na máquina para a API de homologação, que é o teste local de verdade.
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:https://h.tarcisiolzbraga.codeflix.com,http://localhost:3000}

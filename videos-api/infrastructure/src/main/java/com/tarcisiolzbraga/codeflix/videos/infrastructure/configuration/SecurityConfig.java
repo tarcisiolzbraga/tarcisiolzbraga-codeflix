@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.graphql.execution.SecurityDataFetcherExceptionResolver;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -39,6 +40,10 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain apiFilterChain(final HttpSecurity http) throws Exception {
         return http.csrf(AbstractHttpConfigurer::disable)
+                // Usa o CorsConfigurationSource que o CorsConfig publica. A verificação prévia do
+                // browser é respondida pelo filtro de CORS, antes da autorização — por isso ela não
+                // precisa de regra liberando OPTIONS, e há teste provando que não precisa.
+                .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(rules -> rules.anyRequest().permitAll())
                 .oauth2ResourceServer(oauth ->

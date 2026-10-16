@@ -50,6 +50,11 @@ class CopiedSourcesTest {
             "videos-api/infrastructure/src/main/java/com/tarcisiolzbraga/codeflix/videos/infrastructure/security/KeycloakJwtConverter.java",
             "subscription-api/infrastructure/src/main/java/com/tarcisiolzbraga/codeflix/subscription/infrastructure/security/KeycloakJwtConverter.java");
 
+    private static final List<String> CORS_CONFIG_COPIES = List.of(
+            "admin-api/infrastructure/src/main/java/com/tarcisiolzbraga/codeflix/admin/infrastructure/configuration/CorsConfig.java",
+            "videos-api/infrastructure/src/main/java/com/tarcisiolzbraga/codeflix/videos/infrastructure/configuration/CorsConfig.java",
+            "subscription-api/infrastructure/src/main/java/com/tarcisiolzbraga/codeflix/subscription/infrastructure/configuration/CorsConfig.java");
+
     private static final List<String> CONFIGURED_VALUE_COPIES = List.of(
             "admin-api/infrastructure/src/main/java/com/tarcisiolzbraga/codeflix/admin/infrastructure/configuration/ConfiguredValue.java",
             "subscription-api/infrastructure/src/main/java/com/tarcisiolzbraga/codeflix/subscription/infrastructure/configuration/ConfiguredValue.java");
@@ -64,11 +69,18 @@ class CopiedSourcesTest {
         assertCopiesAgree(CONFIGURED_VALUE_COPIES);
     }
 
+    @Test
+    void givenTheCorsConfigCopies_whenComparesTheirCode_thenTheyAreTheSame() throws IOException {
+        assertCopiesAgree(CORS_CONFIG_COPIES);
+    }
+
     // Se o caminho mudar, o teste tem de falhar dizendo isso — e não passar por não ter achado nada
     // para comparar, que é como um teste destes morre sem ninguém notar.
     @Test
     void givenTheExpectedPaths_whenLooksForThem_thenEveryCopyIsThere() {
-        Stream.concat(CONVERTER_COPIES.stream(), CONFIGURED_VALUE_COPIES.stream()).forEach(copy -> assertTrue(
+        Stream.of(CONVERTER_COPIES, CONFIGURED_VALUE_COPIES, CORS_CONFIG_COPIES)
+                .flatMap(List::stream)
+                .forEach(copy -> assertTrue(
                 Files.isRegularFile(MONOREPO.resolve(copy)), "cópia não encontrada em " + copy));
     }
 
