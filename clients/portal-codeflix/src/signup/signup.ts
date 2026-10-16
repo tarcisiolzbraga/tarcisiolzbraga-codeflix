@@ -1,4 +1,5 @@
 import { SUBSCRIPTION_API } from "@/shared/config";
+import { messageOf } from "@/shared/http";
 
 // O documento é conferido pelos **dígitos verificadores** na API, não só pelo comprimento. O portal
 // não repete essa conta: seria uma segunda fonte de verdade para a mesma regra, e o dia em que ela
@@ -29,16 +30,6 @@ export class SignUpRefused extends Error {
   ) {
     super(message);
     this.name = "SignUpRefused";
-  }
-}
-
-async function messageOf(response: Response, fallback: string): Promise<string> {
-  try {
-    const body = (await response.json()) as { message?: string };
-    return body.message?.trim() || fallback;
-  } catch {
-    // Corpo vazio ou que não é JSON: acontece em 500 e em erro de gateway.
-    return fallback;
   }
 }
 
