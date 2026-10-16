@@ -125,6 +125,39 @@ que ela mudasse no domínio o portal passaria a recusar o que a API aceita. O fo
 vazio e o tamanho da senha (8 a 72, que é o limite do domínio) e deixa o resto para a resposta da API,
 mostrando **a mensagem que ela escreveu**.
 
+## A assinatura
+
+Assinar nasce **em período de experiência e sem cobrança**: cobrar é ato separado na API, e o portal
+não finge o contrário. A tela de `/assinatura` mostra a situação, deixa pagar, cancelar e guardar o
+meio de pagamento.
+
+### A renovação do token, que aqui é a parte que importa
+
+Depois de `POST /subscriptions`, o botão chama `signinSilent()` **antes** de navegar. Não é zelo: a
+assinatura concede `CODEFLIX_SUBSCRIBER` por evento, alguns segundos depois, e o token que está na
+mão foi assinado antes disso — ele não muda sozinho. Sem essa linha, a tela do acervo responderia 403
+e pareceria defeito da API.
+
+É por precisar desse controle que a escolha foi uma biblioteca OIDC no browser, e não uma sessão de
+servidor.
+
+### Três coisas que o contrato impõe à tela
+
+- **Cartão recusado não é erro de HTTP.** `POST /subscriptions/me/charge` responde **200** mesmo
+  quando o provedor recusa: a requisição foi atendida, e o que aconteceu está no corpo, com o
+  motivo. Tratar como erro esconderia a razão da recusa.
+- **Nunca ter assinado não é erro.** `GET /subscriptions/me` responde 404 para quem nunca assinou —
+  o estado normal de quem acabou de criar conta. O gateway devolve `null` e a tela mostra o caminho
+  para os planos, em vez de um aviso vermelho.
+- **Cancelar o que já está cancelado não é erro**, por contrato.
+
+### Não há campo de número de cartão, e isso é de propósito
+
+O que a API guarda é **a referência do provedor**: ela recebe um token de uso único, troca por uma
+referência durável e guarda só a referência. Num provedor de verdade, o token vem do SDK dele no
+browser. Dado de cartão não passa nem pelo portal nem pelo serviço — e por isso a tela pede o token
+do provedor, e diz na própria tela que é isso que ela está pedindo.
+
 ## O que dá para verificar sem browser, e o que não dá
 
 O login interativo não é automatizável aqui (não há browser de verdade na verificação), então o que
@@ -150,9 +183,16 @@ Do cadastro, o laço inteiro **foi** conferido pelo lado da API, com a pilha no 
 - depois de pedir o cadastro outra vez, o link **antigo** responde 404 e o novo 200 — "só o link mais
   novo vale", provado de propósito.
 
-O que **não** foi conferido de ponta a ponta: a volta do Keycloak com o código, a troca por token, e
-as telas com dados de verdade no browser. Isso pede um browser, e está dito aqui em vez de
-subentendido.
+Das rotas da assinatura, o que dá para conferir sem token de pessoa é o alcance pelo browser, e ele
+foi conferido: a verificação prévia de `POST /subscriptions`, `PUT /subscriptions/me/cancel`,
+`POST /subscriptions/me/charge` e `PUT /accounts/me/payment-method` responde 200 com
+`Access-Control-Allow-Origin`, e as recusas sem token chegam **com** cabeçalho de CORS — o front lê
+o 401 em vez de ver erro de rede.
+
+O que **não** foi conferido de ponta a ponta: a volta do Keycloak com o código, a troca por token, o
+laço de assinar → evento → papel no token renovado, e as telas com dados de verdade. Tudo isso pede
+um browser e uma pessoa logada; do lado do backend, esse laço é coberto pelos testes de ponta a ponta
+da `subscription-api`. Está dito aqui em vez de subentendido.
 
 ## O que está pronto, e o que não está
 
@@ -160,10 +200,10 @@ Pronto: a tela de planos, lendo `GET /plans/on-sale`, que é **aberta** — quem
 ainda não tem token, e é por isso que essa rota não pede um. E o login por Keycloak, com a tela da
 conta lendo `GET /accounts/me` **com** token, que é a primeira que exercita o CORS de verdade.
 
-E o cadastro, com a confirmação por e-mail.
+O cadastro, com a confirmação por e-mail. E a assinatura: assinar a partir do plano, ver a
+situação, pagar, cancelar e guardar o meio de pagamento.
 
-A seguir, nesta ordem: a assinatura — onde a renovação de token sai do comentário e vai para o
-código — e o acervo pela `videos-api`.
+A seguir: o acervo pela `videos-api` — GraphQL, busca e player.
 
 ## Duas coisas que vão morder quem continuar
 
