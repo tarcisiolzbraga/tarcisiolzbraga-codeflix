@@ -29,7 +29,7 @@ class KeycloakTestTokenIT {
 
     @Test
     void givenTheSubscriberClient_whenAskForAToken_thenCarryTheSubscriberRole() {
-        final var actualRoles = realmRolesIn(this.token.subscriber());
+        final var actualRoles = realmRolesIn(this.token.catalogTest());
 
         assertEquals(List.of("CODEFLIX_SUBSCRIBER"), actualRoles);
     }

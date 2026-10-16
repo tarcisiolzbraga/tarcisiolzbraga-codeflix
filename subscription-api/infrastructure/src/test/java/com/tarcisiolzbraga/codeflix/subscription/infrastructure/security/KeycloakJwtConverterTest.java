@@ -15,7 +15,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 class KeycloakJwtConverterTest {
 
-    private static final String SUBJECT = "service-account-subscriber-codeflix";
+    private static final String SUBJECT = "service-account-catalog-test-codeflix";
     private static final String REALM_ACCESS = "realm_access";
     private static final String RESOURCE_ACCESS = "resource_access";
     private static final String ROLES = "roles";
@@ -42,11 +42,11 @@ class KeycloakJwtConverterTest {
 
     @Test
     void givenClientRoles_whenConverts_thenQualifiesThemWithTheClientName() {
-        final var jwt = jwtWith(Map.of(RESOURCE_ACCESS, Map.of("subscriber-codeflix", Map.of(ROLES, List.of("READER")))));
+        final var jwt = jwtWith(Map.of(RESOURCE_ACCESS, Map.of("catalog-test-codeflix", Map.of(ROLES, List.of("READER")))));
 
         final var actual = this.converter.convert(jwt);
 
-        assertEquals(Set.of("ROLE_SUBSCRIBER-CODEFLIX_READER"), authorityNames(actual.getAuthorities()));
+        assertEquals(Set.of("ROLE_CATALOG-TEST-CODEFLIX_READER"), authorityNames(actual.getAuthorities()));
     }
 
     @Test

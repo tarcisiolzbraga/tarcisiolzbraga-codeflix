@@ -19,28 +19,41 @@ estão aqui.
 | `admin-codeflix` | `CODEFLIX_ADMIN` | acesso a todo o catálogo |
 | `categories-codeflix` | `CODEFLIX_CATEGORIES` | exercitar a restrição: nas rotas dos outros agregados ele recebe 403 |
 | `videos-api-codeflix` | as quatro de leitura | a API de catálogo, que replica os quatro agregados |
-| `subscriber-codeflix` | `CODEFLIX_SUBSCRIBER` | ler o catálogo **do outro lado**, na `videos-api-codeflix` |
+| `catalog-test-codeflix` | `CODEFLIX_SUBSCRIBER` | **client de teste**: lê o catálogo na `videos-api-codeflix` burlando o gate da assinatura |
 | `subscription-api-codeflix` | `manage-users` e `view-users` do `realm-management` | criar e procurar usuário, para o cadastro da assinatura |
 
 O `videos-api-codeflix` existe porque o `categories-codeflix` **não** serve a esse propósito: ele é a peça que
 prova o 403, e usá-lo como credencial do catálogo o faria perder essa função. O do catálogo leva só as quatro
 roles de leitura, nunca a de administrador — ele lê e não escreve nada aqui.
 
-O `subscriber-codeflix` e a role `CODEFLIX_SUBSCRIBER` não têm uso na `admin-api`: lá eles só recebem 403,
+O `catalog-test-codeflix` e a role `CODEFLIX_SUBSCRIBER` não têm uso na `admin-api`: lá eles só recebem 403,
 porque toda rota pede `CODEFLIX_ADMIN` ou a role do agregado. Eles estão neste arquivo porque o realm é um só, e é a
-`videos-api-codeflix` que os consome — é com eles que um assinante lê o catálogo lá. A role de leitura de um
-agregado **não** foi reaproveitada para isso: `CODEFLIX_CATEGORIES` significa poder administrar categorias
-na `admin-api`, e emprestá-la ao catálogo juntaria duas permissões diferentes numa só.
+`videos-api-codeflix` que os consome. A role de leitura de um agregado **não** foi reaproveitada para isso:
+`CODEFLIX_CATEGORIES` significa poder administrar categorias na `admin-api`, e emprestá-la ao catálogo juntaria
+duas permissões diferentes numa só.
+
+### Por que o client do catálogo se chama "de teste"
+
+Ele tem `CODEFLIX_SUBSCRIBER` **fixa**, e por isso lê o catálogo para sempre, sem assinatura e sem pagar.
+Isso é o contrário do que a role significa hoje: quem assina entra no grupo `subscribers` quando a assinatura
+passa a valer, e **sai dele quando ela é cancelada** — a `subscription-api` faz isso pelos eventos de domínio.
+
+O client existe para a `videos-api` ser exercitada sem subir a `subscription-api`, o banco dela, o Keycloak
+administrativo e o CDC inteiro só para obter um token. Ele se chamava `subscriber-codeflix`, e esse nome fazia
+uma credencial de máquina passar por assinante: a coleção da `videos-api` dizia, em texto, que *"é com ele que
+um consumidor lê o catálogo"*. Não é, e desde que a assinatura passou a conceder a role o nome virou armadilha.
+
+**Um consumidor de verdade nunca usa este client.** Ele entra pelo `front-codeflix`, com código de autorização
+e PKCE, e a role chega pelo grupo.
 
 Todos compartilham o mesmo segredo porque este realm é de desenvolvimento, local e descartável.
 
 ## O client que administra usuários
 
 O `subscription-api-codeflix` é o único com poder sobre o realm, e por isso é client próprio em vez de
-roles acrescentadas a um que já existia. O `subscriber-codeflix` seria o candidato óbvio, e não serve:
-ele representa **o assinante**, e é a role dele que a `videos-api` confere para servir o catálogo —
-emprestá-lo ao serviço faria a credencial de uma pessoa qualquer poder criar e ler todos os usuários do
-realm.
+roles acrescentadas a um que já existia. O `catalog-test-codeflix` seria o candidato óbvio, e não serve:
+a role dele é a que a `videos-api` confere para servir o catálogo, e emprestá-lo ao serviço faria uma
+credencial de leitura de catálogo poder criar e ler todos os usuários do realm.
 
 As roles não são do realm, são **do client interno `realm-management`**, que é como o Keycloak expõe a
 API administrativa. Só as duas de que o cadastro precisa:

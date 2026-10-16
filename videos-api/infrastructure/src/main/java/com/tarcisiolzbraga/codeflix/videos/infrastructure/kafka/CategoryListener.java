@@ -8,7 +8,6 @@ import com.tarcisiolzbraga.codeflix.videos.infrastructure.category.CategoryClien
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.category.models.CategoryDTO;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.category.models.CategoryEvent;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.kafka.models.connect.MessageValue;
-import com.tarcisiolzbraga.codeflix.videos.infrastructure.kafka.models.connect.Operation;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

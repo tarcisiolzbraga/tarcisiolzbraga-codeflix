@@ -64,7 +64,7 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
 
     @BeforeEach
     void bindToTheRunningServer() {
-        this.client = clientWith(this.token.subscriber());
+        this.client = clientWith(this.token.catalogTest());
         this.adminClient = clientWith(this.token.admin());
     }
 

@@ -38,7 +38,7 @@ class CategoryE2ETest implements CategoryE2EDsl {
 
     @BeforeEach
     void bindToTheRunningServer() {
-        this.client = clientWith(this.token.subscriber());
+        this.client = clientWith(this.token.catalogTest());
         this.adminClient = clientWith(this.token.admin());
     }
 

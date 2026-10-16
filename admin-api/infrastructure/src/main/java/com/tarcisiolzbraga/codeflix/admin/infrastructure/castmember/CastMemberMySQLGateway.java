@@ -11,7 +11,6 @@ import com.tarcisiolzbraga.codeflix.admin.infrastructure.util.SpecificationUtils
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;

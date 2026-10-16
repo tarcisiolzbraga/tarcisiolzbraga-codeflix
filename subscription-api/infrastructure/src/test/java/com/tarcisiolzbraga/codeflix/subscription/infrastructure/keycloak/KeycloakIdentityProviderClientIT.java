@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.client.RestClient;
 
@@ -31,6 +32,11 @@ import org.springframework.web.client.RestClient;
 // container é um só para a execução toda.
 @IntegrationTest
 class KeycloakIdentityProviderClientIT {
+
+    // O corpo que o Keycloak devolve em /users/{id}/groups: uma lista de objetos, e só o nome
+    // interessa aqui.
+    private static final ParameterizedTypeReference<List<Map<String, Object>>> GRUPOS =
+            new ParameterizedTypeReference<>() {};
 
     private static final String PASSWORD = "uma-senha-boa";
 
@@ -213,15 +219,16 @@ class KeycloakIdentityProviderClientIT {
     }
 
     private List<String> groupsOf(final UserId userId) {
+        // ParameterizedTypeReference, e não List.class: a segunda devolve List cru, e aí o stream
+        // perde o tipo e o compilador avisa de conversão não verificada. Dizendo o tipo aqui, o
+        // cast de cada item desaparece junto.
         final var body = RestClient.create()
                 .get()
                 .uri(this.keycloak.adminRealmUri() + "/users/{id}/groups", userId.value())
                 .header(HttpHeaders.AUTHORIZATION, this.token.bearerOf("subscription-api-codeflix"))
                 .retrieve()
-                .body(List.class);
-        return body == null
-                ? List.of()
-                : body.stream().map(it -> String.valueOf(((Map<?, ?>) it).get("name"))).toList();
+                .body(GRUPOS);
+        return body == null ? List.of() : body.stream().map(it -> String.valueOf(it.get("name"))).toList();
     }
 
     private static NewUser newUserWith(final Email email) {

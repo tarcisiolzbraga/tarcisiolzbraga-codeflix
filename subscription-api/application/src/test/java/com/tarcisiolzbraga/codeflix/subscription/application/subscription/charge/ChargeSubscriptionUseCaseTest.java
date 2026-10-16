@@ -29,7 +29,6 @@ import com.tarcisiolzbraga.codeflix.subscription.domain.subscription.Subscriptio
 import com.tarcisiolzbraga.codeflix.subscription.domain.subscription.SubscriptionGateway;
 import com.tarcisiolzbraga.codeflix.subscription.domain.subscription.SubscriptionStatus;
 import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Optional;

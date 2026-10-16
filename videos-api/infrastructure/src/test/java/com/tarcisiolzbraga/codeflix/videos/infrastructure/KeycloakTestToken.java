@@ -16,7 +16,13 @@ import org.springframework.web.client.RestClient;
 // que não tem papel algum aqui — sem precisar de um client inventado só para isso.
 public class KeycloakTestToken {
 
-    public static final String SUBSCRIBER = "subscriber-codeflix";
+    // O client de teste do catálogo: ele tem CODEFLIX_SUBSCRIBER fixo no realm e **burla o gate da
+    // assinatura de propósito**, para o catálogo ser exercitado sem subir a subscription-api inteira.
+    //
+    // Não é como um consumidor de verdade lê o catálogo: esse recebe a role pelo grupo subscribers,
+    // que a assinatura concede e o cancelamento revoga. O nome diz isso desde que ele deixou de se
+    // chamar subscriber-codeflix, que fazia a credencial de máquina passar por assinante.
+    public static final String CATALOG_TEST = "catalog-test-codeflix";
     public static final String ADMIN = "admin-codeflix";
     public static final String STRANGER = "categories-codeflix";
 
@@ -30,8 +36,8 @@ public class KeycloakTestToken {
         this.issuerUri = Objects.requireNonNull(issuerUri, "'issuerUri' should not be null");
     }
 
-    public String subscriber() {
-        return bearerOf(SUBSCRIBER);
+    public String catalogTest() {
+        return bearerOf(CATALOG_TEST);
     }
 
     public String admin() {
