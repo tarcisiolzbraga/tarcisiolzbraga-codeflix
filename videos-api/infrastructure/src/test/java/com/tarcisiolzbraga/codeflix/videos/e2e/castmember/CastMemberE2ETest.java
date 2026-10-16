@@ -95,8 +95,8 @@ class CastMemberE2ETest implements CastMemberE2EDsl {
 
     @Test
     void givenSeveralMembersFromTheAdmin_whenAClientListsThem_thenSeeThemSortedWithTheirPageNumbers() {
-        givenAMemberPublishedByTheAdmin("00000003-6000-0000-0000-000000000000", "Denis Villeneuve", "DIRECTOR");
-        givenAMemberPublishedByTheAdmin("00000003-7000-0000-0000-000000000000", "Rebecca Ferguson", "ACTOR");
+        givenAMemberPublishedByTheAdmin("00000003-8000-0000-0000-000000000000", "Denis Villeneuve", "DIRECTOR");
+        givenAMemberPublishedByTheAdmin("00000003-8100-0000-0000-000000000000", "Rebecca Ferguson", "ACTOR");
 
         await().atMost(VISIBLE).untilAsserted(() -> {
             final var actualPage = listCastMembers();
@@ -110,8 +110,8 @@ class CastMemberE2ETest implements CastMemberE2EDsl {
 
     @Test
     void givenMembersFromTheAdmin_whenSearchByName_thenSeeOnlyWhatMatches() {
-        givenAMemberPublishedByTheAdmin("00000003-6000-0000-0000-000000000000", "Denis Villeneuve", "DIRECTOR");
-        givenAMemberPublishedByTheAdmin("00000003-7000-0000-0000-000000000000", "Rebecca Ferguson", "ACTOR");
+        givenAMemberPublishedByTheAdmin("00000003-9000-0000-0000-000000000000", "Denis Villeneuve", "DIRECTOR");
+        givenAMemberPublishedByTheAdmin("00000003-9100-0000-0000-000000000000", "Rebecca Ferguson", "ACTOR");
 
         await().atMost(VISIBLE).untilAsserted(() -> {
             final var actualPage = listCastMembers("Rebecca");
@@ -131,6 +131,15 @@ class CastMemberE2ETest implements CastMemberE2EDsl {
 
     // Publica no tópico a mensagem que o Debezium publicaria, com o id e o conteúdo deste caso. O
     // envelope é o capturado do admin; só o id muda, para um teste não ver mensagem de outro.
+    //
+    // **Id diferente em cada teste**, e isto era afirmado aqui sem ser verdade: três testes usavam o
+    // mesmo par.
+    //
+    // Quem isola o índice é o ElasticsearchCleanUpExtension, que o esvazia antes de cada caso. O que
+    // o id próprio protege é outra coisa: a fila do Kafka **não** é esvaziada, e o mock do cliente
+    // REST é reiniciado entre testes. Uma mensagem que chega fora da janela do teste que a publicou
+    // vai cair num mock que não tem resposta para aquele id — e aí ela é descartada com um aviso, em
+    // vez de virar um documento que o teste da vez não esperava.
     private void givenAMemberPublishedByTheAdmin(final String id, final String name, final String type) {
         when(this.castMemberClient.castMemberOfId(id))
                 .thenReturn(Optional.of(new CastMemberDTO(
