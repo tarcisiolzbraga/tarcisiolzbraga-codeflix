@@ -4,6 +4,7 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.when;
 
 import com.tarcisiolzbraga.codeflix.videos.e2e.category.CategoryE2EDsl;
@@ -17,6 +18,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.awaitility.core.ConditionTimeoutException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,7 +93,7 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
     void givenAGenreWithAnActiveAndAnInactiveCategory_whenAClientReadsIt_thenSeeOnlyTheActiveOne() {
         givenACategory("00000004-0000-0000-0000-000000000000", "Filmes", "A mais assistida");
         givenAnInactiveCategory("00000006-0000-0000-0000-000000000000", "Desativada", "Fora do catálogo");
-        givenAGenrePublishedByTheAdmin("00000016-0000-0000-0000-000000000000", "Ação", Set.of("00000004-0000-0000-0000-000000000000", "00000006-0000-0000-0000-000000000000"));
+        givenAGenrePublishedByTheAdmin("00000021-0000-0000-0000-000000000000", "Ação", Set.of("00000004-0000-0000-0000-000000000000", "00000006-0000-0000-0000-000000000000"));
 
         await().atMost(VISIBLE).untilAsserted(() -> {
             final var actualPage = listGenres();
@@ -107,7 +109,7 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
     void givenAGenreFromTheAdmin_whenAClientReadsIt_thenSeeItWithItsCategoriesResolved() {
         givenACategory("00000009-0000-0000-0000-000000000000", "Filmes", "A mais assistida");
         givenACategory("00000010-0000-0000-0000-000000000000", "Séries", "A segunda mais assistida");
-        givenAGenrePublishedByTheAdmin("00000016-0000-0000-0000-000000000000", "Ação", Set.of("00000009-0000-0000-0000-000000000000", "00000010-0000-0000-0000-000000000000"));
+        givenAGenrePublishedByTheAdmin("00000022-0000-0000-0000-000000000000", "Ação", Set.of("00000009-0000-0000-0000-000000000000", "00000010-0000-0000-0000-000000000000"));
 
         await().atMost(VISIBLE).untilAsserted(() -> {
             final var actualItems = listGenres().items();
@@ -121,13 +123,13 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
 
     @Test
     void givenGenresInDifferentCategories_whenFilterByOne_thenSeeOnlyTheGenresOfThatCategory() {
-        givenACategory("00000009-0000-0000-0000-000000000000", "Filmes", "A mais assistida");
-        givenACategory("00000010-0000-0000-0000-000000000000", "Séries", "A segunda mais assistida");
-        givenAGenrePublishedByTheAdmin("00000016-0000-0000-0000-000000000000", "Ação", Set.of("00000009-0000-0000-0000-000000000000"));
-        givenAGenrePublishedByTheAdmin("00000017-0000-0000-0000-000000000000", "Comédia", Set.of("00000010-0000-0000-0000-000000000000"));
-        await().atMost(VISIBLE).untilAsserted(() -> assertEquals(2L, listGenres().meta().total()));
+        givenACategory("00000011-0000-0000-0000-000000000000", "Filmes", "A mais assistida");
+        givenACategory("00000012-0000-0000-0000-000000000000", "Séries", "A segunda mais assistida");
+        givenAGenrePublishedByTheAdmin("00000023-0000-0000-0000-000000000000", "Ação", Set.of("00000011-0000-0000-0000-000000000000"));
+        givenAGenrePublishedByTheAdmin("00000024-0000-0000-0000-000000000000", "Comédia", Set.of("00000012-0000-0000-0000-000000000000"));
+        awaitGenres(2L);
 
-        final var actualPage = listGenres(Set.of("00000010-0000-0000-0000-000000000000"));
+        final var actualPage = listGenres(Set.of("00000012-0000-0000-0000-000000000000"));
 
         assertEquals(1L, actualPage.meta().total());
         assertEquals("Comédia", actualPage.items().getFirst().name());
@@ -135,7 +137,7 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
 
     @Test
     void givenAGenreWithoutCategories_whenAClientReadsIt_thenSeeAnEmptyList() {
-        givenAGenrePublishedByTheAdmin("00000016-0000-0000-0000-000000000000", "Sem categoria", Set.of());
+        givenAGenrePublishedByTheAdmin("00000025-0000-0000-0000-000000000000", "Sem categoria", Set.of());
 
         await().atMost(VISIBLE).untilAsserted(() -> {
             final var actualItems = listGenres().items();
@@ -151,6 +153,32 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
 
         assertEquals(0L, actualPage.meta().total());
         assertTrue(actualPage.items().isEmpty());
+    }
+
+    // Espera a contagem, e **diz o que encontrou** quando ela não vem.
+    //
+    // Esta classe teve uma intermitência que só aparecia no CI, e a mensagem era `expected: <2> but
+    // was: <1>` — uma contagem sem contexto, que não diz qual dos dois gêneros faltou nem o que mais
+    // está no índice. Três investigações terminaram em hipótese, e a próxima falha precisa chegar
+    // com evidência em vez de aritmética.
+    private void awaitGenres(final long expected) {
+        try {
+            await().atMost(VISIBLE).untilAsserted(() -> assertEquals(expected, listGenres().meta().total()));
+        } catch (final ConditionTimeoutException timeout) {
+            final var page = listGenres();
+            fail("esperava %d gêneros em %s. O índice tem %d: %s"
+                    .formatted(
+                            expected,
+                            VISIBLE,
+                            page.meta().total(),
+                            page.items().stream()
+                                    .map(it -> "%s=%s%s"
+                                            .formatted(
+                                                    it.id().substring(0, 8),
+                                                    it.name(),
+                                                    namesOf(it.categories())))
+                                    .toList()));
+        }
     }
 
     // Publica no tópico a mensagem que o Debezium publicaria, e prepara a resposta da API do admin,
