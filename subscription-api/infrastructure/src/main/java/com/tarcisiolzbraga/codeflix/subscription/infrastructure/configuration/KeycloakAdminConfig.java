@@ -25,11 +25,6 @@ public class KeycloakAdminConfig {
     private static final Duration TOKEN_MARGIN = Duration.ofSeconds(30);
 
     @Bean
-    Clock clock() {
-        return Clock.systemUTC();
-    }
-
-    @Bean
     RestClient keycloakRestClient(final RestClient.Builder builder) {
         final var settings = HttpClientSettings.defaults().withTimeouts(CONNECT_TIMEOUT, READ_TIMEOUT);
         return builder.requestFactory(ClientHttpRequestFactoryBuilder.detect().build(settings))
