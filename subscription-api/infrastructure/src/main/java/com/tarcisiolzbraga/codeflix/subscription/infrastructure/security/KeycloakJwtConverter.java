@@ -47,7 +47,10 @@ public class KeycloakJwtConverter implements Converter<Jwt, AbstractAuthenticati
     // A role do client é qualificada pelo nome dele, senão duas roles homônimas de clients
     // diferentes virariam a mesma autoridade.
     private Stream<String> clientRolesOf(final Jwt jwt) {
-        return Optional.ofNullable(jwt.getClaimAsMap(RESOURCE_ACCESS)).orElse(Map.of()).entrySet().stream()
+        return Optional.ofNullable(jwt.getClaimAsMap(RESOURCE_ACCESS))
+                .orElse(Map.of())
+                .entrySet()
+                .stream()
                 .flatMap(this::qualifiedRolesOf);
     }
 

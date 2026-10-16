@@ -17,8 +17,7 @@ public final class ConfiguredValue {
     private static final String UNRESOLVED_MESSAGE = "'%s' was not resolved; got '%s'. Set the environment variable.";
     private static final String NOT_A_URL_MESSAGE = "'%s' must be an absolute URL; got '%s'";
 
-    private ConfiguredValue() {
-    }
+    private ConfiguredValue() {}
 
     public static String text(final String name, final String value) {
         if (value == null || value.isBlank()) {

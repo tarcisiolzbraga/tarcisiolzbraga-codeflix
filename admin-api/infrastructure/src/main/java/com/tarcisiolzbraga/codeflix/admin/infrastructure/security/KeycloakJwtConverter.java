@@ -68,7 +68,7 @@ public class KeycloakJwtConverter implements Converter<Jwt, AbstractAuthenticati
     private Map<String, Object> asMap(final Object value) {
         return value instanceof Map<?, ?> map
                 ? map.entrySet().stream()
-                        .collect(Collectors.toMap(e -> String.valueOf(e.getKey()), Map.Entry::getValue))
+                        .collect(Collectors.toMap(entry -> String.valueOf(entry.getKey()), Map.Entry::getValue))
                 : Map.of();
     }
 }
