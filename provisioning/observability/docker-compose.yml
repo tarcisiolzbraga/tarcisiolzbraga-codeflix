@@ -78,7 +78,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       # O arquivo que o bootRun escreve, que roda com workingDir na raiz do projeto.
-      - ../../admin-api/build/logs:/logs:ro
+      - ../../services/admin-api/build/logs:/logs:ro
       # Onde o Filebeat guarda até onde já leu. Sem este volume o registro morre com o container, e
       # um down/up relê o arquivo inteiro: medido, 154 documentos viraram 308.
       - filebeat_data:/usr/share/filebeat/data

@@ -1,9 +1,0 @@
-// O plugin de convenção dos módulos vem de ../build-logic, um build incluído: a configuração de
-// build é a mesma nos três serviços Java e vive num lugar só, fora daqui.
-pluginManagement {
-    includeBuild '../build-logic'
-}
-
-rootProject.name = 'subscription-api-codeflix'
-
-include 'domain', 'application', 'infrastructure'

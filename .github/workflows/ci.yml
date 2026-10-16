@@ -32,7 +32,7 @@ jobs:
         service: [admin-api, videos-api, subscription-api]
     defaults:
       run:
-        working-directory: ${{ matrix.service }}
+        working-directory: services/${{ matrix.service }}
     steps:
       - uses: actions/checkout@v4
 
@@ -60,7 +60,7 @@ jobs:
         service: [admin-api, videos-api, subscription-api]
     defaults:
       run:
-        working-directory: ${{ matrix.service }}
+        working-directory: services/${{ matrix.service }}
     steps:
       - uses: actions/checkout@v4
 
@@ -82,7 +82,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: relatorios-de-teste-${{ matrix.service }}
-          path: '${{ matrix.service }}/*/build/reports/tests/**'
+          path: 'services/${{ matrix.service }}/*/build/reports/tests/**'
           retention-days: 7
 
   image:
@@ -105,7 +105,7 @@ jobs:
 
       # O Dockerfile de cada serviço empacota o jar já construído, por isso o bootJar antes.
       - name: Gera o jar
-        working-directory: ${{ matrix.service }}
+        working-directory: services/${{ matrix.service }}
         run: ./gradlew bootJar -x test
 
       # Constrói sem publicar: não exige credencial nenhuma, e passa a verificar os Dockerfiles, que
@@ -113,7 +113,7 @@ jobs:
       - name: Constrói a imagem
         uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.service }}
+          context: services/${{ matrix.service }}
           push: false
           tags: ${{ matrix.service }}:${{ github.sha }}
 
@@ -133,14 +133,14 @@ jobs:
         service: [encoder-api, mail-api]
     defaults:
       run:
-        working-directory: ${{ matrix.service }}
+        working-directory: services/${{ matrix.service }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: ${{ matrix.service }}/go.mod
-          cache-dependency-path: ${{ matrix.service }}/go.sum
+          go-version-file: services/${{ matrix.service }}/go.mod
+          cache-dependency-path: services/${{ matrix.service }}/go.sum
 
       # O mesmo alvo que se usa na mão antes de commitar: vet e depois os testes com -race.
       - name: Verificação

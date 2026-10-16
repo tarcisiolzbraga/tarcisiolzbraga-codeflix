@@ -1,0 +1,77 @@
+# O serviço de assinatura e o banco dele.
+#
+# Banco próprio, e não um schema a mais no MySQL da admin-api: são serviços diferentes, e o estado de
+# um não é assunto do outro — a mesma decisão que o encoder tomou com o Postgres dele. Custa um
+# container e um conector do Debezium a mais, e em troca nenhuma migration daqui alcança o banco de
+# lá, e derrubar um não derruba o outro.
+# Teto do log de cada container. Sem isto o Docker guarda o json-file sem limite nenhum, e um
+# serviço em laço enche o disco: aconteceu, com 73 GB num container só.
+#
+# 50 MB por arquivo e 5 arquivos dão 250 MB por container — folgado para investigar um problema de
+# dias atrás, e três ordens de grandeza abaixo do que um laço é capaz de escrever.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
+services:
+  subscription-api:
+    logging: *logging
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: adm_videos_subscription
+    env_file:
+      - ../../.env
+    environment:
+      # Dentro da rede do compose os serviços se acham pelo nome; o .env traz os valores de quem
+      # roda no host, e estas linhas os substituem.
+      SUBSCRIPTION_DB_HOST: subscription-mysql
+      SUBSCRIPTION_DB_PORT: 3306
+      KEYCLOAK_ISSUER_URI: http://keycloak:${KEYCLOAK_PORT}/realms/${KEYCLOAK_REALM}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    ports:
+      - "${SUBSCRIPTION_APP_PORT}:8084"
+    # service_healthy no banco, e não só started: o Flyway roda na subida e a aplicação sai se não
+    # conseguir conectar — esperar o container existir não basta, ele precisa aceitar conexão.
+    depends_on:
+      subscription-mysql:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    labels:
+      filebeat_collector: "true"
+
+  subscription-mysql:
+    logging: *logging
+    image: mysql:8.4
+    container_name: adm_videos_subscription_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${SUBSCRIPTION_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${SUBSCRIPTION_DB_NAME}
+      MYSQL_USER: ${SUBSCRIPTION_DB_USER}
+      MYSQL_PASSWORD: ${SUBSCRIPTION_DB_PASSWORD}
+      # Lidas pelo script de init que cria o usuário de leitura do binlog.
+      CDC_USER: ${CDC_USER}
+      CDC_PASSWORD: ${CDC_PASSWORD}
+    # O binlog em ROW é o que o Debezium lê, e é dele que sai a entrega dos eventos de domínio
+    # gravados na fila de saída. A imagem já vem com log-bin ligado; o formato é o padrão, mas fica
+    # declarado para não depender dele.
+    command: ["--binlog-format=ROW", "--binlog-row-image=FULL"]
+    ports:
+      - "${SUBSCRIPTION_DB_PORT}:3306"
+    volumes:
+      # Scripts executados uma única vez, na criação do volume: é de onde sai o usuário do Debezium.
+      # Em volume que já existe eles não rodam — veja a nota de CDC no README.
+      - ./init:/docker-entrypoint-initdb.d:ro
+      - subscription_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  subscription_mysql_data:

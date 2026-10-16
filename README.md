@@ -5,16 +5,18 @@ Os serviços de back-end do Codeflix, num repositório só. Cada serviço tem o 
 
 | Pasta | O que é | Porta |
 |---|---|---|
-| [`admin-api/`](admin-api/) | administra o catálogo: cria, edita e publica. É a fonte do dado. | 8080 |
-| [`videos-api/`](videos-api/) | serve o catálogo ao usuário final, replicando o que a `admin-api` publica. | 8082 |
-| [`encoder-api/`](encoder-api/) | converte as mídias que a `admin-api` recebe. Em Go. | — |
-| [`subscription-api/`](subscription-api/) | diz quem é assinante e se a cobrança do mês passou. É quem dá direito ao catálogo. | 8084 |
+| [`services/admin-api/`](services/admin-api/) | administra o catálogo: cria, edita e publica. É a fonte do dado. | 8080 |
+| [`services/videos-api/`](services/videos-api/) | serve o catálogo ao usuário final, replicando o que a `admin-api` publica. | 8082 |
+| [`services/encoder-api/`](services/encoder-api/) | converte as mídias que a `admin-api` recebe. Em Go. | — |
+| [`services/subscription-api/`](services/subscription-api/) | diz quem é assinante e se a cobrança do mês passou. É quem dá direito ao catálogo. | 8084 |
+| [`services/mail-api/`](services/mail-api/) | entrega o e-mail que a `subscription-api` manda, consumindo a fila. Em Go. | — |
+| [`clients/`](clients/) | não é serviço: os fronts que falam com as APIs. | — |
 | [`build-logic/`](build-logic/) | não é serviço: a configuração de build que os serviços Java dividem. | — |
 | [`provisioning/`](provisioning/) | não é serviço: os containers de apoio, um compose por parte. | — |
 
 A leitura de cada um está no README da própria pasta. Comece pelo
-[`admin-api/README.md`](admin-api/README.md) se quer entender de onde o dado vem, ou pelo
-[`videos-api/README.md`](videos-api/README.md) se quer entender como ele é servido.
+[`services/admin-api/README.md`](services/admin-api/README.md) se quer entender de onde o dado vem, ou pelo
+[`services/videos-api/README.md`](services/videos-api/README.md) se quer entender como ele é servido.
 
 ## Por que num repositório só
 
@@ -48,6 +50,18 @@ docker compose --profile cdc up -d   # Kafka e Kafka Connect, para a replicaçã
 Os comandos são os de sempre, rodados da raiz: a inclusão é montagem de arquivo, não projeto
 separado, então `up`, `down`, `logs` e os profiles enxergam tudo junto.
 
+A raiz separa o que é serviço do que é cliente, e o que não é nem um nem outro:
+
+```
+services/      as cinco aplicações: três em Java, duas em Go
+clients/       os fronts que falam com elas
+build-logic/   a configuração de build que os serviços Java dividem
+provisioning/  os containers de apoio, um compose por parte
+```
+
+Os serviços em Go não expõem rota HTTP — consomem fila —, então `services/` é o nome honesto dos
+cinco; `apis/` só valeria para três.
+
 ```
 provisioning/
 ├── mysql/                  banco da admin-api, e a origem do binlog
@@ -62,7 +76,7 @@ provisioning/
 Cada serviço compila e roda a partir da própria pasta, e é de lá que o Gradle roda:
 
 ```bash
-cd admin-api && ./gradlew bootRun    # ou videos-api
+cd services/admin-api && ./gradlew bootRun    # ou videos-api
 ```
 
 O serviço continua sendo o build de entrada; `build-logic/` entra como build incluído, compilado
@@ -71,7 +85,7 @@ antes dele. Não há wrapper na raiz, e não se roda Gradle de lá.
 Para subir as aplicações em container, empacote o jar antes e depois use o compose:
 
 ```bash
-cd admin-api && ./gradlew bootJar && cd ..
+cd services/admin-api && ./gradlew bootJar && cd ../..
 docker compose up -d --build admin-api
 ```
 
