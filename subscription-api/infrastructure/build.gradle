@@ -52,6 +52,27 @@ dependencies {
     testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
 }
 
+// O CopiedSourcesTest compara as cópias que moram nos outros serviços, e o Gradle não enxerga esses
+// arquivos como entrada da task: quando só eles mudam, ele considera os testes atualizados e a
+// checagem passa verde sem rodar. Foi exatamente o que aconteceu ao conferir se o teste pegava uma
+// divergência de verdade. Declarar as cópias como entrada devolve a verdade ao up-to-date check.
+//
+// O padrão casa os arquivos em vez de repetir a lista de caminhos do teste; se um caminho mudar de
+// lugar, esta entrada fica vazia em silêncio, mas o teste falha dizendo que não achou a cópia.
+def copiedSources = files(['admin-api', 'videos-api', 'subscription-api'].collect { service ->
+    fileTree(dir: new File(rootDir.parentFile, "$service/infrastructure/src/main/java"),
+            include: ['**/security/KeycloakJwtConverter.java', '**/configuration/ConfiguredValue.java'])
+})
+
+// Só as tasks que rodam o teste: as de container o excluem por tag.
+['test', 'unitTests'].each { name ->
+    tasks.named(name, Test) {
+        inputs.files(copiedSources)
+                .withPropertyName('copiedSources')
+                .withPathSensitivity(PathSensitivity.RELATIVE)
+    }
+}
+
 tasks.named('bootRun') {
     workingDir = rootProject.projectDir
 }
