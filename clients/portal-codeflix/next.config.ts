@@ -18,6 +18,14 @@ if (existsSync(rootEnv)) {
 const apiUrl = (port: string | undefined, fallback: string) =>
   `http://localhost:${port ?? fallback}`;
 
+// O emissor, montado das mesmas variáveis que o `keycloak.issuer-uri` dos três serviços usa.
+const keycloakIssuer = () => {
+  const host = process.env.KEYCLOAK_HOST ?? "localhost";
+  const port = process.env.KEYCLOAK_PORT ?? "8081";
+  const realm = process.env.KEYCLOAK_REALM ?? "codeflix";
+  return `http://${host}:${port}/realms/${realm}`;
+};
+
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
@@ -37,6 +45,13 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_SUBSCRIPTION_API_URL: apiUrl(process.env.SUBSCRIPTION_APP_PORT, "8084"),
     NEXT_PUBLIC_CATALOG_API_URL: apiUrl(process.env.CATALOG_APP_PORT, "8082"),
     NEXT_PUBLIC_ADMIN_API_URL: apiUrl(process.env.APP_PORT, "8080"),
+    // O mesmo emissor que os três serviços validam. Montado do mesmo jeito que o
+    // `keycloak.issuer-uri` deles, a partir das mesmas variáveis: divergir aqui faria o token do
+    // portal ser recusado pelo `iss`, que é o defeito que o .env único existe para evitar.
+    NEXT_PUBLIC_KEYCLOAK_ISSUER: keycloakIssuer(),
+    // O client público do realm, com authorization code + PKCE S256. Não tem segredo: é o que
+    // permite ele viver no browser.
+    NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: process.env.FRONT_KEYCLOAK_CLIENT_ID ?? "front-codeflix",
   },
 };
 
