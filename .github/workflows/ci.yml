@@ -2,7 +2,8 @@
 # retorno de um erro bobo não esperar os containers subirem.
 #
 # Os serviços Java entram numa matriz, e não em jobs copiados: eles têm o mesmo build, e a diferença
-# é só a pasta. O encoder tem job próprio — ele é Go, outra cadeia de ferramentas.
+# é só a pasta. Os dois serviços em Go têm job próprio, e os clientes também: cada cadeia de
+# ferramentas é uma — Gradle, Go e Node.
 #
 # Sem filtro por caminho de propósito. Filtrar teste pelo que mudou dá push verde com contrato
 # quebrado: mexer só no admin-api — uma coluna renomeada, um payload diferente — quebra a videos-api,
@@ -145,3 +146,39 @@ jobs:
       # O mesmo alvo que se usa na mão antes de commitar: vet e depois os testes com -race.
       - name: Verificação
         run: make check
+
+  # Os clientes têm job próprio pelo mesmo motivo dos serviços em Go: a cadeia de ferramentas é
+  # outra. `npm run check` é a porta de entrada de cada commit do portal — lint, tipos, testes e
+  # build —, como o `./gradlew build` é nos Java e o `make check` nos Go.
+  #
+  # Numa matriz desde já, com um cliente só: o front de administração entra aqui sem copiar job.
+  clients:
+    name: ${{ matrix.client }} (front)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        client: [portal-codeflix]
+    defaults:
+      run:
+        working-directory: clients/${{ matrix.client }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: clients/${{ matrix.client }}/.nvmrc
+          cache: npm
+          cache-dependency-path: clients/${{ matrix.client }}/package-lock.json
+
+      # npm ci, e não npm install: respeita o package-lock e falha se ele estiver fora de sincronia,
+      # em vez de resolver versão nova sem ninguém pedir.
+      - name: Instala as dependências
+        run: npm ci
+
+      # A telemetria do Next é ligada por padrão e manda dado de build para fora. Aqui ela fica
+      # desligada: o que sai do CI é escolha, não padrão herdado.
+      - name: Verificação
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+        run: npm run check
