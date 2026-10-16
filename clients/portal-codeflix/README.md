@@ -158,6 +158,46 @@ referência durável e guarda só a referência. Num provedor de verdade, o toke
 browser. Dado de cartão não passa nem pelo portal nem pelo serviço — e por isso a tela pede o token
 do provedor, e diz na própria tela que é isso que ela está pedindo.
 
+## O acervo
+
+Busca e página de título, pelo GraphQL da `videos-api` — em `/api/graphql`, porque o contexto `/api`
+faz parte do endereço dela.
+
+### A recusa que vira "renove a sessão"
+
+**O catálogo recusa dentro do corpo, com HTTP 200**, e a classificação vem em
+`errors[0].extensions.classification`. Isso muda o tratamento:
+
+| Caso | HTTP | Corpo | O que a tela faz |
+|---|---|---|---|
+| sem token | 200 | `UNAUTHORIZED` | pede para entrar |
+| token sem o papel do catálogo | 200 | `FORBIDDEN` | **oferece renovar a sessão** |
+| token com o papel | 200 | dados | mostra o acervo |
+| token inválido | **401** | — | erro de transporte |
+
+O `FORBIDDEN` quase nunca é "não pode assistir": é o papel que **ainda não chegou ao token**, porque
+a assinatura o concede por evento, segundos depois. Dizer "acesso negado" a quem acabou de pagar
+seria mentir; a tela oferece renovar, que é o que resolve.
+
+### Não há reprodução, e não é esquecimento
+
+Os campos `video`, `banner` e `thumbnail` do acervo guardam **a localização no armazenamento**, não
+uma URL que o browser alcance. A única rota que serve o arquivo é
+`GET /videos/{id}/medias/{type}`, na **admin-api**, e ela exige `CODEFLIX_ADMIN` ou
+`CODEFLIX_VIDEOS` — papéis que um assinante não tem. A `videos-api` não serve mídia, e o Garage não
+é público.
+
+Servir mídia a quem assina precisa de uma rota que ainda não existe, e ela traz decisões que não são
+do front:
+
+- **servir o arquivo pela API** (a `videos-api` lê do Garage e devolve) ou **gerar URL assinada** com
+  validade curta;
+- o que fazer com o campo `opened`, que diz se o título é aberto a todos;
+- se a autorização olha só o papel no token ou também a situação da assinatura.
+
+Enquanto isso não existe, a página do título **diz** que a reprodução não está disponível. Fingir um
+player esconderia a lacuna.
+
 ## O que dá para verificar sem browser, e o que não dá
 
 O login interativo não é automatizável aqui (não há browser de verdade na verificação), então o que
@@ -189,6 +229,11 @@ foi conferido: a verificação prévia de `POST /subscriptions`, `PUT /subscript
 `Access-Control-Allow-Origin`, e as recusas sem token chegam **com** cabeçalho de CORS — o front lê
 o 401 em vez de ver erro de rede.
 
+Do acervo, os cinco caminhos foram exercitados contra a `videos-api` no ar — a verificação prévia em
+`/api/graphql` (200 com `Access-Control-Allow-Origin`, o contexto `/api` não atrapalha), a recusa sem
+token (200 + `UNAUTHORIZED`), a recusa por falta do papel (200 + `FORBIDDEN`), o acesso com o papel
+(dados) e o token inválido (401). São exatamente os cinco que o gateway distingue.
+
 O que **não** foi conferido de ponta a ponta: a volta do Keycloak com o código, a troca por token, o
 laço de assinar → evento → papel no token renovado, e as telas com dados de verdade. Tudo isso pede
 um browser e uma pessoa logada; do lado do backend, esse laço é coberto pelos testes de ponta a ponta
@@ -203,7 +248,10 @@ conta lendo `GET /accounts/me` **com** token, que é a primeira que exercita o C
 O cadastro, com a confirmação por e-mail. E a assinatura: assinar a partir do plano, ver a
 situação, pagar, cancelar e guardar o meio de pagamento.
 
-A seguir: o acervo pela `videos-api` — GraphQL, busca e player.
+E o acervo: busca e página de título, pelo GraphQL da `videos-api`.
+
+O que falta para o portal fazer o que o nome promete é **reprodução**, e ela depende de uma rota de
+mídia que a `videos-api` ainda não tem — está explicado abaixo.
 
 ## Duas coisas que vão morder quem continuar
 
