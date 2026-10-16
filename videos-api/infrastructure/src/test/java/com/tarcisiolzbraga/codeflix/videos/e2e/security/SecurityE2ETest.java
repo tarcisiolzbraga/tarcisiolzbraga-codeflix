@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.web.client.RestClient;
@@ -24,6 +25,9 @@ class SecurityE2ETest {
 
     private static final String QUERY = "{ categories { meta { total } } }";
     private static final String CLASSIFICATION = "classification";
+
+    // A origem do front no perfil development, que é o que vale nos testes.
+    private static final String FRONT_ORIGIN = "http://localhost:3000";
     private static final String MUTATION =
             """
             mutation { saveCategory(input: { id: "00000024-0000-0000-0000-000000000000", name: "Filmes",
@@ -111,6 +115,29 @@ class SecurityE2ETest {
                 .exchange((request, response) -> response.getStatusCode());
 
         assertEquals(HttpStatus.NOT_FOUND, actual);
+    }
+
+    // A verificação prévia do browser, no /graphql: o front do catálogo consulta por POST com corpo
+    // JSON, que é justamente o caso em que o browser manda o OPTIONS antes.
+    //
+    // Passa **sem token**, e tem de passar: ela sai antes de qualquer tela ter um. Quem responde é o
+    // filtro de CORS, antes da autorização.
+    //
+    // A política mora no CorsConfig, que é a mesma classe nos três serviços — o CopiedSourcesTest
+    // prova que continua sendo, e o CorsConfigTest da subscription-api exercita a política inteira. O
+    // que este teste prova é a **ligação** dela na cadeia de filtros deste serviço.
+    @Test
+    void givenTheFrontOrigin_whenAskPreflightWithoutToken_thenAllowIt() {
+        final var actualHeaders = clientWith(null)
+                .method(HttpMethod.OPTIONS)
+                .uri("/graphql")
+                .header(HttpHeaders.ORIGIN, FRONT_ORIGIN)
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
+                .retrieve()
+                .toBodilessEntity()
+                .getHeaders();
+
+        assertEquals(FRONT_ORIGIN, actualHeaders.getFirst(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
     }
 
     @SuppressWarnings("unchecked")

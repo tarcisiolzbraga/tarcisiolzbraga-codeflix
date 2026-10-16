@@ -61,7 +61,8 @@ dependencies {
 // lugar, esta entrada fica vazia em silêncio, mas o teste falha dizendo que não achou a cópia.
 def copiedSources = files(['admin-api', 'videos-api', 'subscription-api'].collect { service ->
     fileTree(dir: new File(rootDir.parentFile, "$service/infrastructure/src/main/java"),
-            include: ['**/security/KeycloakJwtConverter.java', '**/configuration/ConfiguredValue.java'])
+            include: ['**/security/KeycloakJwtConverter.java', '**/configuration/ConfiguredValue.java',
+                     '**/configuration/CorsConfig.java'])
 })
 
 // Só as tasks que rodam o teste: as de container o excluem por tag.
