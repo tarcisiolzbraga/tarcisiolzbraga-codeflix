@@ -33,6 +33,11 @@ export const SUBSCRIPTION_API = apiUrl(
   process.env.NEXT_PUBLIC_SUBSCRIPTION_API_URL,
 );
 
+export const CATALOG_API = apiUrl(
+  "NEXT_PUBLIC_CATALOG_API_URL",
+  process.env.NEXT_PUBLIC_CATALOG_API_URL,
+);
+
 export const KEYCLOAK_ISSUER = apiUrl(
   "NEXT_PUBLIC_KEYCLOAK_ISSUER",
   process.env.NEXT_PUBLIC_KEYCLOAK_ISSUER,
