@@ -1,4 +1,5 @@
 import { SUBSCRIPTION_API } from "@/shared/config";
+import { bearer } from "@/shared/http";
 
 // A conta como `GET /accounts/me` a devolve.
 export type BillingAddress = {
@@ -32,7 +33,7 @@ export class AccountRequestFailed extends Error {
 // para o servidor do Next, que é outra decisão e outra superfície.
 export async function fetchMyAccount(accessToken: string): Promise<Account> {
   const response = await fetch(`${SUBSCRIPTION_API}/accounts/me`, {
-    headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` },
+    headers: { Accept: "application/json", ...bearer(accessToken) },
   });
 
   if (!response.ok) {

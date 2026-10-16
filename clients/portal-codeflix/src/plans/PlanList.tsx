@@ -1,5 +1,6 @@
 import { unstable_rethrow } from "next/navigation";
 import { PlanCard } from "@/plans/PlanCard";
+import { SubscribeButton } from "@/subscription/SubscribeButton";
 import { listPlansOnSale, PlansUnavailableError } from "@/plans/plans";
 
 // A parte da tela que depende da API, separada da página de propósito: é ela que fica dentro do
@@ -37,7 +38,7 @@ export async function PlanList() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {page.items.map((plan) => (
-        <PlanCard key={plan.id} plan={plan} />
+        <PlanCard key={plan.id} plan={plan} action={<SubscribeButton planId={plan.id} />} />
       ))}
     </div>
   );
