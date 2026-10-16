@@ -27,6 +27,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 CODEFLIX
               </Link>
               <div className="flex items-center gap-6">
+                <Link href="/acervo" className="text-sm text-neutral-300 hover:text-neutral-50">
+                  Acervo
+                </Link>
                 <Link href="/planos" className="text-sm text-neutral-300 hover:text-neutral-50">
                   Planos
                 </Link>
