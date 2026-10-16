@@ -93,6 +93,38 @@ mão foi assinado antes disso e não muda. Quando a tela de assinatura existir, 
 a renovação explicitamente depois de assinar — e é por ter esse controle explícito que a escolha foi
 uma biblioteca OIDC, e não uma sessão de servidor.
 
+## O cadastro
+
+Duas telas, e as duas carregam decisão da API:
+
+**`/cadastro`** pede o cadastro. A API responde **202 com a mesma mensagem em todos os casos** —
+e-mail novo, e-mail que já existe no provedor de identidade, ou e-mail que já tem conta. É decisão
+dela, para não contar a um estranho se um endereço está cadastrado, e **a tela preserva isso**: o
+sucesso é o mesmo texto, sem "este e-mail já existe".
+
+**`/cadastro/confirmar`** é o endereço que o link do e-mail abre. O nome da rota não foi escolhido
+aqui: a `subscription-api` manda este endereço desde antes de o portal existir, no
+`amqp.confirmation-url` dela. Divergir quebraria o e-mail que já é enviado hoje.
+
+### O token sai da URL assim que é lido
+
+A API recebe o token **no corpo**, não em query string, porque em query string ele acabaria no log do
+servidor — e ele é credencial. O portal o recebe na URL porque chega por link de e-mail, o que é
+inevitável; o que dá para fazer é tirá-lo de lá no primeiro instante, com `history.replaceState`, para
+ele não ficar no histórico do navegador nem viajar em `Referer`.
+
+Isso tem uma consequência no código: o token é capturado na **primeira** renderização, porque logo
+depois o parâmetro desaparece. Sem isso a tela voltaria para "falta o link" justamente depois de
+confirmar.
+
+### O que o portal não valida
+
+**Os dígitos verificadores do documento.** A API confere CPF e CNPJ pela conta dos dígitos, não só
+pelo comprimento; repetir isso aqui seria uma segunda fonte de verdade para a mesma regra, e o dia em
+que ela mudasse no domínio o portal passaria a recusar o que a API aceita. O formulário confere campo
+vazio e o tamanho da senha (8 a 72, que é o limite do domínio) e deixa o resto para a resposta da API,
+mostrando **a mensagem que ela escreveu**.
+
 ## O que dá para verificar sem browser, e o que não dá
 
 O login interativo não é automatizável aqui (não há browser de verdade na verificação), então o que
@@ -105,8 +137,22 @@ foi conferido contra a pilha no ar foi o que costuma estar errado:
 - **um 401 chega com cabeçalho de CORS**, então o front lê a recusa em vez de ver "erro de rede",
   que é o que acontece quando o CORS falta no caminho de erro.
 
+Do cadastro, o laço inteiro **foi** conferido pelo lado da API, com a pilha no ar:
+
+- a verificação prévia de `POST /accounts/sign-up` da origem do portal passa, e o 202 vem com
+  `Access-Control-Allow-Origin`;
+- pedir duas vezes o mesmo e-mail devolve resposta **idêntica** — a propriedade de privacidade se
+  mantém;
+- **o link que a API enfileira é `http://localhost:3000/cadastro/confirmar?token=…`**, isto é, bate
+  com a rota criada aqui;
+- confirmar devolve 200 com o `accountId`, e confirmar **de novo com o mesmo token** devolve a mesma
+  conta: idempotente, como o contrato promete;
+- depois de pedir o cadastro outra vez, o link **antigo** responde 404 e o novo 200 — "só o link mais
+  novo vale", provado de propósito.
+
 O que **não** foi conferido de ponta a ponta: a volta do Keycloak com o código, a troca por token, e
-a tela da conta com dados de verdade. Isso pede um browser, e está dito aqui em vez de subentendido.
+as telas com dados de verdade no browser. Isso pede um browser, e está dito aqui em vez de
+subentendido.
 
 ## O que está pronto, e o que não está
 
@@ -114,8 +160,10 @@ Pronto: a tela de planos, lendo `GET /plans/on-sale`, que é **aberta** — quem
 ainda não tem token, e é por isso que essa rota não pede um. E o login por Keycloak, com a tela da
 conta lendo `GET /accounts/me` **com** token, que é a primeira que exercita o CORS de verdade.
 
-A seguir, nesta ordem: o cadastro com confirmação por e-mail (a rota `/cadastro/confirmar` já é
-esperada pela API), a assinatura, e o acervo pela `videos-api`.
+E o cadastro, com a confirmação por e-mail.
+
+A seguir, nesta ordem: a assinatura — onde a renovação de token sai do comentário e vai para o
+código — e o acervo pela `videos-api`.
 
 ## Duas coisas que vão morder quem continuar
 
