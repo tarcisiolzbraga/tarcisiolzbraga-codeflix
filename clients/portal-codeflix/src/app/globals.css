@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/* O tema é escuro e único, como o da referência do curso: não há alternância, então não há
+   prefers-color-scheme aqui — a cor de fundo vem do body, no layout. */
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+}
