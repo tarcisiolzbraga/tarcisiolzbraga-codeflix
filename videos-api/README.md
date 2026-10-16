@@ -93,6 +93,16 @@ Um consumidor de verdade não entra assim — ele recebe a role pelo grupo `subs
 Para a mutation de exemplo, use o `admin-codeflix`. Os dois vivem no realm da raiz do monorepo, que é um
 só — veja `../provisioning/keycloak/README.md`.
 
+### O front noutra origem
+
+Requisição de browser vinda de outra origem é aceita por perfil: `localhost` no `development`,
+`h.tarcisiolzbraga.codeflix.com` na homologação e `tarcisiolzbraga.codeflix.com` na produção, sobrescrevendo com
+`CORS_ALLOWED_ORIGINS`. Não é segurança desta API — quem autoriza é o token; o que isso muda é o
+browser deixar o front **ler** a resposta.
+
+A decisão, e por que o `localhost` está na homologação e não na produção, está no
+[README da raiz](../README.md#o-front-e-o-cors): vale igual nos três serviços.
+
 ### Perfis
 
 Três perfis, como no `admin-codeflix`. Sem perfil ativo — `bootRun` e os testes — vale o

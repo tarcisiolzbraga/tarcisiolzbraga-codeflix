@@ -243,6 +243,16 @@ Sem bandeira nem últimos quatro dígitos, que um provedor de verdade devolveria
 "Visa •••• 4242": o provedor aqui é de mentira e não os devolve, e campo que ninguém preenche é
 exatamente o erro do `deletedAt` da referência.
 
+### O front noutra origem
+
+Requisição de browser vinda de outra origem é aceita por perfil: `localhost` no `development`,
+`h.tarcisiolzbraga.codeflix.com` na homologação e `tarcisiolzbraga.codeflix.com` na produção, sobrescrevendo com
+`CORS_ALLOWED_ORIGINS`. Não é segurança desta API — quem autoriza é o token; o que isso muda é o
+browser deixar o front **ler** a resposta.
+
+A decisão, e por que o `localhost` está na homologação e não na produção, está no
+[README da raiz](../README.md#o-front-e-o-cors): vale igual nos três serviços.
+
 ## As rotas do plano
 
 O plano é administração: quem o cria e altera é o operador do catálogo.
