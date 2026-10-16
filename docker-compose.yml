@@ -17,8 +17,8 @@ include:
   - path: provisioning/docker-compose.yml
 
   # as aplicações, cada uma com o compose ao lado do próprio Dockerfile
-  - path: admin-api/docker-compose.yml
-  - path: videos-api/docker-compose.yml
-  - path: encoder-api/docker-compose.yml
-  - path: subscription-api/docker-compose.yml
-  - path: mail-api/docker-compose.yml
+  - path: services/admin-api/docker-compose.yml
+  - path: services/videos-api/docker-compose.yml
+  - path: services/encoder-api/docker-compose.yml
+  - path: services/subscription-api/docker-compose.yml
+  - path: services/mail-api/docker-compose.yml

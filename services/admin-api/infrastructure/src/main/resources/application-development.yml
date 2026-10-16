@@ -1,0 +1,47 @@
+# Máquina do desenvolvedor: credenciais do .env da raiz do monorepo (o mesmo do docker compose e o
+# mesmo da videos-api) e banco local.
+spring:
+  config:
+    import: optional:file:../../.env[.properties]
+  rabbitmq:
+    host: ${AMQP_HOST:localhost}
+    port: ${AMQP_PORT:5672}
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:adm_videos}
+    hikari:
+      # Na máquina local, poucas conexões bastam; e conexão presa por mais de 2 s vira aviso no log.
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+      minimum-idle: ${DB_POOL_SIZE:5}
+      leak-detection-threshold: 2000
+
+# O Keycloak do docker compose.
+keycloak:
+  issuer-uri: http://${KEYCLOAK_HOST:localhost}:${KEYCLOAK_PORT:8081}/realms/${KEYCLOAK_REALM:codeflix}
+
+# O Garage do docker compose, na porta do .env.
+storage:
+  endpoint: http://${STORAGE_HOST:localhost}:${STORAGE_PORT:3900}
+
+# O console segue legível para quem está desenvolvendo, e o arquivo sai em ECS, o esquema da própria
+# Elastic — é dele que o Filebeat se alimenta. O Boot 4 formata sozinho: nada de logback-spring.xml
+# nem de encoder a mais no classpath.
+#
+# Só no development: em homolog e produção quem recolhe o log é a plataforma, a partir do stdout, e
+# essa decisão é outra.
+logging:
+  file:
+    name: ${LOG_FILE:build/logs/admin-codeflix.json}
+  structured:
+    format:
+      file: ecs
+    ecs:
+      service:
+        environment: development
+  level:
+    com.tarcisiolzbraga.codeflix.admin: debug
+    org.hibernate.SQL: debug
+
+# As origens do front que o browser confere. Isto **não** é segurança desta API — quem autoriza é o
+# token; ver o comentário do CorsConfig. Na máquina local, o front do próprio desenvolvedor.
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
