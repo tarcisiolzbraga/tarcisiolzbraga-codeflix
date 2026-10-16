@@ -82,6 +82,15 @@ cd services/admin-api && ./gradlew bootRun    # ou videos-api
 O serviço continua sendo o build de entrada; `build-logic/` entra como build incluído, compilado
 antes dele. Não há wrapper na raiz, e não se roda Gradle de lá.
 
+O portal sobe do mesmo jeito, da pasta dele:
+
+```bash
+cd clients/portal-codeflix && npm install && npm run dev    # http://localhost:3000
+```
+
+Ele lê as portas das APIs do **mesmo `.env`** desta raiz, então não há segunda lista de portas para
+manter em dia.
+
 Para subir as aplicações em container, empacote o jar antes e depois use o compose:
 
 ```bash
