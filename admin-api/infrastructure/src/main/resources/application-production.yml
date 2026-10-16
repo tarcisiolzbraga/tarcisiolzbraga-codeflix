@@ -18,3 +18,9 @@ logging:
         environment: production
   level:
     com.tarcisiolzbraga.codeflix.admin: info
+
+# As origens do front que o browser confere. Diferente do banco e do Keycloak, aqui há valor padrão:
+# a URL do nosso próprio front não é segredo nem endereço de infraestrutura, e deixá-la no arquivo é
+# o que faz a lista ser revisável. Sem localhost nesta lista — ver o README.
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:https://tarcisiolzbraga.codeflix.com}
