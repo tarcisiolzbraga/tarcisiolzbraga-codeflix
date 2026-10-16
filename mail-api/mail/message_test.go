@@ -12,7 +12,7 @@ func quem() mail.Identity {
 	return mail.Identity{FromName: "Codeflix", FromAddress: "nao-responda@codeflix.com.br"}
 }
 
-func TestSignUpValidation(t *testing.T) {
+func Test_givenASignUpValidationNotice_whenBuildsTheEmail_thenItIsReadyToSend(t *testing.T) {
 	msg := messaging.SignUpValidation{
 		To:              "assinante@codeflix.com.br",
 		Firstname:       "Tarcisio",
