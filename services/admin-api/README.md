@@ -96,6 +96,22 @@ browser deixar o front **ler** a resposta.
 A decisão, e por que o `localhost` está na homologação e não na produção, está no
 [README da raiz](../../README.md#o-front-e-o-cors): vale igual nos três serviços.
 
+### O teto da descrição, e um 500 que virou 422
+
+A coluna `description` é `VARCHAR(4000)` na categoria e no vídeo. O `VideoValidator` sempre conferiu
+esse teto; o `CategoryValidator` **não** — ele validava só o nome.
+
+A consequência era medível: uma categoria com 4001 caracteres de descrição passava pelo domínio,
+quebrava na coluna, e o `DataIntegrityViolationException` não está mapeado no
+`GlobalExceptionHandler` — a API respondia **500**, com corpo sem explicação nenhuma. Medido contra
+a API de verdade antes do conserto.
+
+Agora o domínio recusa com `'description' must be at most 4000 characters`, e a resposta é 422 como
+nos outros erros de validação. A descrição da categoria continua **opcional**, diferente da do
+vídeo: nula e em branco são estados válidos, e o teto é a única regra.
+
+A coleção do Postman tem o caso, e o `CategoryE2ETest` também.
+
 ### Mídias dos vídeos
 
 Cada vídeo aceita cinco arquivos — `VIDEO`, `TRAILER`, `BANNER`, `THUMBNAIL` e `THUMBNAIL_HALF` — em
