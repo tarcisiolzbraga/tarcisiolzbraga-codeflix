@@ -12,5 +12,8 @@ public interface VideoClient {
 
     // O arquivo de mídia do vídeo. Vazio quando o admin não tem aquele tipo para aquele id — é o
     // caso de um vídeo cadastrado sem upload, que existe no catálogo e não tem o que reproduzir.
-    Optional<VideoMediaFile> mediaOf(String id, String type);
+    // O `range` vai como o cliente o mandou, no formato do cabeçalho HTTP, ou nulo para o arquivo
+    // inteiro. O admin fala esse formato, e o armazenamento dele também: ninguém no caminho precisa
+    // interpretar o intervalo.
+    Optional<VideoMediaFile> mediaOf(String id, String type, String range);
 }

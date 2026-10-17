@@ -47,8 +47,18 @@ public class VideoRestClient implements VideoClient {
     // pelo interceptor de client credentials do adminRestClient: é o service account dele que tem o
     // papel de vídeos no admin. Quem autoriza o assinante é o controller, antes de chegar aqui.
     @Override
-    public Optional<VideoMediaFile> mediaOf(final String id, final String type) {
-        return this.restClient.get().uri(MEDIA, id, type).exchange((request, response) -> {
+    public Optional<VideoMediaFile> mediaOf(final String id, final String type, final String range) {
+        return this.restClient
+                .get()
+                .uri(MEDIA, id, type)
+                // O cabeçalho é repassado como veio: é assim que o player pede trecho, e é assim que
+                // o admin e o armazenamento dele esperam receber.
+                .headers(headers -> {
+                    if (range != null && !range.isBlank()) {
+                        headers.set(HttpHeaders.RANGE, range);
+                    }
+                })
+                .exchange((request, response) -> {
             if (response.getStatusCode() == HttpStatus.NOT_FOUND) {
                 return Optional.<VideoMediaFile>empty();
             }
@@ -63,7 +73,8 @@ public class VideoRestClient implements VideoClient {
                             ? MediaType.APPLICATION_OCTET_STREAM_VALUE
                             : headers.getContentType().toString(),
                     filenameOf(headers),
-                    response.bodyTo(byte[].class)));
+                    response.bodyTo(byte[].class),
+                    headers.getFirst(HttpHeaders.CONTENT_RANGE)));
         });
     }
 
