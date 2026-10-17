@@ -10,7 +10,8 @@ Os serviços de back-end do Codeflix, num repositório só. Cada serviço tem o 
 | [`services/encoder-api/`](services/encoder-api/) | converte as mídias que a `admin-api` recebe. Em Go. | — |
 | [`services/subscription-api/`](services/subscription-api/) | diz quem é assinante e se a cobrança do mês passou. É quem dá direito ao catálogo. | 8084 |
 | [`services/mail-api/`](services/mail-api/) | entrega o e-mail que a `subscription-api` manda, consumindo a fila. Em Go. | — |
-| [`clients/`](clients/) | não é serviço: os fronts que falam com as APIs. | — |
+| [`clients/portal-codeflix/`](clients/portal-codeflix/) | não é serviço: o front de quem assina e assiste. | 3000 |
+| [`clients/back-office-codeflix/`](clients/back-office-codeflix/) | não é serviço: o front de quem administra o catálogo. | 3001 |
 | [`build-logic/`](build-logic/) | não é serviço: a configuração de build que os serviços Java dividem. | — |
 | [`provisioning/`](provisioning/) | não é serviço: os containers de apoio, um compose por parte. | — |
 
@@ -82,14 +83,16 @@ cd services/admin-api && ./gradlew bootRun    # ou videos-api
 O serviço continua sendo o build de entrada; `build-logic/` entra como build incluído, compilado
 antes dele. Não há wrapper na raiz, e não se roda Gradle de lá.
 
-O portal sobe do mesmo jeito, da pasta dele:
+Os fronts sobem do mesmo jeito, da pasta de cada um:
 
 ```bash
-cd clients/portal-codeflix && npm install && npm run dev    # http://localhost:3000
+cd clients/portal-codeflix     && npm install && npm run dev    # http://localhost:3000
+cd clients/back-office-codeflix && npm install && npm run dev   # http://localhost:3001
 ```
 
-Ele lê as portas das APIs do **mesmo `.env`** desta raiz, então não há segunda lista de portas para
-manter em dia.
+Portas diferentes porque os dois rodam juntos no desenvolvimento, e as duas estão liberadas no
+client do realm. Os dois leem as portas das APIs do **mesmo `.env`** desta raiz, então não há segunda
+lista de portas para manter em dia.
 
 Para subir as aplicações em container, empacote o jar antes e depois use o compose:
 

@@ -12,7 +12,9 @@ serviços Java o usam, com papéis diferentes: a `admin-api` e a `videos-api` va
 campo desconhecido no realm — um `_comment` derruba a subida com `Unrecognized field`. Por isso estas notas
 estão aqui.
 
-## Os cinco clients
+## Os seis clients
+
+Cinco de máquina, com `clientCredentials`, e um público para humano:
 
 | Client | Role | Para quê |
 |---|---|---|
@@ -21,6 +23,7 @@ estão aqui.
 | `videos-api-codeflix` | as quatro de leitura | a API de catálogo, que replica os quatro agregados |
 | `catalog-test-codeflix` | `CODEFLIX_SUBSCRIBER` | **client de teste**: lê o catálogo na `videos-api-codeflix` burlando o gate da assinatura |
 | `subscription-api-codeflix` | `manage-users` e `view-users` do `realm-management` | criar e procurar usuário, para o cadastro da assinatura |
+| `front-codeflix` | nenhuma: quem entra traz as suas | **público**: por onde uma pessoa entra, com authorization code e PKCE S256 |
 
 O `videos-api-codeflix` existe porque o `categories-codeflix` **não** serve a esse propósito: ele é a peça que
 prova o 403, e usá-lo como credencial do catálogo o faria perder essa função. O do catálogo leva só as quatro
@@ -73,6 +76,35 @@ sem mexer em role de usuário um por um.
 
 Ele está aqui antes do código que o usa: o arquivo é compartilhado pelos três serviços, e mexer nele
 duas vezes custa mais do que uma configuração esperando o seu consumidor.
+
+## As contas humanas, e o client que os dois fronts dividem
+
+Os dois fronts — o [portal](../../clients/portal-codeflix) e o
+[back-office](../../clients/back-office-codeflix) — entram pelo **mesmo** `front-codeflix`. Ele é
+"por onde uma pessoa entra"; quem separa o que cada uma pode é o **papel** no token. Um client por
+front exigiria manter duas listas de `redirectUris` e dois segredos de nada (o público não tem
+segredo que valha), sem ganhar controle algum.
+
+Por isso os `redirectUris` dele cobrem as duas portas de desenvolvimento, 3000 e 3001, além dos
+endereços de homologação e produção e do callback do Postman.
+
+**A consequência é que um assinante consegue se autenticar no back-office.** Quem recusa é a
+`admin-api`, em cada rota; o painel também confere o papel antes de desenhar a interface, para a
+pessoa ler "sua conta não tem permissão" em vez de tomar 403 em cada tela.
+
+O realm cria **um humano**, para entrar no back-office sem passar pelo cadastro da assinatura:
+
+| Usuário | Papel | Para quê |
+|---|---|---|
+| `operador-de-teste` | `CODEFLIX_ADMIN` | administrar o catálogo pelo browser |
+
+A senha dele é o marcador `__OPERATOR_TEST_PASSWORD__`, trocado do mesmo jeito que o segredo dos
+clients: pelo `command` do compose, com `OPERATOR_TEST_PASSWORD` do `.env` da raiz, e pelo
+`KeycloakContainerConfiguration` nos testes. Credencial não entra em arquivo versionado, nem sendo
+de desenvolvimento.
+
+Quem assina **não** é criado aqui: a conta nasce pelo cadastro da `subscription-api`, que a cria no
+realm e a põe no grupo `accounts`.
 
 ## O segredo
 

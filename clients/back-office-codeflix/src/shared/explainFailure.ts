@@ -1,0 +1,22 @@
+import { AdminApiError } from "@/shared/http";
+
+// Uma mensagem por motivo, porque "falhou" não diz à pessoa o que fazer.
+//
+// 401 e 403 parecem o mesmo defeito na tela e são coisas opostas: no primeiro a sessão venceu e
+// entrar de novo resolve; no segundo a conta não tem o papel e entrar de novo não muda nada. Erro
+// sem status nenhum quase sempre é a admin-api fora do ar — e dizer isso poupa a pessoa de procurar
+// defeito no catálogo.
+//
+// Fica no shared porque os quatro agregados vão explicar as mesmas falhas.
+export function explainFailure(erro: unknown): string {
+  if (erro instanceof AdminApiError) {
+    if (erro.status === 401) {
+      return "Sua sessão expirou. Entre de novo.";
+    }
+    if (erro.status === 403) {
+      return "Sua conta não tem permissão para esta operação.";
+    }
+    return erro.message;
+  }
+  return "Não foi possível falar com a admin-api. Verifique se ela está no ar.";
+}

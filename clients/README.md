@@ -1,7 +1,21 @@
 # Os clientes
 
-Esta pasta guarda os fronts que falam com as APIs de [`services/`](../services/). Está aqui vazia de
-propósito no commit que criou o layout: o primeiro cliente, o portal do assinante, entra a seguir.
+Esta pasta guarda os fronts que falam com as APIs de [`services/`](../services/). São dois:
+
+| Cliente | Para quem | Com quem fala | Porta |
+|---|---|---|---|
+| [`portal-codeflix/`](portal-codeflix/) | quem assina e assiste | `subscription-api` e `videos-api` | 3000 |
+| [`back-office-codeflix/`](back-office-codeflix/) | quem administra o catálogo | `admin-api` | 3001 |
+
+Os dois entram pelo **mesmo** client do Keycloak, o `front-codeflix`. Ele é "por onde uma pessoa
+entra"; quem separa o que cada um pode é o **papel** no token — `CODEFLIX_ACCOUNT` e
+`CODEFLIX_SUBSCRIBER` de um lado, `CODEFLIX_ADMIN` do outro. Um client por front exigiria manter duas
+listas de `redirectUris` sem ganhar controle algum, já que os dois são públicos.
+
+Cadeias de ferramenta diferentes, de propósito: o portal é Next (renderiza no servidor, e isso
+importa para quem chega pelo Google), o back-office é Vite (não renderiza nada no servidor, porque
+tudo atrás dele exige login). Os dois expõem o mesmo `npm run check`, e é só isso que o CI precisa
+saber.
 
 ## Por que separado de services/
 

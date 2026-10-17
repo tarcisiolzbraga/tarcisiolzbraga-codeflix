@@ -16,6 +16,12 @@ import org.testcontainers.utility.DockerImageName;
 // com um token forjado. O realm é lido do arquivo versionado, então teste e desenvolvimento não
 // podem divergir nas roles nem no nome do client.
 //
+// Os dois marcadores do arquivo versionado — o segredo dos clients e a senha do
+// `operador-de-teste` — são trocados aqui por valores fixos de teste. O do operador não é usado
+// por teste nenhum (aquele usuário existe para entrar no back-office pelo browser), mas deixar o
+// marcador sem trocar gravaria o texto dele como senha, e o realm dos testes passaria a diferir
+// do realm do compose de um jeito invisível.
+//
 // O container sobe uma vez e é reaproveitado entre as classes pelo cache de contexto do Spring.
 @TestConfiguration(proxyBeanMethods = false)
 public class KeycloakContainerConfiguration {
@@ -27,6 +33,8 @@ public class KeycloakContainerConfiguration {
     private static final String CLIENT_ID = "admin-codeflix";
     private static final String CLIENT_SECRET = "segredo-de-teste";
     private static final String SECRET_PLACEHOLDER = "__KEYCLOAK_CLIENT_SECRET__";
+    private static final String OPERATOR_PASSWORD_PLACEHOLDER = "__OPERATOR_TEST_PASSWORD__";
+    private static final String OPERATOR_PASSWORD = "operador-de-teste";
 
     // Estático e fora do ciclo de vida do Spring: como bean, subiria um Keycloak por contexto.
     private static final GenericContainer<?> CONTAINER = startedContainer();
@@ -63,7 +71,9 @@ public class KeycloakContainerConfiguration {
     private static String realmDefinition() {
         final var path = Path.of(System.getProperty("codeflix.rootDir"), "..", "..", "provisioning", "keycloak", "realm.json");
         try {
-            return Files.readString(path).replace(SECRET_PLACEHOLDER, CLIENT_SECRET);
+            return Files.readString(path)
+                    .replace(SECRET_PLACEHOLDER, CLIENT_SECRET)
+                    .replace(OPERATOR_PASSWORD_PLACEHOLDER, OPERATOR_PASSWORD);
         } catch (final IOException exception) {
             throw new UncheckedIOException("could not read the realm at " + path, exception);
         }

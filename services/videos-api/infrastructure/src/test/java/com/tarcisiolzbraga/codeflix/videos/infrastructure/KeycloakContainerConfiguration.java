@@ -22,7 +22,10 @@ import org.testcontainers.utility.DockerImageName;
 // possível.
 //
 // O segredo dos clients vem com um marcador no arquivo versionado, do mesmo jeito que o compose
-// encontra; aqui a troca é por um valor fixo de teste.
+// encontra; aqui a troca é por um valor fixo de teste. O mesmo vale para a senha do
+// `operador-de-teste`: nenhum teste Java usa aquele usuário — ele existe para entrar no
+// back-office pelo browser —, mas deixar o marcador sem trocar gravaria o texto dele como senha,
+// e o realm dos testes passaria a diferir do realm do compose de um jeito invisível.
 //
 // Estático e fora do ciclo de vida do Spring, como os outros containers: um Keycloak por contexto
 // não se paga.
@@ -33,6 +36,8 @@ public class KeycloakContainerConfiguration {
     private static final int HTTP_PORT = 8080;
     private static final String REALM = "codeflix";
     private static final String SECRET_PLACEHOLDER = "__KEYCLOAK_CLIENT_SECRET__";
+    private static final String OPERATOR_PASSWORD_PLACEHOLDER = "__OPERATOR_TEST_PASSWORD__";
+    private static final String OPERATOR_PASSWORD = "operador-de-teste";
 
     private static final GenericContainer<?> CONTAINER = startedContainer();
 
@@ -65,7 +70,9 @@ public class KeycloakContainerConfiguration {
     private static String realmDefinition() {
         final var path = Path.of(System.getProperty("codeflix.rootDir"), "..", "..", "provisioning", "keycloak", "realm.json");
         try {
-            return Files.readString(path).replace(SECRET_PLACEHOLDER, KeycloakTestToken.SECRET);
+            return Files.readString(path)
+                    .replace(SECRET_PLACEHOLDER, KeycloakTestToken.SECRET)
+                    .replace(OPERATOR_PASSWORD_PLACEHOLDER, OPERATOR_PASSWORD);
         } catch (final IOException exception) {
             throw new UncheckedIOException("could not read the realm at " + path, exception);
         }
