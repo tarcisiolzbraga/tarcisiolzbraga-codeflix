@@ -449,6 +449,54 @@
           ]
         },
         {
+          "name": "Recusa descrição acima do limite",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "categories"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Descrição longa\",\n  \"description\": \"{{descricaoLonga}}\"\n}"
+            },
+            "description": "O teto da descrição é 4000, o mesmo da coluna. Este caso respondia **500**: a descrição passava pelo domínio e quebrava no banco, e erro de integridade não está mapeado. Agora o domínio recusa, e a resposta é 422 com a mensagem."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"descricaoLonga\", \"a\".repeat(4001));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 422, e não 500\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"explica o limite da descrição\", () => pm.expect(pm.response.json().errors)",
+                  "    .to.include(\"'description' must be at most 4000 characters\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Busca id inexistente",
           "request": {
             "method": "GET",
