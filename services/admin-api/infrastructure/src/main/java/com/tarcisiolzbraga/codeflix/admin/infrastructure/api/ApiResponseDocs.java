@@ -4,6 +4,12 @@ package com.tarcisiolzbraga.codeflix.admin.infrastructure.api;
 public final class ApiResponseDocs {
 
     public static final String OK = "200";
+
+    // Só a rota de mídia usa estes dois, e por causa do cabeçalho Range: 206 quando devolve um
+    // trecho, 416 quando o trecho pedido não existe no arquivo.
+    public static final String PARTIAL_CONTENT = "206";
+
+    public static final String RANGE_NOT_SATISFIABLE = "416";
     public static final String CREATED = "201";
     public static final String NO_CONTENT = "204";
     public static final String NOT_FOUND = "404";

@@ -29,7 +29,10 @@ import com.tarcisiolzbraga.codeflix.admin.application.video.delete.DeleteVideoUs
 import com.tarcisiolzbraga.codeflix.admin.application.video.get.GetVideoByIdUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.list.ListVideosUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.list.VideoListOutput;
+import com.tarcisiolzbraga.codeflix.admin.application.video.media.get.GetMediaSliceUseCase;
 import com.tarcisiolzbraga.codeflix.admin.application.video.media.get.GetMediaUseCase;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.storage.RangeNotSatisfiableException;
+import com.tarcisiolzbraga.codeflix.admin.application.video.media.get.MediaSliceOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.video.media.get.MediaOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.video.media.upload.UploadMediaOutput;
 import com.tarcisiolzbraga.codeflix.admin.application.video.media.upload.UploadMediaUseCase;
@@ -53,6 +56,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.mock.web.MockMultipartFile;
@@ -116,6 +120,9 @@ class VideoControllerTest {
 
     @MockitoBean
     private GetMediaUseCase getMediaUseCase;
+
+    @MockitoBean
+    private GetMediaSliceUseCase getMediaSliceUseCase;
 
     @Test
     void givenValidBody_whenCallCreate_thenReturn201WithLocation() throws Exception {
@@ -313,6 +320,49 @@ class VideoControllerTest {
                         .value("Media VIDEO of Video with ID %s was not found".formatted(EXPECTED_ID)));
     }
 
+    // Com `Range`, a resposta é outra: 206 e só o trecho. É o que permite a um player buscar na linha
+    // de tempo sem baixar o arquivo inteiro.
+    @Test
+    void givenARangeHeader_whenCallGetMedia_thenReturnPartialContentWithTheContentRange() throws Exception {
+        when(getMediaSliceUseCase.execute(any()))
+                .thenReturn(new MediaSliceOutput("conte".getBytes(), "video/mp4", "duna.mp4", "bytes 0-4/8"));
+
+        final var response = this.mockMvc.perform(
+                get(VIDEOS_PATH + "/" + EXPECTED_ID + "/medias/VIDEO").header(HttpHeaders.RANGE, "bytes=0-4"));
+
+        response.andExpect(status().isPartialContent())
+                .andExpect(header().string(HttpHeaders.CONTENT_RANGE, "bytes 0-4/8"))
+                .andExpect(header().string(HttpHeaders.ACCEPT_RANGES, "bytes"))
+                .andExpect(content().bytes("conte".getBytes()));
+        // O cabeçalho vai ao caso de uso **como veio**: ninguém no caminho interpreta o intervalo.
+        verify(getMediaSliceUseCase).execute(argThat(command -> "bytes=0-4".equals(command.range())));
+    }
+
+    // `Accept-Ranges` também na resposta inteira: é por ele que o player descobre que pode pedir
+    // trecho. Sem o cabeçalho, o browser baixa tudo mesmo que a rota saiba servir partes.
+    @Test
+    void givenNoRangeHeader_whenCallGetMedia_thenStillAnnounceThatRangesAreAccepted() throws Exception {
+        when(getMediaUseCase.execute(any()))
+                .thenReturn(new MediaOutput("conteudo".getBytes(), "video/mp4", "duna.mp4"));
+
+        final var response = this.mockMvc.perform(get(VIDEOS_PATH + "/" + EXPECTED_ID + "/medias/VIDEO"));
+
+        response.andExpect(status().isOk()).andExpect(header().string(HttpHeaders.ACCEPT_RANGES, "bytes"));
+    }
+
+    // Trecho que o arquivo não tem é 416, e não 404: o arquivo está lá.
+    @Test
+    void givenARangeTheFileDoesNotHave_whenCallGetMedia_thenReturn416() throws Exception {
+        when(getMediaSliceUseCase.execute(any()))
+                .thenThrow(new RangeNotSatisfiableException("bytes=5000-6000", new IllegalStateException("416")));
+
+        final var response = this.mockMvc.perform(
+                get(VIDEOS_PATH + "/" + EXPECTED_ID + "/medias/VIDEO").header(HttpHeaders.RANGE, "bytes=5000-6000"));
+
+        response.andExpect(status().isRequestedRangeNotSatisfiable())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("bytes=5000-6000")));
+    }
+
     @TestConfiguration
     static class UseCaseGroups {
 
@@ -338,8 +388,11 @@ class VideoControllerTest {
         }
 
         @Bean
-        VideoMediaUseCases videoMediaUseCases(final UploadMediaUseCase upload, final GetMediaUseCase getMedia) {
-            return new VideoMediaUseCases(upload, getMedia);
+        VideoMediaUseCases videoMediaUseCases(
+                final UploadMediaUseCase upload,
+                final GetMediaUseCase getMedia,
+                final GetMediaSliceUseCase getMediaSlice) {
+            return new VideoMediaUseCases(upload, getMedia, getMediaSlice);
         }
     }
 

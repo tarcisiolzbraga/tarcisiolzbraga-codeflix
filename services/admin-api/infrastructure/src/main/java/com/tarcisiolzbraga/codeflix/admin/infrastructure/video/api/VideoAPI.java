@@ -6,6 +6,8 @@ import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseD
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.NOT_FOUND_DESCRIPTION;
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.NO_CONTENT;
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.OK;
+import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.PARTIAL_CONTENT;
+import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.RANGE_NOT_SATISFIABLE;
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.UNPROCESSABLE;
 import static com.tarcisiolzbraga.codeflix.admin.infrastructure.api.ApiResponseDocs.UNPROCESSABLE_DESCRIPTION;
 
@@ -29,6 +31,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,6 +41,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.multipart.MultipartFile;
@@ -143,16 +147,26 @@ public interface VideoAPI {
             @Parameter(description = MEDIA_TYPE_DESCRIPTION) @PathVariable("type") VideoMediaType type,
             @RequestParam("file") MultipartFile file);
 
+    String RANGE_DESCRIPTION =
+            "O trecho pedido, no formato HTTP: `bytes=0-1023`. Ausente devolve o arquivo inteiro, com 200.";
+
     @GetMapping("/{id}/medias/{type}")
     @Operation(
             summary = "Baixa um arquivo de mídia do vídeo",
-            description = "Responde com o arquivo, o tipo de conteúdo original e o nome com que foi enviado.")
+            description = "Responde com o arquivo, o tipo de conteúdo original e o nome com que foi enviado. "
+                    + "Aceita `Range`: com ele, responde 206 e só o trecho pedido, que é o que permite a um "
+                    + "player buscar na linha de tempo sem baixar o arquivo inteiro.")
     @ApiResponse(responseCode = OK, description = "Arquivo encontrado")
+    @ApiResponse(responseCode = PARTIAL_CONTENT, description = "O trecho pedido no cabeçalho Range")
     @ApiResponse(responseCode = NOT_FOUND, description = "Nenhum arquivo desse tipo para o vídeo informado",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(responseCode = RANGE_NOT_SATISFIABLE, description = "O trecho pedido não existe no arquivo",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     ResponseEntity<byte[]> getMedia(
             @Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id,
-            @Parameter(description = MEDIA_TYPE_DESCRIPTION) @PathVariable("type") VideoMediaType type);
+            @Parameter(description = MEDIA_TYPE_DESCRIPTION) @PathVariable("type") VideoMediaType type,
+            @Parameter(description = RANGE_DESCRIPTION) @RequestHeader(value = HttpHeaders.RANGE, required = false)
+                    String range);
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
