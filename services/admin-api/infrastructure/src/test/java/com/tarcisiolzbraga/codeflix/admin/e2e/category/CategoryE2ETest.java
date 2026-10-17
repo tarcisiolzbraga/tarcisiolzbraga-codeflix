@@ -149,6 +149,22 @@ class CategoryE2ETest implements CategoryE2EDsl, GenreE2EDsl {
         assertEquals(0, listCategories(0, 10).total());
     }
 
+    // Este caso respondia 500: a descricao passava pelo dominio e quebrava na coluna, e erro de
+    // integridade nao esta mapeado no GlobalExceptionHandler. O conserto foi o dominio passar a
+    // validar o campo, como o VideoValidator ja fazia com a descricao do video.
+    @Test
+    void givenADescriptionLongerThanTheColumn_whenCreate_thenReturnUnprocessableContentWithTheErrors() {
+        final var request = new CreateCategoryRequest(EXPECTED_NAME, "a".repeat(4001), null);
+
+        final var actualException =
+                assertThrows(HttpClientErrorException.class, () -> createACategory(request));
+
+        assertEquals(HttpStatus.UNPROCESSABLE_CONTENT, actualException.getStatusCode());
+        final var actualError = actualException.getResponseBodyAs(ApiError.class);
+        assertEquals("'description' must be at most 4000 characters", actualError.errors().getFirst());
+        assertEquals(0, listCategories(0, 10).total());
+    }
+
     @Test
     void givenABodyWithoutTheActiveField_whenCreate_thenTheCategoryIsBornActive() {
         final var request = new CreateCategoryRequest(EXPECTED_NAME, EXPECTED_DESCRIPTION, null);

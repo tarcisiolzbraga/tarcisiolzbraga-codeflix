@@ -78,6 +78,36 @@ describe("adminFetch", () => {
     expect((erro as AdminApiError).message).toBe("sem permissão");
   });
 
+  // O `ApiError` da admin-api manda a lista inteira em `errors`; `message` é só a primeira.
+  it("givenVariasFalhasDeValidacao_whenChama_thenTodasChegam", async () => {
+    respondeCom(
+      {
+        message: "'name' should not be empty",
+        errors: ["'name' should not be empty", "'description' is too long"],
+      },
+      { status: 422 },
+    );
+
+    const erro = (await adminFetch("/categories", "abc.123", {
+      method: "POST",
+      body: {},
+      fallback: "falhou",
+    }).catch((e: unknown) => e)) as AdminApiError;
+
+    expect(erro.message).toBe("'name' should not be empty");
+    expect(erro.errors).toEqual(["'name' should not be empty", "'description' is too long"]);
+  });
+
+  it("givenErroSemListaDeErros_whenChama_thenAListaFicaVazia", async () => {
+    respondeCom({ message: "Category with ID 123 was not found" }, { status: 404 });
+
+    const erro = (await adminFetch("/categories/123", "abc.123", { fallback: "falhou" }).catch(
+      (e: unknown) => e,
+    )) as AdminApiError;
+
+    expect(erro.errors).toEqual([]);
+  });
+
   it("givenMensagemEmBranco_whenChama_thenUsaAMensagemReserva", async () => {
     respondeCom({ message: "   " }, { status: 500 });
 

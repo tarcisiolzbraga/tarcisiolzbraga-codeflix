@@ -4,24 +4,35 @@ import { ADMIN_API } from "@/shared/config";
 // espaço depois de "Bearer" dá 401 sem explicação, e ler o corpo de erro sem `try` derruba o
 // tratamento de erro dentro do próprio tratamento de erro.
 export class AdminApiError extends Error {
-  // Campo declarado e atribuído à mão, e não propriedade no parâmetro do construtor: o tsconfig do
-  // Vite liga `erasableSyntaxOnly`, que proíbe a sintaxe que só o TypeScript tem — o código tem de
-  // continuar válido depois de apagados os tipos.
+  // Campos declarados e atribuídos à mão, e não propriedades no parâmetro do construtor: o tsconfig
+  // do Vite liga `erasableSyntaxOnly`, que proíbe a sintaxe que só o TypeScript tem — o código tem
+  // de continuar válido depois de apagados os tipos.
   readonly status: number;
 
-  constructor(status: number, message: string) {
+  // O `ApiError` da admin-api tem **dois** campos: `message`, que é a primeira mensagem, e `errors`,
+  // que é a lista inteira. Um formulário com nome curto e descrição longa recebe duas mensagens, e
+  // mostrar só a primeira esconderia a segunda — a pessoa corrigiria uma coisa e levaria o mesmo
+  // 422 de volta.
+  readonly errors: string[];
+
+  constructor(status: number, message: string, errors: string[] = []) {
     super(message);
     this.name = "AdminApiError";
     this.status = status;
+    this.errors = errors;
   }
 }
 
-async function messageOf(response: Response, fallback: string): Promise<string> {
+async function failureOf(response: Response, fallback: string): Promise<AdminApiError> {
   try {
-    const body = (await response.json()) as { message?: string };
-    return body.message?.trim() || fallback;
+    const body = (await response.json()) as { message?: string; errors?: unknown };
+    const errors = Array.isArray(body.errors)
+      ? body.errors.filter((erro): erro is string => typeof erro === "string")
+      : [];
+    return new AdminApiError(response.status, body.message?.trim() || fallback, errors);
   } catch {
-    return fallback;
+    // Corpo vazio ou que não é JSON: é o 403 do Spring Security, e o 502 de um proxy.
+    return new AdminApiError(response.status, fallback);
   }
 }
 
@@ -41,7 +52,7 @@ export async function adminFetch<T>(
   });
 
   if (!response.ok) {
-    throw new AdminApiError(response.status, await messageOf(response, init.fallback));
+    throw await failureOf(response, init.fallback);
   }
 
   // 204 não tem corpo, e tentar ler JSON dele estoura.

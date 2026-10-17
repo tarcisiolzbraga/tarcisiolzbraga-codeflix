@@ -114,6 +114,37 @@ class CategoryTest {
     }
 
     @Test
+    void givenDescriptionLongerThan4000Chars_whenCallValidate_thenThrowDomainException() {
+        final var actualCategory = Category.newCategory(EXPECTED_NAME, "a".repeat(4001), true);
+
+        final var actualException = assertThrows(
+                DomainException.class, () -> actualCategory.validate(new ThrowsValidationHandler()));
+
+        assertEquals("'description' must be at most 4000 characters", actualException.getMessage());
+    }
+
+    @Test
+    void givenDescriptionWithExactly4000Chars_whenCallValidate_thenHaveNoErrors() {
+        final var category = Category.newCategory(EXPECTED_NAME, "a".repeat(4000), true);
+        final var notification = Notification.create();
+
+        category.validate(notification);
+
+        assertTrue(notification.getErrors().isEmpty());
+    }
+
+    // O espaco das bordas nao conta, como no nome: a coluna recebe o texto aparado.
+    @Test
+    void givenDescriptionWith4000CharsPlusSpaces_whenCallValidate_thenHaveNoErrors() {
+        final var category = Category.newCategory(EXPECTED_NAME, "  " + "a".repeat(4000) + "  ", true);
+        final var notification = Notification.create();
+
+        category.validate(notification);
+
+        assertTrue(notification.getErrors().isEmpty());
+    }
+
+    @Test
     void givenBlankDescription_whenCallValidate_thenHaveNoErrors() {
         final var category = Category.newCategory(EXPECTED_NAME, "   ", true);
         final var notification = Notification.create();

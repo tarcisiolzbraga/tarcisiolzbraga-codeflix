@@ -16,6 +16,16 @@ describe("explainFailure", () => {
     );
   });
 
+  // O 409 tem remédio, e a frase da API o diz em inglês. Aqui ela é traduzida porque o caso é
+  // conhecido e a ação é uma só: desativar.
+  it("given409_whenExplicado_thenMandaDesativar", () => {
+    const daApi = "Category with ID 123 is linked to at least one Genre; deactivate it instead";
+
+    expect(explainFailure(new AdminApiError(409, daApi))).toBe(
+      "Este registro está em uso por outro do catálogo. Desative-o em vez de remover.",
+    );
+  });
+
   // A admin-api diz o que está errado na validação; repetir a mensagem dela é melhor que inventar.
   it("givenErroComMensagemDaApi_whenExplicado_thenRepeteAMensagem", () => {
     expect(explainFailure(new AdminApiError(422, "Parâmetro 'dir' inválido"))).toBe(

@@ -90,7 +90,11 @@ acontecendo.
 O papel exigido é `CODEFLIX_ADMIN`, e não os por agregado (`CODEFLIX_CATEGORIES` e companhia): o
 painel administra os quatro.
 
-## A lista de categorias
+## As categorias
+
+O CRUD completo: listar, criar, editar, ativar, desativar e remover.
+
+### A lista
 
 Paginação **e** ordenação no servidor, pelos mesmos parâmetros do `CategorySearchRequest` da
 `admin-api` (`search`, `page`, `perPage`, `sort`, `dir`). Não é preferência: nenhuma rota de
@@ -113,10 +117,68 @@ O cliente de consultas **não repete 4xx**. O padrão do TanStack é três tenta
 vira três chamadas e segundos de espera antes de a pessoa ler "sem permissão", quando a primeira
 resposta já disse tudo.
 
+### Desativar não é remover, e a tela trata os dois diferente
+
+| Ação | Pergunta antes? | Por quê |
+|---|---|---|
+| ativar / desativar | não | é reversível no mesmo botão |
+| remover | **sim** | não há como desfazer |
+
+E o caso que o monorepo decidiu desde o banco: **categoria referenciada não se apaga, se desativa**.
+Nenhuma foreign key tem `ON DELETE CASCADE`, e a `admin-api` responde **409** quando a categoria está
+em um gênero ou vídeo. A frase dela é em inglês (`is linked to at least one Genre; deactivate it
+instead`), e aqui ela é traduzida — é um caso conhecido com uma ação só. Mensagem de **validação**
+continua vindo como a API escreveu: lá a regra é dela, aqui o remédio é nosso.
+
+### O interruptor de situação só aparece na criação
+
+No `UpdateCategoryRequest` da `admin-api` o campo `active` **não existe**: ativar e desativar têm
+rotas próprias. Mostrar o interruptor na edição prometeria uma mudança que a chamada não levaria.
+
+A tela de edição carrega a categoria **pelo id**, em vez de reaproveitar a linha da tabela: a linha
+pode estar velha, e salvar por cima do que outra pessoa mudou é pior que uma ida à rede.
+
+### O formulário, e o que ele confere
+
+`react-hook-form` com `zod`, as mesmas da referência do curso — aqui nas versões de hoje (7.90 e 4.6,
+publicadas em outubro de 2026).
+
+Ele confere o nome (3 a 255, contados depois de aparar) e o teto da descrição (4000). São os limites
+do domínio, e repeti-los aqui não cria segunda fonte de verdade: cria um atalho para o caso comum,
+porque a mensagem que volta da API é em inglês e o painel é em português. Quando a regra mudar lá, o
+que chega é o 422, com a frase dela.
+
+**O 422 mostra a lista inteira.** O `ApiError` da `admin-api` tem dois campos — `message`, que é a
+primeira mensagem, e `errors`, que é todas. Um formulário com nome curto e descrição longa recebe
+duas, e mostrar só a primeira faria a pessoa corrigir uma coisa e levar o mesmo erro de volta.
+
+Descrição vazia vai como `null`, e não como string vazia: na coluna ela é anulável, e gravar `""`
+faria a listagem mostrar uma célula vazia que o filtro `like` ainda alcança.
+
+### O 500 que este trabalho encontrou na admin-api
+
+A descrição da categoria não tinha teto **no domínio** — só na coluna, `VARCHAR(4000)`. Uma descrição
+mais longa passava pela validação, quebrava no banco, e o erro de integridade não está mapeado no
+`GlobalExceptionHandler`: a API respondia **500**, com corpo sem explicação nenhuma. Medido contra a
+API de verdade antes de consertar.
+
+O conserto foi no lugar certo, o domínio, e não neste formulário: o `CategoryValidator` agora recusa
+o campo como o `VideoValidator` já fazia com a descrição do vídeo, e a resposta é 422. O corte no
+formulário continua, pelo mesmo motivo que o do nome — é atalho, não remendo.
+
+### O aviso de "salvo" e de "não deu"
+
+`Snackbar` do Material, atrás de um contexto de trinta linhas. A referência usa `notistack`, e a
+escolha aqui foi medida: a última publicação dele é de **janeiro de 2025**, e o que ele oferece além
+disto é empilhar vários avisos — num painel a pessoa faz uma ação por vez.
+
+O aviso de erro fica o dobro do tempo do de sucesso: ele costuma ser uma frase para ler, e o de
+sucesso é uma palavra para conferir de canto de olho.
+
 ## As escolhas de ferramenta, e onde elas divergem do curso
 
 A referência é o [FC3-admin-videos-react](https://github.com/devfullcycle/FC3-admin-videos-react). Ela
-informa, não decide — e aqui divergiu em quatro pontos, todos por idade do que ela usa:
+informa, não decide — e aqui divergiu em cinco pontos, todos por idade do que ela usa:
 
 | O que ela usa | O que está aqui | Por quê |
 |---|---|---|
@@ -124,6 +186,10 @@ informa, não decide — e aqui divergiu em quatro pontos, todos por idade do qu
 | `@reduxjs/toolkit` 1.8 (RTK Query) | TanStack Query 5 | não há estado global a guardar: é cache de servidor |
 | `@react-keycloak/web` 3.4 | `oidc-client-ts` + `react-oidc-context` | última publicação em **abril de 2022** |
 | Material 5 e DataGrid 5 | Material 7.3 e DataGrid 8.29 | duas e três versões maiores atrás |
+| `notistack` 3.0.2 | `Snackbar` do Material | parado desde janeiro de 2025, e empilhar avisos não é preciso aqui |
+
+O que **não** divergiu: `react-hook-form` com `zod` para o formulário. Os dois estão em dia (7.90 e
+4.6, de outubro de 2026), e a escolha dela continua certa.
 
 Material **7**, e não 9: o `@mui/x-data-grid` 8 não aceita Material 9 como par, e o DataGrid 9 só
 existe como *release candidate*. 7.3 com 8.29 é o par estável mais novo que existe hoje — medido, não
@@ -141,18 +207,17 @@ e um acesso a possível `null` falham a compilação.
 
 ## O que já existe, e o que não
 
-Existe: entrar, o guarda de administração, o layout com as quatro abas e a **lista** de categorias.
+Existe: entrar, o guarda de administração, o layout com as quatro abas, e **as categorias por
+inteiro** — listar, criar, editar, ativar, desativar e remover.
 
-Não existe ainda: criar, editar e desativar categoria, e os outros três agregados — as abas estão lá
-e dizem isso. Quando as telas de formulário entrarem, duas decisões ficam para aquele momento: a
-biblioteca de formulário (a referência usa `react-hook-form` com `zod`) e o aviso de sucesso e erro
-(ela usa `notistack`).
+Não existe ainda: gêneros, elenco e vídeos, com o envio de mídia. As abas estão lá e **dizem isso**,
+porque aba que abre página vazia parece defeito.
 
 ## O tamanho do pacote
 
 As telas entram por `lazy`: o DataGrid é o pedaço mais pesado, e ninguém precisa dele para ver a
-tela de entrar. Com isso o pacote de entrada caiu de 335 kB para **159 kB** comprimidos, e a tabela
-chega depois do login.
+tela de entrar. Com isso o pacote de entrada ficou em **82 kB** comprimidos — era 335 kB quando tudo
+vinha junto —, e a tabela chega depois do login.
 
 O aviso de tamanho do Vite está em 700 kB, e não nos 500 kB padrão: os dois pedaços são Material e
 DataGrid, que custam isto mesmo, e um aviso disparando em todo build treina a ignorar a saída. 700 kB
@@ -160,10 +225,20 @@ ainda grita se uma dependência nova entrar.
 
 ## Os testes
 
-`npm test` roda o Vitest com jsdom. São 49, e cada guarda tem o seu: que o assinante não entra, que
+`npm test` roda o Vitest com jsdom. São 88, e cada guarda tem o seu: que o assinante não entra, que
 a consulta espera o token, que `search` vazio não vai na URL, que 4xx não é repetido, que 401 e 403
-dizem coisas diferentes. Todos foram conferidos ao contrário — removendo o que eles guardam e vendo
+dizem coisas diferentes, que `active` não vai no corpo da atualização, que remover pergunta antes,
+que o 409 manda desativar. Todos foram conferidos ao contrário — removendo o que eles guardam e vendo
 cada um falhar.
+
+Um deles ficou **verde** nessa conferência, e vale registrar o que ensinou: estreitar o tipo do corpo
+da atualização (`Pick<CategoryDraft, "name" | "description">`) é documentação, não guarda — quem
+mantém o `active` fora da chamada é a tela de edição, que monta o objeto campo por campo. O teste
+passou a mirar nela.
+
+Os testes de tela usam o cliente de consultas **de produção**, e não um com `retry: false`: um dublê
+ali faria os testes passarem com uma política que ninguém usa. O preço é que falha de rede levaria as
+repetições em tempo real, e por isso aquele caso é testado no `queryClient.test.ts`, sem tela.
 
 O DataGrid precisa de altura medida para desenhar linha, e o jsdom dá zero a tudo; por isso o teste
 da tela finge `offsetHeight`. Sem isso a tabela existiria sem nenhuma célula, e o teste acusaria um
