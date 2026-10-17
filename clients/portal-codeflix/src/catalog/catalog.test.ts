@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CatalogRefused,
+  fetchSignedMediaUrl,
   CatalogUnavailable,
   fetchVideo,
   formatDuration,
@@ -130,5 +131,47 @@ describe("ratingLabel", () => {
     expect(ratingLabel("L")).toBe("Livre");
     expect(ratingLabel("14")).toBe("14 anos");
     expect(ratingLabel("ER")).toBe("Especialmente recomendado");
+  });
+});
+
+describe("fetchSignedMediaUrl", () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it("givenATokenAndAVideo_whenAsksForTheLink_thenCallsTheLinkRouteAndJoinsTheRelativePath", async () => {
+    // Given o catálogo emitindo o endereço assinado
+    const fetchSpy = respondWith({
+      path: "/videos/um-id/medias/VIDEO?expires=99&signature=selo",
+      expiresAt: "2026-10-16T12:05:00Z",
+    });
+
+    // When pede o endereço
+    const actual = await fetchSignedMediaUrl("um-id", "VIDEO", "um-token");
+
+    // Then chama a rota de link **com** o token, e junta o caminho relativo com a base — o caminho
+    // vem relativo porque quem sabe o host público do catálogo é quem publica o serviço
+    const [url, options] = fetchSpy.mock.calls[0]!;
+    expect(String(url)).toBe("http://localhost:8082/api/videos/um-id/medias/VIDEO/link");
+    expect(new Headers(options?.headers).get("Authorization")).toBe("Bearer um-token");
+    expect(actual?.url).toBe(
+      "http://localhost:8082/api/videos/um-id/medias/VIDEO?expires=99&signature=selo",
+    );
+  });
+
+  it("givenAVideoThatIsNotThere_whenAsksForTheLink_thenReturnsNull", async () => {
+    // Given o catálogo respondendo 404
+    respondWith(undefined, 404);
+
+    // When pede o endereço / Then volta null, e a tela diz que não há o que reproduzir
+    await expect(fetchSignedMediaUrl("um-id", "VIDEO", "um-token")).resolves.toBeNull();
+  });
+
+  it("givenTheCatalogRefusing_whenAsksForTheLink_thenFails", async () => {
+    // Given o catálogo recusando por falta de direito
+    respondWith(undefined, 403);
+
+    // When pede o endereço / Then estoura, e a tela mostra o recado
+    await expect(fetchSignedMediaUrl("um-id", "VIDEO", "um-token")).rejects.toBeInstanceOf(
+      CatalogUnavailable,
+    );
   });
 });

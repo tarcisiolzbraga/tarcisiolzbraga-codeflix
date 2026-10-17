@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "react-oidc-context";
+import { Player } from "@/catalog/Player";
 import {
   fetchVideo,
   formatDuration,
@@ -89,15 +90,10 @@ export function VideoScreen({ id }: { id: string }) {
 
       <p className="max-w-3xl text-neutral-300">{video.description}</p>
 
-      {/* **Não há player, e não é esquecimento.** O campo `video` do acervo guarda a localização no
-          armazenamento, não uma URL que o browser alcance; a única rota que serve o arquivo é a da
-          admin-api, e ela exige papel de administração. Servir mídia a assinante precisa de uma rota
-          na videos-api que hoje não existe — está escrito no README, com o que ela precisaria
-          decidir. Fingir um player aqui esconderia essa lacuna. */}
-      <p className="rounded-lg border border-neutral-800 bg-neutral-900 p-4 text-sm text-neutral-400">
-        A reprodução ainda não está disponível: o acervo publica os dados do título, mas servir o
-        arquivo a quem assina depende de uma rota que a <code>videos-api</code> ainda não tem.
-      </p>
+      {/* O player veio depois do resto desta tela: a rota de mídia do catálogo não existia, e a
+          página dizia isso em vez de fingir. Agora existe, e com as limitações que o README registra
+          — arquivo baixado por inteiro, sem busca na linha de tempo. */}
+      <Player videoId={video.id} />
 
       <Facts label="Gêneros" values={video.genres.map((it) => it.name)} />
       <Facts label="Categorias" values={video.categories.map((it) => it.name)} />
