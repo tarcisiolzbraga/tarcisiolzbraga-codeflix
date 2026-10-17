@@ -108,6 +108,41 @@ export async function fetchVideo(id: string, token: string): Promise<Video | nul
   return data.video;
 }
 
+// O endereço **assinado** da mídia, pedido no clique.
+//
+// Existe porque `<video src>` não carrega cabeçalho de `Authorization`: o browser busca o `src` por
+// conta própria, sem token. O catálogo emite um caminho com validade e assinatura depois de conferir
+// quem está pedindo, e o player aponta para ele — reprodução progressiva, sem baixar o arquivo antes.
+//
+// A primeira versão desta tela fazia o contrário: baixava os bytes com `fetch` e tocava de um
+// endereço de objeto local. Funcionava, e custava a reprodução progressiva e a busca na linha de
+// tempo.
+export type SignedMedia = { url: string; expiresAt: string };
+
+export async function fetchSignedMediaUrl(
+  id: string,
+  type: "VIDEO" | "TRAILER" | "BANNER" | "THUMBNAIL",
+  token: string,
+): Promise<SignedMedia | null> {
+  const response = await fetch(`${CATALOG_API}/api/videos/${id}/medias/${type}/link`, {
+    headers: { Accept: "application/json", ...bearer(token) },
+  });
+
+  // 404 aqui seria vídeo inexistente; a ausência de **arquivo** só aparece ao buscar a mídia, e a
+  // tela trata os dois como "não tem o que reproduzir".
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new CatalogUnavailable(response.status);
+  }
+
+  const body = (await response.json()) as { path: string; expiresAt: string };
+  // O caminho vem **relativo** de propósito: quem sabe o host público do catálogo é quem publica o
+  // serviço, não ele. Quem junta é o cliente, que já conhece a base para falar com a API.
+  return { url: `${CATALOG_API}/api${body.path}`, expiresAt: body.expiresAt };
+}
+
 // A duração vem em minutos, como ponto flutuante. "1h 47min" é o que se lê numa tela de catálogo;
 // "107.0" não é.
 export function formatDuration(minutes: number): string {

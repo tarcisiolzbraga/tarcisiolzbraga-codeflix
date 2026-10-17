@@ -1,9 +1,12 @@
 package com.tarcisiolzbraga.codeflix.videos.infrastructure.video;
 
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.video.models.VideoDTO;
+import com.tarcisiolzbraga.codeflix.videos.infrastructure.video.models.VideoMediaFile;
 import java.util.Objects;
 import java.util.Optional;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -11,6 +14,9 @@ import org.springframework.web.client.RestClient;
 public class VideoRestClient implements VideoClient {
 
     private static final String BY_ID = "/videos/{id}";
+
+    // O mesmo caminho da rota do admin: o catálogo repassa, não reinventa o endereço.
+    private static final String MEDIA = "/videos/{id}/medias/{type}";
 
     private final RestClient restClient;
 
@@ -35,5 +41,36 @@ public class VideoRestClient implements VideoClient {
                     }
                     return Optional.ofNullable(response.bodyTo(VideoDTO.class));
                 });
+    }
+
+    // Repassa o arquivo que o admin guarda. **Esta chamada vai autenticada como o próprio catálogo**,
+    // pelo interceptor de client credentials do adminRestClient: é o service account dele que tem o
+    // papel de vídeos no admin. Quem autoriza o assinante é o controller, antes de chegar aqui.
+    @Override
+    public Optional<VideoMediaFile> mediaOf(final String id, final String type) {
+        return this.restClient.get().uri(MEDIA, id, type).exchange((request, response) -> {
+            if (response.getStatusCode() == HttpStatus.NOT_FOUND) {
+                return Optional.<VideoMediaFile>empty();
+            }
+            // Igual ao videoOfId: 5xx é falha temporária e vira exceção, não "não existe".
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                throw new IllegalStateException("admin-codeflix respondeu %s para a mídia %s de %s"
+                        .formatted(response.getStatusCode(), type, id));
+            }
+            final var headers = response.getHeaders();
+            return Optional.of(new VideoMediaFile(
+                    headers.getContentType() == null
+                            ? MediaType.APPLICATION_OCTET_STREAM_VALUE
+                            : headers.getContentType().toString(),
+                    filenameOf(headers),
+                    response.bodyTo(byte[].class)));
+        });
+    }
+
+    // O nome com que o arquivo foi enviado, que o admin manda no Content-Disposition. Sem ele o
+    // download sai com o nome da rota, que não diz nada a quem salvou o arquivo.
+    private static String filenameOf(final HttpHeaders headers) {
+        final var filename = headers.getContentDisposition().getFilename();
+        return filename == null || filename.isBlank() ? "media" : filename;
     }
 }

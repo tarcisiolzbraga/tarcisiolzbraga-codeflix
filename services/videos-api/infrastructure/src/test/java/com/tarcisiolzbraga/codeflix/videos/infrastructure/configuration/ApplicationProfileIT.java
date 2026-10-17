@@ -28,11 +28,16 @@ class ApplicationProfileIT {
             "KEYCLOAK_TOKEN_URI=http://localhost:8081/realms/codeflix/protocol/openid-connect/token";
     private static final String CLIENT_SECRET = "KEYCLOAK_CLIENT_SECRET=segredo-de-teste";
 
+    // O segredo que assina o endereço da mídia. Sem padrão fora do development, de propósito — e é
+    // por isso que ele precisa entrar aqui: este teste sobe os três perfis, e em homolog e produção o
+    // serviço **não deve** subir sem ele. A falha que trouxe esta linha foi justamente essa.
+    private static final String MEDIA_SECRET = "media.signing-secret=um-segredo-de-teste";
+
     private static final String INTROSPECTION = "{ __schema { queryType { name } } }";
 
     @Nested
     @IntegrationTest
-    @TestPropertySource(properties = {ADMIN_API, TOKEN_URI, CLIENT_SECRET})
+    @TestPropertySource(properties = {ADMIN_API, TOKEN_URI, CLIENT_SECRET, MEDIA_SECRET})
     class Development {
 
         @Autowired
@@ -63,7 +68,7 @@ class ApplicationProfileIT {
     @Nested
     @IntegrationTest
     @ActiveProfiles("homolog")
-    @TestPropertySource(properties = {ADMIN_API, TOKEN_URI, CLIENT_SECRET})
+    @TestPropertySource(properties = {ADMIN_API, TOKEN_URI, CLIENT_SECRET, MEDIA_SECRET})
     class Homolog {
 
         @Autowired
@@ -87,7 +92,7 @@ class ApplicationProfileIT {
     @IntegrationTest
     @AutoConfigureGraphQlTester
     @ActiveProfiles("production")
-    @TestPropertySource(properties = {ADMIN_API, TOKEN_URI, CLIENT_SECRET})
+    @TestPropertySource(properties = {ADMIN_API, TOKEN_URI, CLIENT_SECRET, MEDIA_SECRET})
     class Production {
 
         @Autowired

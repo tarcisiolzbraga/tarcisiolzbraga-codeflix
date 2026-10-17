@@ -103,7 +103,88 @@ browser deixar o front **ler** a resposta.
 A decisão, e por que o `localhost` está na homologação e não na produção, está no
 [README da raiz](../../README.md#o-front-e-o-cors): vale igual nos três serviços.
 
-### Perfis
+### A mídia de quem assina
+
+O acervo tem **duas rotas REST**, as únicas do serviço:
+
+| Rota | Quem passa |
+|---|---|
+| `GET /videos/{id}/medias/{type}/link` | papel de assinante ou de admin — ou qualquer pessoa logada, se o título for aberto |
+| `GET /videos/{id}/medias/{type}` | a **assinatura** emitida pela rota de cima, ou o mesmo direito dela |
+
+Elas existem porque nenhum assinante tinha como reproduzir nada: os campos de mídia do documento
+guardam a **localização no armazenamento**, não uma URL que o browser alcance, e a única rota que
+devolvia o arquivo era a da `admin-api`, que exige papel de administração.
+
+### Por que endereço assinado
+
+**`<video src>` não carrega cabeçalho de `Authorization`.** O browser busca o `src` por conta
+própria, sem token — então uma rota que só aceita `Bearer` obriga o front a baixar o arquivo inteiro
+por `fetch` antes de tocar, que foi a primeira versão disto e custava a reprodução progressiva.
+
+A assinatura **não é um token**: é HMAC-SHA256 sobre vídeo + tipo + validade, e não concede nada além
+daquele arquivo por **cinco minutos**. Quem a emite é a rota de link, que confere direito antes — a
+autorização continua num lugar só.
+
+- a validade entra no que é assinado, então esticá-la na URL não funciona;
+- o selo de um vídeo não serve para outro, nem o de um tipo de mídia para outro;
+- a comparação é em tempo constante, para o tempo de resposta não revelar o selo byte a byte;
+- **o limite inerente**: URL copiada funciona até expirar. É o que a validade curta contém.
+
+O segredo vem de `CATALOG_MEDIA_SIGNING_SECRET`, sem valor padrão fora do `development` — segredo
+faltando derruba a subida, como no banco e no Keycloak.
+
+### O `opened` saiu da inércia
+
+O campo do vídeo que diz se o título é aberto a todos **passou a decidir acesso**, e era inerte até
+aqui. A regra tem duas portas, e elas precisam ser lidas juntas:
+
+1. **quem tem o papel do catálogo assiste.** Não é atalho: o papel é concedido e revogado pelos
+   eventos da assinatura, então exigi-lo **é** exigir assinatura viva;
+2. **quem não tem o papel assiste o que o título disser ser aberto — e precisa estar logado.**
+   Título aberto sem exigir identificação transformaria a rota numa superfície de banda sem limite de
+   taxa, que este serviço não tem.
+
+O `opened` é lido do índice do próprio catálogo, que é leitura barata: o documento já está lá.
+
+### O que ainda custa
+
+- **o arquivo passa inteiro pela memória** dos dois serviços: a rota do admin responde `byte[]`, e o
+  catálogo repassa sem melhorar isso;
+- **não há suporte a `Range`**, então não há busca na linha de tempo. Isso depende da admin-api
+  ganhar `Range`, ou de o catálogo ler o armazenamento direto — e aí seria preciso um cliente de S3
+  aqui, que hoje não existe.
+
+## Por que repasse, e não URL assinada
+
+| | Repasse pelo catálogo | URL assinada do Garage |
+|---|---|---|
+| onde se autoriza | **um lugar**: este controller | dois: aqui e na validade da URL |
+| o que precisa ser alcançável | nada novo | o Garage, de fora |
+| credencial nova | **nenhuma** (usa o service account que já existe) | chave de assinatura |
+| custo | o arquivo passa pela memória dos dois serviços | nenhum |
+
+Para um acervo de POC o repasse ganha. **Para arquivo grande não ganha**, e o README diz por quê
+logo abaixo.
+
+### O que isso custa, dito antes de alguém descobrir
+
+- **o arquivo passa inteiro pela memória** dos dois serviços: a rota do admin responde `byte[]`, e o
+  catálogo repassa sem melhorar isso;
+- **não há suporte a `Range`**, então não há busca na linha de tempo: o player reproduz do começo.
+
+O caminho para arquivo grande é URL assinada de validade curta, e aí a decisão de produto é outra.
+
+### Duas decisões em aberto
+
+- **o campo `opened`** do vídeo — que diz se o título é aberto a todos — **não é consultado**.
+  Honrá-lo significaria servir arquivo sem token, e isso é decisão de produto;
+- **a autorização olha o papel, e só.** Isso não é atalho: o papel de assinante é concedido e
+  revogado pelos eventos da assinatura, então exigi-lo **é** exigir assinatura viva. Se um dia a
+  regra precisar olhar a situação da assinatura diretamente, o catálogo passaria a depender da
+  subscription-api, que hoje ele não conhece.
+
+## Perfis
 
 Três perfis, como no `admin-codeflix`. Sem perfil ativo — `bootRun` e os testes — vale o
 **`development`**; nos outros ambientes o perfil vem de `SPRING_PROFILES_ACTIVE`.
