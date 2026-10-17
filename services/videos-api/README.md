@@ -147,13 +147,23 @@ aqui. A regra tem duas portas, e elas precisam ser lidas juntas:
 
 O `opened` é lido do índice do próprio catálogo, que é leitura barata: o documento já está lá.
 
+### O `Range` é repassado, e o status vem da resposta
+
+O player busca na linha de tempo, e isso funciona porque **ninguém no caminho interpreta o
+intervalo**: o cabeçalho vai como o cliente o mandou até o armazenamento, que fala `bytes=0-1023`
+nativamente e devolve o `Content-Range` já calculado, com o trecho servido e o tamanho total.
+
+O status sai **do que o admin devolveu**, e não da presença do cabeçalho no pedido: com
+`Content-Range` é 206, sem ele é 200. Decidir pelo pedido seria adivinhar — o admin pode ignorar um
+`Range` que não souber atender, e aí 206 com o arquivo inteiro enganaria o player.
+
+`Accept-Ranges: bytes` vai nas duas respostas: é por ele que o player descobre que pode pedir trecho.
+
 ### O que ainda custa
 
-- **o arquivo passa inteiro pela memória** dos dois serviços: a rota do admin responde `byte[]`, e o
-  catálogo repassa sem melhorar isso;
-- **não há suporte a `Range`**, então não há busca na linha de tempo. Isso depende da admin-api
-  ganhar `Range`, ou de o catálogo ler o armazenamento direto — e aí seria preciso um cliente de S3
-  aqui, que hoje não existe.
+**O arquivo passa pela memória dos dois serviços**: a rota do admin responde `byte[]`. Com `Range` o
+tamanho de cada resposta deixou de ser o do arquivo inteiro, o que torna o custo proporcional ao que
+o player pede — mas um trecho grande continua sendo um arranjo em memória nos dois lados.
 
 ## Por que repasse, e não URL assinada
 
