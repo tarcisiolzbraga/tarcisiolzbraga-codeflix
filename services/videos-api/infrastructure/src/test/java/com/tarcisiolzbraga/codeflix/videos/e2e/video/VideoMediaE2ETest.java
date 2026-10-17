@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tarcisiolzbraga.codeflix.videos.application.video.VideoOutput;
@@ -63,8 +64,8 @@ class VideoMediaE2ETest {
     @Test
     void givenTheSubscriberRole_whenAsksForTheMedia_thenServeItWithTheOriginalContentType() {
         // Given o admin tendo o arquivo
-        when(this.videoClient.mediaOf(any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT)));
+        when(this.videoClient.mediaOf(any(), any(), any()))
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT, null)));
 
         // When quem assina pede a mídia
         final var actual = clientWith(this.token.catalogTest())
@@ -84,8 +85,8 @@ class VideoMediaE2ETest {
     @Test
     void givenTheSubscriberRole_whenAsksForTheMedia_thenTheDispositionIsInlineWithTheOriginalName() {
         // Given o admin tendo o arquivo
-        when(this.videoClient.mediaOf(any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT)));
+        when(this.videoClient.mediaOf(any(), any(), any()))
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT, null)));
 
         // When pede a mídia
         final var actual = clientWith(this.token.catalogTest())
@@ -104,7 +105,7 @@ class VideoMediaE2ETest {
     @Test
     void givenAVideoWithoutThatMedia_whenAsksForIt_thenReturnNotFound() {
         // Given o admin sem aquele tipo de mídia
-        when(this.videoClient.mediaOf(any(), any())).thenReturn(Optional.empty());
+        when(this.videoClient.mediaOf(any(), any(), any())).thenReturn(Optional.empty());
 
         // When pede a mídia / Then é 404
         assertEquals(HttpStatus.NOT_FOUND, statusOf(this.token.catalogTest()));
@@ -130,8 +131,8 @@ class VideoMediaE2ETest {
     @Test
     void givenTheAdminRole_whenAsksForTheMedia_thenServeIt() {
         // Given o admin tendo o arquivo
-        when(this.videoClient.mediaOf(any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT)));
+        when(this.videoClient.mediaOf(any(), any(), any()))
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT, null)));
 
         // When o administrador pede / Then é servido
         assertEquals(HttpStatus.OK, statusOf(this.token.admin()));
@@ -160,8 +161,8 @@ class VideoMediaE2ETest {
     @Test
     void givenASignedPath_whenAsksForTheMediaWithoutAnyToken_thenServeIt() {
         // Given o admin tendo o arquivo, e um link assinado emitido a quem assina
-        when(this.videoClient.mediaOf(any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT)));
+        when(this.videoClient.mediaOf(any(), any(), any()))
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT, null)));
         final var link = clientWith(this.token.catalogTest())
                 .get()
                 .uri("/videos/{id}/medias/{type}/link", A_VIDEO, "VIDEO")
@@ -212,8 +213,8 @@ class VideoMediaE2ETest {
     void givenAnOpenTitleAndATokenWithoutTheRole_whenAsksForTheMedia_thenServeIt() {
         // Given um título marcado como aberto no catálogo
         when(this.getVideoUseCase.execute(any())).thenReturn(Optional.of(openTitle()));
-        when(this.videoClient.mediaOf(any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT)));
+        when(this.videoClient.mediaOf(any(), any(), any()))
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT, null)));
 
         // When alguém identificado e sem o papel pede / Then é servido
         assertEquals(HttpStatus.OK, statusOf(this.token.bearerOf(KeycloakTestToken.STRANGER)));
@@ -234,6 +235,65 @@ class VideoMediaE2ETest {
     }
 
     record LinkView(String path, Instant expiresAt) {}
+
+    // O repasse do `Range`: é o que permite ao player buscar na linha de tempo, e o que fez esta rota
+    // deixar de obrigar o browser a baixar o arquivo inteiro.
+    @Test
+    void givenARangeHeader_whenAsksForTheMedia_thenRelayTheRangeAndAnswerPartialContent() {
+        // Given o admin devolvendo um trecho, com o Content-Range que o armazenamento calculou
+        when(this.videoClient.mediaOf(any(), any(), any()))
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT, "bytes 0-9/100")));
+
+        // When o player pede um trecho
+        final var actual = clientWith(this.token.catalogTest())
+                .get()
+                .uri("/videos/{id}/medias/{type}", A_VIDEO, "VIDEO")
+                .header(HttpHeaders.RANGE, "bytes=0-9")
+                .retrieve()
+                .toEntity(byte[].class);
+
+        // Then a resposta é 206 com o intervalo, e o cabeçalho foi repassado **como veio**
+        assertEquals(HttpStatus.PARTIAL_CONTENT, actual.getStatusCode());
+        assertEquals("bytes 0-9/100", actual.getHeaders().getFirst(HttpHeaders.CONTENT_RANGE));
+        verify(this.videoClient).mediaOf(A_VIDEO, "VIDEO", "bytes=0-9");
+    }
+
+    // O status sai do que o admin devolveu, e não da presença do cabeçalho de pedido: o admin pode
+    // ignorar um Range que não souber atender, e aí 206 com o arquivo inteiro enganaria o player.
+    @Test
+    void givenARangeThatTheAdminIgnored_whenAsksForTheMedia_thenAnswerTwoHundredAndNotPartial() {
+        // Given o admin devolvendo o arquivo inteiro, sem Content-Range, apesar do pedido
+        when(this.videoClient.mediaOf(any(), any(), any()))
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT, null)));
+
+        // When o player pede um trecho
+        final var actual = clientWith(this.token.catalogTest())
+                .get()
+                .uri("/videos/{id}/medias/{type}", A_VIDEO, "VIDEO")
+                .header(HttpHeaders.RANGE, "bytes=0-9")
+                .exchange((request, response) -> response.getStatusCode());
+
+        // Then é 200: a resposta descreve o que foi servido, não o que foi pedido
+        assertEquals(HttpStatus.OK, actual);
+    }
+
+    // `Accept-Ranges` é o que faz o player saber que pode pedir trecho.
+    @Test
+    void givenTheMediaServed_whenReadTheHeaders_thenRangesAreAnnounced() {
+        // Given o admin devolvendo o arquivo
+        when(this.videoClient.mediaOf(any(), any(), any()))
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT, null)));
+
+        // When pede a mídia
+        final var actual = clientWith(this.token.catalogTest())
+                .get()
+                .uri("/videos/{id}/medias/{type}", A_VIDEO, "VIDEO")
+                .retrieve()
+                .toBodilessEntity();
+
+        // Then a rota anuncia que aceita trecho
+        assertEquals("bytes", actual.getHeaders().getFirst(HttpHeaders.ACCEPT_RANGES));
+    }
 
     private HttpStatusCode statusOf(final String bearer) {
         return clientWith(bearer)

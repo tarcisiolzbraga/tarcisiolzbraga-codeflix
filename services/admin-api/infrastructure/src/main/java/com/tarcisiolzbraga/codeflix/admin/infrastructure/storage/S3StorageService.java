@@ -1,6 +1,7 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.storage;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Resource;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.ResourceSlice;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -8,6 +9,7 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.Delete;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 
 // Fala S3, então serve tanto ao Garage do desenvolvimento quanto a um bucket de verdade. Checksum e
@@ -36,6 +38,8 @@ public class S3StorageService implements StorageService {
                 RequestBody.fromBytes(resource.content()));
     }
 
+    private static final int RANGE_NOT_SATISFIABLE = 416;
+
     @Override
     public Optional<Resource> get(final String name) {
         try {
@@ -62,5 +66,34 @@ public class S3StorageService implements StorageService {
                 .toList();
         this.client.deleteObjects(request ->
                 request.bucket(this.bucket).delete(Delete.builder().objects(objects).build()));
+    }
+
+    // O trecho, pedido ao próprio armazenamento.
+    //
+    // O cabeçalho vai **como veio**: o S3 aceita o formato `bytes=0-1023` e devolve o `Content-Range`
+    // já calculado, com o intervalo servido e o tamanho total. Interpretar o cabeçalho aqui seria
+    // repetir essa conta e errar nas pontas — e o acervo precisa justamente do Content-Range para
+    // responder 206.
+    @Override
+    public Optional<ResourceSlice> getSlice(final String name, final String range) {
+        try {
+            final var object =
+                    this.client.getObjectAsBytes(request -> request.bucket(this.bucket).key(name).range(range));
+            final var response = object.response();
+            return Optional.of(new ResourceSlice(
+                    object.asByteArray(),
+                    response.contentType(),
+                    response.metadata().get(NAME_METADATA),
+                    response.contentRange()));
+        } catch (final NoSuchKeyException _) {
+            return Optional.empty();
+        } catch (final S3Exception refused) {
+            // 416 é o armazenamento dizendo que o trecho não existe no arquivo. Virar Optional vazio
+            // o transformaria em 404, que mentiria: o arquivo está lá.
+            if (refused.statusCode() == RANGE_NOT_SATISFIABLE) {
+                throw new RangeNotSatisfiableException(range, refused);
+            }
+            throw refused;
+        }
     }
 }

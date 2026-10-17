@@ -105,6 +105,24 @@ mesmo tipo troca o arquivo anterior, e apagar o vídeo leva os arquivos junto.
 O arquivo enviado é lido inteiro em memória antes de ir para o armazenamento, então o teto é
 `MEDIA_MAX_FILE_SIZE` (padrão 100MB). Subir daqui pede envio em fluxo, que ainda não existe.
 
+### A mídia aceita `Range`
+
+`GET /videos/{id}/medias/{type}` responde o arquivo inteiro com 200, e **só o trecho pedido com 206**
+quando o cliente manda `Range`. É o que permite a um player buscar na linha de tempo sem baixar tudo —
+e quem consome isso é o catálogo, que repassa a rota a quem assina.
+
+**O cabeçalho não é interpretado aqui.** Ele vai como veio até o armazenamento: o S3 entende
+`bytes=0-1023` e devolve o `Content-Range` pronto, com o trecho servido e o tamanho total. Refazer
+essa conta na rota seria repetir o que o armazenamento já fez, e errar nas pontas.
+
+Trecho que o arquivo não tem responde **416, e não 404**: o arquivo está lá, o intervalo é que não
+existe. `Accept-Ranges: bytes` vai nas duas respostas, porque é por ele que o player descobre que
+pode pedir trecho.
+
+O caso de uso do trecho é separado do caso de uso do arquivo inteiro, de propósito: a resposta é
+outra, e misturar os dois num só com parâmetro opcional faria a rota decidir o status por `if` de
+campo nulo.
+
 ### Codificação dos vídeos
 
 O arquivo de áudio e vídeo nasce com status `PENDING` e é o codificador que o move. A conversa acontece por uma

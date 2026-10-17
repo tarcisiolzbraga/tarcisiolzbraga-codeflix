@@ -1,10 +1,12 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.storage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Resource;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -52,6 +54,54 @@ class S3StorageServiceIT {
         this.storageService.delete(Set.of());
 
         assertTrue(this.storageService.get(name).isPresent());
+    }
+
+    // O trecho, contra o armazenamento de verdade. É aqui que se confere a afirmação em que o resto
+    // do caminho se apoia: **o S3 entende o cabeçalho `bytes=` e devolve o `Content-Range` pronto**,
+    // com o intervalo servido e o tamanho total. Se isso não fosse verdade, a rota teria de refazer a
+    // conta do intervalo.
+    @Test
+    void givenAStoredResource_whenGetSlice_thenReceiveOnlyThoseBytesAndTheContentRange() {
+        final var name = uniqueName();
+        this.storageService.store(name, resource());
+
+        final var actual = this.storageService.getSlice(name, "bytes=0-7");
+
+        assertTrue(actual.isPresent());
+        assertEquals("conteudo", new String(actual.get().content(), StandardCharsets.UTF_8));
+        // "conteudo do arquivo" tem 19 bytes, e o total vem do próprio armazenamento.
+        assertEquals("bytes 0-7/19", actual.get().contentRange());
+        assertEquals("video/mp4", actual.get().contentType());
+    }
+
+    // `bytes=10-` é o que um player manda ao buscar na linha de tempo: do ponto até o fim, sem saber
+    // onde o fim está.
+    @Test
+    void givenAnOpenEndedRange_whenGetSlice_thenReceiveFromThereToTheEnd() {
+        final var name = uniqueName();
+        this.storageService.store(name, resource());
+
+        final var actual = this.storageService.getSlice(name, "bytes=9-");
+
+        assertTrue(actual.isPresent());
+        assertEquals("do arquivo", new String(actual.get().content(), StandardCharsets.UTF_8));
+        assertEquals("bytes 9-18/19", actual.get().contentRange());
+    }
+
+    @Test
+    void givenAnUnknownName_whenGetSlice_thenReceiveEmpty() {
+        assertTrue(this.storageService.getSlice(uniqueName(), "bytes=0-7").isEmpty());
+    }
+
+    // Trecho que o arquivo não tem **não é** arquivo ausente: virar Optional vazio daria 404, que
+    // mentiria — o arquivo está lá.
+    @Test
+    void givenARangeBeyondTheFile_whenGetSlice_thenFailSayingTheRangeDoesNotExist() {
+        final var name = uniqueName();
+        this.storageService.store(name, resource());
+
+        assertThrows(
+                RangeNotSatisfiableException.class, () -> this.storageService.getSlice(name, "bytes=5000-6000"));
     }
 
     private String uniqueName() {

@@ -4,6 +4,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.video.AudioVideoMedia;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.ImageMedia;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.MediaResourceGateway;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Resource;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.ResourceSlice;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoID;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoMediaType;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoResource;
@@ -44,6 +45,11 @@ public class MediaResourceStorageGateway implements MediaResourceGateway {
     @Override
     public Optional<Resource> getResource(final VideoID id, final VideoMediaType type) {
         return this.storageService.get(locationOf(id, type));
+    }
+
+    @Override
+    public Optional<ResourceSlice> getResourceSlice(final VideoID id, final VideoMediaType type, final String range) {
+        return this.storageService.getSlice(locationOf(id, type), range);
     }
 
     @Override

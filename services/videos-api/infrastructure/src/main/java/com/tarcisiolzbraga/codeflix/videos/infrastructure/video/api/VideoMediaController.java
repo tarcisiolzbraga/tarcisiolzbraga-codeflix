@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -71,27 +72,40 @@ public class VideoMediaController {
             @PathVariable("type") final String type,
             @RequestParam(name = "expires", required = false) final String expires,
             @RequestParam(name = "signature", required = false) final String signature,
+            @RequestHeader(value = HttpHeaders.RANGE, required = false) final String range,
             final Authentication authentication) {
         if (signature != null) {
             // Assinatura apresentada e inválida é 403, e não 401: quem a apresentou tinha direito
             // quando a pediu — ela venceu, ou foi mexida.
             return this.links.valid(id, type, expires, signature)
-                    ? serve(id, type)
+                    ? serve(id, type, range)
                     : ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         final var decision = this.access.decide(id, authentication);
         return decision == MediaAccess.Decision.ALLOWED
-                ? serve(id, type)
+                ? serve(id, type, range)
                 : ResponseEntity.status(statusOf(decision)).build();
     }
 
-    private ResponseEntity<byte[]> serve(final String id, final String type) {
+    // O status sai do que o admin devolveu: com `Content-Range` é 206, sem ele é 200. Decidir pela
+    // presença do cabeçalho de **pedido** seria adivinhar — o admin pode ignorar um Range que não
+    // souber atender, e aí 206 com o arquivo inteiro enganaria o player.
+    private ResponseEntity<byte[]> serve(final String id, final String type, final String range) {
         return this.videoClient
-                .mediaOf(id, type)
-                .map(file -> ResponseEntity.ok()
+                .mediaOf(id, type, range)
+                .map(file -> ResponseEntity.status(
+                                file.contentRange() == null ? HttpStatus.OK : HttpStatus.PARTIAL_CONTENT)
                         .contentType(MediaType.parseMediaType(file.contentType()))
-                        // inline, e não attachment: o player aponta para esta rota, e attachment
-                        // faria o browser baixar em vez de reproduzir.
+                        // `Accept-Ranges` é o que faz o player saber que pode pedir trecho; sem ele o
+                        // browser baixa tudo mesmo que a rota saiba servir partes.
+                        .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                        .headers(headers -> {
+                            if (file.contentRange() != null) {
+                                headers.set(HttpHeaders.CONTENT_RANGE, file.contentRange());
+                            }
+                        })
+                        // inline, e não attachment: o player aponta para esta rota, e attachment faria
+                        // o browser baixar em vez de reproduzir.
                         .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"%s\"".formatted(file.filename()))
                         .body(file.content()))
                 // Vídeo sem aquela mídia é 404 limpo: existe no acervo e não tem o que reproduzir,

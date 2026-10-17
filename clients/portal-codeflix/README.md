@@ -197,8 +197,9 @@ sabe o host público do catálogo é quem publica o serviço.
 O endereço é pedido **no clique**, e não ao abrir a página: a assinatura é curta, e pedi-la antes
 faria ela vencer na mão de quem leu a sinopse com calma.
 
-**O que ainda não há:** busca na linha de tempo, porque a rota do admin não suporta `Range`. Está
-registrado no README da `videos-api`, com o que seria preciso para mudar.
+**A busca na linha de tempo funciona**: o `<video>` pede trecho com `Range`, o catálogo repassa e a
+admin-api serve 206. O player não precisou de nada para isso — quem faz o pedido de trecho é o
+browser.
 
 ## O que dá para verificar sem browser, e o que não dá
 
