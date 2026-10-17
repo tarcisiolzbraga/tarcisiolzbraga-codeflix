@@ -179,24 +179,26 @@ O `FORBIDDEN` quase nunca é "não pode assistir": é o papel que **ainda não c
 a assinatura o concede por evento, segundos depois. Dizer "acesso negado" a quem acabou de pagar
 seria mentir; a tela oferece renovar, que é o que resolve.
 
-### Não há reprodução, e não é esquecimento
+### A reprodução, e o endereço assinado
 
-Os campos `video`, `banner` e `thumbnail` do acervo guardam **a localização no armazenamento**, não
-uma URL que o browser alcance. A única rota que serve o arquivo é
-`GET /videos/{id}/medias/{type}`, na **admin-api**, e ela exige `CODEFLIX_ADMIN` ou
-`CODEFLIX_VIDEOS` — papéis que um assinante não tem. A `videos-api` não serve mídia, e o Garage não
-é público.
+O player aponta para um endereço **assinado** que o catálogo emite no clique — não para um arquivo
+baixado antes.
 
-Servir mídia a quem assina precisa de uma rota que ainda não existe, e ela traz decisões que não são
-do front:
+**Por que não dá para apontar direto para a rota com token:** `<video src>` não carrega cabeçalho de
+`Authorization`. O browser busca o `src` por conta própria, sem token. A primeira versão desta tela
+contornava isso baixando os bytes com `fetch` e tocando de um endereço de objeto local; funcionava, e
+custava a reprodução progressiva.
 
-- **servir o arquivo pela API** (a `videos-api` lê do Garage e devolve) ou **gerar URL assinada** com
-  validade curta;
-- o que fazer com o campo `opened`, que diz se o título é aberto a todos;
-- se a autorização olha só o papel no token ou também a situação da assinatura.
+Com o endereço assinado a reprodução começa na hora, e a autorização continua num lugar só: a
+assinatura é emitida pela `videos-api` depois de conferir direito, vale **cinco minutos** e não
+concede nada além daquele arquivo. O caminho vem relativo, e quem junta com a base é o portal — quem
+sabe o host público do catálogo é quem publica o serviço.
 
-Enquanto isso não existe, a página do título **diz** que a reprodução não está disponível. Fingir um
-player esconderia a lacuna.
+O endereço é pedido **no clique**, e não ao abrir a página: a assinatura é curta, e pedi-la antes
+faria ela vencer na mão de quem leu a sinopse com calma.
+
+**O que ainda não há:** busca na linha de tempo, porque a rota do admin não suporta `Range`. Está
+registrado no README da `videos-api`, com o que seria preciso para mudar.
 
 ## O que dá para verificar sem browser, e o que não dá
 
