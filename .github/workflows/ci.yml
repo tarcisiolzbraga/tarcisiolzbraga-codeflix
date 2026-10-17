@@ -151,14 +151,15 @@ jobs:
   # outra. `npm run check` é a porta de entrada de cada commit do portal — lint, tipos, testes e
   # build —, como o `./gradlew build` é nos Java e o `make check` nos Go.
   #
-  # Numa matriz desde já, com um cliente só: o front de administração entra aqui sem copiar job.
+  # Os dois clientes na mesma matriz: o portal (Next) e o back-office (Vite) expõem o mesmo
+  # `npm run check`, então o job não precisa saber qual é qual.
   clients:
     name: ${{ matrix.client }} (front)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        client: [portal-codeflix]
+        client: [portal-codeflix, back-office-codeflix]
     defaults:
       run:
         working-directory: clients/${{ matrix.client }}
@@ -177,7 +178,8 @@ jobs:
         run: npm ci
 
       # A telemetria do Next é ligada por padrão e manda dado de build para fora. Aqui ela fica
-      # desligada: o que sai do CI é escolha, não padrão herdado.
+      # desligada: o que sai do CI é escolha, não padrão herdado. Para o back-office a variável não
+      # faz nada — o Vite não tem telemetria.
       - name: Verificação
         env:
           NEXT_TELEMETRY_DISABLED: 1
