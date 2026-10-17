@@ -29,12 +29,16 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      # A senha do operador de teste do realm. Vem do .env pelo mesmo motivo do segredo acima:
+      # credencial não entra em arquivo versionado, nem sendo de desenvolvimento.
+      OPERATOR_TEST_PASSWORD: ${OPERATOR_TEST_PASSWORD:-operador-de-teste}
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
         mkdir -p /opt/keycloak/data/import
         template=$$(cat /realm-template.json)
-        printf '%s' "$${template//__KEYCLOAK_CLIENT_SECRET__/$$KEYCLOAK_CLIENT_SECRET}" \
+        comSegredo="$${template//__KEYCLOAK_CLIENT_SECRET__/$$KEYCLOAK_CLIENT_SECRET}"
+        printf '%s' "$${comSegredo//__OPERATOR_TEST_PASSWORD__/$$OPERATOR_TEST_PASSWORD}" \
           > /opt/keycloak/data/import/realm.json
         exec /opt/keycloak/bin/kc.sh start-dev --import-realm --http-port=${KEYCLOAK_PORT}
     ports:
