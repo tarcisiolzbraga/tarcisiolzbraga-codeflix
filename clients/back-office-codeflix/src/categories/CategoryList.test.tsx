@@ -1,26 +1,16 @@
-import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ADMIN_API } from "@/shared/config";
-import { newQueryClient } from "@/shared/queryClient";
+import { jsonResponse, renderWithProviders, withMeasuredHeight } from "@/shared/testing";
 
 const sessao = vi.hoisted(() => ({ atual: {} as Record<string, unknown> }));
-
 vi.mock("react-oidc-context", () => ({ useAuth: () => sessao.atual }));
 
 const { CategoryList } = await import("@/categories/CategoryList");
 
 function respondeCom(body: unknown, init: ResponseInit = {}) {
-  vi.spyOn(globalThis, "fetch").mockImplementation(() =>
-    Promise.resolve(
-      body === undefined
-        ? new Response(null, init)
-        : new Response(JSON.stringify(body), {
-            ...init,
-            headers: { "Content-Type": "application/json" },
-          }),
-    ),
-  );
+  vi.spyOn(globalThis, "fetch").mockImplementation(() => Promise.resolve(jsonResponse(body, init)));
 }
 
 function pagina(items: unknown[], total = items.length) {
@@ -43,26 +33,14 @@ const ARQUIVADA = {
   createdAt: "2026-02-04T10:15:00Z",
 };
 
-// O DataGrid precisa de altura medida para desenhar linha, e o jsdom dá zero a tudo. Sem isto a
-// tabela existe mas nenhuma célula é renderizada, e o teste acusaria um defeito que não existe.
-function comAlturaMedida() {
-  for (const propriedade of ["offsetHeight", "offsetWidth"] as const) {
-    vi.spyOn(HTMLElement.prototype, propriedade, "get").mockReturnValue(600);
-  }
-}
-
 function renderiza() {
-  return render(
-    <QueryClientProvider client={newQueryClient()}>
-      <CategoryList />
-    </QueryClientProvider>,
-  );
+  return renderWithProviders(<CategoryList />, { path: "/categorias", route: "/categorias" });
 }
 
 describe("CategoryList", () => {
   beforeEach(() => {
     sessao.atual = { user: { access_token: "abc.123" } };
-    comAlturaMedida();
+    withMeasuredHeight();
     respondeCom(pagina([]));
   });
 
@@ -130,5 +108,115 @@ describe("CategoryList", () => {
 
     expect(await screen.findByText("Categorias")).toBeInTheDocument();
     expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("givenALista_whenAbre_thenOferecCriarUmaNova", async () => {
+    renderiza();
+
+    const botao = await screen.findByRole("link", { name: /Nova categoria/ });
+    expect(botao).toHaveAttribute("href", "/categorias/nova");
+  });
+
+  describe("as ações da linha", () => {
+    beforeEach(() => {
+      vi.spyOn(globalThis, "fetch").mockImplementation((_url, init) => {
+        const metodo = (init as RequestInit | undefined)?.method ?? "GET";
+        return Promise.resolve(
+          metodo === "GET"
+            ? jsonResponse(pagina([DOCUMENTARIO, ARQUIVADA], 2))
+            : jsonResponse(undefined, { status: 204 }),
+        );
+      });
+    });
+
+    function chamadasDeEscrita() {
+      return vi
+        .mocked(globalThis.fetch)
+        .mock.calls.filter(([, init]) => ((init as RequestInit).method ?? "GET") !== "GET");
+    }
+
+    it("givenCategoriaAtiva_whenClicaEmDesativar_thenChamaDeactivate", async () => {
+      renderiza();
+      await screen.findByText("Documentário");
+
+      await userEvent.click(screen.getByRole("menuitem", { name: "Desativar" }));
+
+      await waitFor(() => expect(chamadasDeEscrita()).toHaveLength(1));
+      expect(chamadasDeEscrita()[0]![0]).toBe(`${ADMIN_API}/categories/cat-1/deactivate`);
+      expect(await screen.findByText("Categoria desativada.")).toBeInTheDocument();
+    });
+
+    it("givenCategoriaInativa_whenClicaEmAtivar_thenChamaActivate", async () => {
+      renderiza();
+      await screen.findByText("Clássicos");
+
+      await userEvent.click(screen.getByRole("menuitem", { name: "Ativar" }));
+
+      await waitFor(() => expect(chamadasDeEscrita()).toHaveLength(1));
+      expect(chamadasDeEscrita()[0]![0]).toBe(`${ADMIN_API}/categories/cat-2/activate`);
+      expect(await screen.findByText("Categoria ativada.")).toBeInTheDocument();
+    });
+
+    // Remover pergunta antes porque não dá para desfazer. Desativar não pergunta: é reversível no
+    // mesmo botão.
+    it("givenUmaCategoria_whenClicaEmRemover_thenPerguntaAntesDeChamar", async () => {
+      renderiza();
+      await screen.findByText("Documentário");
+
+      await userEvent.click(screen.getAllByRole("menuitem", { name: "Remover" })[0]!);
+
+      expect(await screen.findByText("Remover a categoria?")).toBeInTheDocument();
+      expect(chamadasDeEscrita()).toHaveLength(0);
+    });
+
+    it("givenAPerguntaAberta_whenCancela_thenNaoRemove", async () => {
+      renderiza();
+      await screen.findByText("Documentário");
+
+      await userEvent.click(screen.getAllByRole("menuitem", { name: "Remover" })[0]!);
+      await userEvent.click(await screen.findByRole("button", { name: "Cancelar" }));
+
+      expect(chamadasDeEscrita()).toHaveLength(0);
+    });
+
+    it("givenAPerguntaAberta_whenConfirma_thenChamaODelete", async () => {
+      renderiza();
+      await screen.findByText("Documentário");
+
+      await userEvent.click(screen.getAllByRole("menuitem", { name: "Remover" })[0]!);
+      await userEvent.click(await screen.findByRole("button", { name: "Remover" }));
+
+      await waitFor(() => expect(chamadasDeEscrita()).toHaveLength(1));
+      expect(chamadasDeEscrita()[0]![0]).toBe(`${ADMIN_API}/categories/cat-1`);
+      expect(chamadasDeEscrita()[0]![1]!.method).toBe("DELETE");
+      expect(await screen.findByText("Categoria removida.")).toBeInTheDocument();
+    });
+
+    // O 409 da admin-api: categoria usada por um gênero ou vídeo **não** se apaga, se desativa.
+    it("given409NaRemocao_whenConfirma_thenMandaDesativar", async () => {
+      vi.spyOn(globalThis, "fetch").mockImplementation((_url, init) => {
+        const metodo = (init as RequestInit | undefined)?.method ?? "GET";
+        return Promise.resolve(
+          metodo === "GET"
+            ? jsonResponse(pagina([DOCUMENTARIO], 1))
+            : jsonResponse(
+                {
+                  message:
+                    "Category with ID cat-1 is linked to at least one Genre; deactivate it instead",
+                  errors: [],
+                },
+                { status: 409 },
+              ),
+        );
+      });
+
+      renderiza();
+      await screen.findByText("Documentário");
+
+      await userEvent.click(screen.getByRole("menuitem", { name: "Remover" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Remover" }));
+
+      expect(await screen.findByText(/Desative-o em vez de remover/)).toBeInTheDocument();
+    });
   });
 });
