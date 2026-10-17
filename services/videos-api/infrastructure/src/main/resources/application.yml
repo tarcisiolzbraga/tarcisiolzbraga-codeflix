@@ -15,6 +15,14 @@ admin-api:
   # O nome do registro de client OAuth2 declarado abaixo, usado pelo interceptor do RestClient.
   client-registration-id: admin-api
 
+# A mídia que o catálogo serve a quem assina.
+#
+# O segredo assina o endereço que o player usa: o `<video src>` do browser não carrega cabeçalho de
+# Authorization, então a URL precisa se autorizar sozinha. Sem valor padrão aqui de propósito —
+# segredo faltando derruba a subida, como no banco e no Keycloak.
+media:
+  signing-secret: ${CATALOG_MEDIA_SIGNING_SECRET}
+
 kafka:
   consumers:
     category:
