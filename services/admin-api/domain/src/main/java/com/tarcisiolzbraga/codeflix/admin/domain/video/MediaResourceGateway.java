@@ -12,6 +12,13 @@ public interface MediaResourceGateway {
 
     Optional<Resource> getResource(VideoID id, VideoMediaType type);
 
+    // Um trecho do arquivo, para o player poder buscar na linha de tempo sem baixar tudo.
+    //
+    // O `range` vai como o cliente o mandou, no formato do cabeçalho HTTP (`bytes=0-1023`): o
+    // armazenamento fala esse formato nativamente, então interpretá-lo aqui seria repetir uma conta
+    // que o S3 já faz — e errar nas pontas.
+    Optional<ResourceSlice> getResourceSlice(VideoID id, VideoMediaType type, String range);
+
     // Apagar o vídeo apaga os arquivos dele: não há quem os referencie depois.
     void clearResources(VideoID id);
 }
