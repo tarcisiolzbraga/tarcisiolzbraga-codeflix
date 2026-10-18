@@ -3,41 +3,33 @@ import DeleteIcon from "@mui/icons-material/DeleteOutline";
 import EditIcon from "@mui/icons-material/EditOutlined";
 import ToggleOffIcon from "@mui/icons-material/ToggleOffOutlined";
 import ToggleOnIcon from "@mui/icons-material/ToggleOnOutlined";
-import { Alert, Box, Button, Chip, Stack, TextField, Typography } from "@mui/material";
-import { DataGrid, GridActionsCellItem, type GridColDef, type GridSortModel } from "@mui/x-data-grid";
-import { ptBR } from "@mui/x-data-grid/locales";
+import { Button, Chip, Stack, Typography } from "@mui/material";
+import { GridActionsCellItem, type GridColDef } from "@mui/x-data-grid";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import {
-  CATEGORY_QUERY_DEFAULTS,
-  type CategoryQuery,
-  type Category,
-} from "@/categories/categoriesGateway";
+import type { Category } from "@/categories/categoriesGateway";
 import { useCategories } from "@/categories/useCategories";
 import { useDeleteCategory, useSetCategoryActive } from "@/categories/useCategoryMutations";
+import { AggregateTable } from "@/shared/AggregateTable";
 import { ConfirmDialog } from "@/shared/ConfirmDialog";
 import { explainFailure } from "@/shared/explainFailure";
 import { useFeedback } from "@/shared/feedback";
+import { SEARCH_DEFAULTS, withSearch, type SearchQuery } from "@/shared/search";
 import { useDebounced } from "@/shared/useDebounced";
 
 const dataHora = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" });
 
 export function CategoryList() {
   const [digitado, setDigitado] = useState("");
-  const [query, setQuery] = useState<CategoryQuery>(CATEGORY_QUERY_DEFAULTS);
+  const [query, setQuery] = useState<SearchQuery>(SEARCH_DEFAULTS);
   const [aRemover, setARemover] = useState<Category | null>(null);
-  const busca = useDebounced(digitado);
   const navegar = useNavigate();
   const avisar = useFeedback();
 
-  // A busca atrasada entra na consulta junto com a volta para a primeira página: filtrar e continuar
-  // na página 4 mostraria "nenhum resultado" num filtro que tem resultados.
-  const consulta = busca === query.search ? query : { ...query, search: busca, page: 0 };
+  const consulta = withSearch(query, useDebounced(digitado));
   const categorias = useCategories(consulta);
   const alternar = useSetCategoryActive();
   const remover = useDeleteCategory();
-
-  const ordenacao: GridSortModel = [{ field: consulta.sort, sort: consulta.dir }];
 
   const colunas: GridColDef<Category>[] = [
     { field: "name", headerName: "Nome", flex: 1, minWidth: 180 },
@@ -110,44 +102,17 @@ export function CategoryList() {
         </Button>
       </Stack>
 
-      <TextField
+      <AggregateTable<Category>
         label="Buscar por nome ou descrição"
-        value={digitado}
-        onChange={(evento) => setDigitado(evento.target.value)}
-        size="small"
-        sx={{ maxWidth: 420 }}
+        columns={colunas}
+        page={categorias.data}
+        isFetching={categorias.isFetching}
+        failure={categorias.error}
+        query={consulta}
+        onQueryChange={setQuery}
+        search={digitado}
+        onSearchChange={setDigitado}
       />
-
-      {categorias.isError && <Alert severity="error">{explainFailure(categorias.error)}</Alert>}
-
-      <Box sx={{ height: 520 }}>
-        <DataGrid<Category>
-          rows={categorias.data?.items ?? []}
-          columns={colunas}
-          localeText={ptBR.components.MuiDataGrid.defaultProps.localeText}
-          loading={categorias.isFetching}
-          disableColumnFilter
-          disableRowSelectionOnClick
-          // Paginação e ordenação no servidor: o banco do catálogo não cabe no navegador, e é a
-          // mesma razão pela qual nenhuma rota da admin-api devolve List.
-          paginationMode="server"
-          sortingMode="server"
-          rowCount={categorias.data?.total ?? 0}
-          pageSizeOptions={[10, 25, 50]}
-          paginationModel={{ page: consulta.page, pageSize: consulta.perPage }}
-          onPaginationModelChange={(modelo) =>
-            setQuery({ ...consulta, page: modelo.page, perPage: modelo.pageSize })
-          }
-          sortModel={ordenacao}
-          onSortModelChange={([primeiro]) =>
-            setQuery({
-              ...consulta,
-              sort: primeiro?.field ?? CATEGORY_QUERY_DEFAULTS.sort,
-              dir: primeiro?.sort ?? CATEGORY_QUERY_DEFAULTS.dir,
-            })
-          }
-        />
-      </Box>
 
       <ConfirmDialog
         open={aRemover !== null}
