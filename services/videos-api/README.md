@@ -179,10 +179,12 @@ do cliente**; se o catálogo bufferizasse, o servidor esperaria para sempre.
 
 ### O que ainda custa
 
-**O envio ainda sobe inteiro em memória, do lado do admin.** Não é deste serviço — o catálogo não
-recebe upload —, mas é a outra metade do mesmo problema, e está registrada no README da admin-api: o
-checksum é calculado sobre o conteúdo e gravado como metadado do objeto, então o arquivo precisa ser
-lido antes do PUT.
+Do caminho da mídia, nada: ele atravessa os dois serviços em fluxo, nos dois sentidos. O envio, que
+era a outra metade do problema, foi em seguida — está no README da admin-api, porque o catálogo não
+recebe upload.
+
+O que continua buffered, de propósito, é o **download sem `Range`** do lado do admin: ele serve as
+artes do catálogo, que são pequenas, e o player sempre manda `Range`.
 
 ## Por que repasse, e não URL assinada
 

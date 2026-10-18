@@ -164,10 +164,28 @@ permite a rota escolher o status antes de começar a responder.
 **O caminho sem `Range` continua montando o corpo em memória, e é escolha.** Ele serve as artes do
 catálogo — banner e miniatura —, que são pequenas, e o player sempre manda `Range`.
 
-**O envio ainda sobe inteiro em memória**, e isso continua em aberto: o checksum é calculado sobre o
-conteúdo e gravado como metadado do objeto, então o arquivo precisa ser lido **antes** do PUT. O
-conserto é uma passada para o checksum e outra para o envio, sobre o arquivo temporário que o Spring
-já grava em disco — não foi feito aqui.
+### O envio também, e o checksum é o nó
+
+O envio de 100 MB chegava a três cópias do arquivo inteiro em memória: `getBytes()` na rota, e as duas
+cópias defensivas do `Resource`.
+
+O nó é o **checksum**: ele é gravado como metadado do objeto no armazenamento, então tem de ser
+conhecido **antes** do PUT — não dá para calculá-lo durante o envio. A saída são duas passadas sobre
+o arquivo, e por isso o conteúdo de um `Resource` é um
+[`MediaSource`](domain/src/main/java/com/tarcisiolzbraga/codeflix/admin/domain/video/MediaSource.java):
+uma fonte que pode ser **aberta mais de uma vez**.
+
+As duas passadas são de graça: acima do limiar de memória, o Spring já gravou o multipart num arquivo
+temporário em disco, e abrir o `getInputStream()` dele duas vezes é ler duas vezes um arquivo local. A
+alternativa — guardar os bytes para precisar de uma passada só — é justamente o custo que isto remove.
+
+O checksum sai do `DigestInputStream`, lendo em blocos. O PUT usa
+`RequestBody.fromInputStream` **com o tamanho**: sem `Content-Length` o SDK bufferiza o corpo para
+descobri-lo, o que anularia a troca.
+
+O `Resource` perdeu a cópia defensiva e o `equals` por bytes, e isso é consequência: não há arranjo a
+proteger, e comparar duas fontes exigiria abrir e ler as duas. Sobrou **uma** cópia, na fábrica que
+recebe um arranjo — o lugar certo para ela, em vez de em toda leitura.
 
 ### Codificação dos vídeos
 

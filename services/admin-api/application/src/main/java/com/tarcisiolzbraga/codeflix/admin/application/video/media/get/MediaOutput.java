@@ -1,41 +1,24 @@
 package com.tarcisiolzbraga.codeflix.admin.application.video.media.get;
 
+import com.tarcisiolzbraga.codeflix.admin.domain.video.MediaContent;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Resource;
-import java.util.Arrays;
-import java.util.Objects;
 
-// O que a rota precisa para devolver o arquivo. Copia o conteúdo na entrada e na saída pelo mesmo
-// motivo do Resource: quem recebeu não pode alterar o que o caso de uso devolveu.
-public record MediaOutput(byte[] content, String contentType, String name) {
-
-    public MediaOutput {
-        content = content.clone();
-    }
+// O que a rota precisa para devolver o arquivo inteiro.
+//
+// O conteúdo é um `MediaContent` — uma função que escreve —, como o do trecho. A diferença é de onde
+// ele vem: aqui a fonte é o `Resource` que o armazenamento devolveu, e **esse caminho continua
+// montando o corpo em memória**, de propósito. Ele serve as artes do catálogo (banner e miniatura),
+// que são pequenas, e o player sempre manda `Range`.
+public record MediaOutput(MediaContent content, String contentType, String name) {
 
     public static MediaOutput from(final Resource resource) {
-        return new MediaOutput(resource.content(), resource.contentType(), resource.name());
-    }
-
-    @Override
-    public byte[] content() {
-        return this.content.clone();
-    }
-
-    @Override
-    public boolean equals(final Object other) {
-        if (this == other) {
-            return true;
-        }
-        if (!(other instanceof MediaOutput that)) {
-            return false;
-        }
-        return Arrays.equals(this.content, that.content)
-                && Objects.equals(this.contentType, that.contentType)
-                && Objects.equals(this.name, that.name);
-    }
-
-    @Override
-    public int hashCode() {
-        return 31 * Objects.hash(this.contentType, this.name) + Arrays.hashCode(this.content);
+        return new MediaOutput(
+                destination -> {
+                    try (var content = resource.content().open()) {
+                        content.transferTo(destination);
+                    }
+                },
+                resource.contentType(),
+                resource.name());
     }
 }

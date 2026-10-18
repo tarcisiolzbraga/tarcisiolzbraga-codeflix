@@ -296,7 +296,7 @@ class VideoControllerTest {
     @Test
     void givenAStoredMedia_whenCallGetMedia_thenReturnTheFileWithItsTypeAndName() throws Exception {
         when(getMediaUseCase.execute(any()))
-                .thenReturn(new MediaOutput("conteudo".getBytes(), "video/mp4", "duna.mp4"));
+                .thenReturn(new MediaOutput(destination -> destination.write("conteudo".getBytes()), "video/mp4", "duna.mp4"));
 
         final var response = this.mockMvc.perform(get(VIDEOS_PATH + "/" + EXPECTED_ID + "/medias/VIDEO"));
 
@@ -350,7 +350,7 @@ class VideoControllerTest {
     @Test
     void givenNoRangeHeader_whenCallGetMedia_thenStillAnnounceThatRangesAreAccepted() throws Exception {
         when(getMediaUseCase.execute(any()))
-                .thenReturn(new MediaOutput("conteudo".getBytes(), "video/mp4", "duna.mp4"));
+                .thenReturn(new MediaOutput(destination -> destination.write("conteudo".getBytes()), "video/mp4", "duna.mp4"));
 
         final var response = this.mockMvc.perform(get(VIDEOS_PATH + "/" + EXPECTED_ID + "/medias/VIDEO"));
 

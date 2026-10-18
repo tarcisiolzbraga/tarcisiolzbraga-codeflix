@@ -1,5 +1,9 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.util;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
@@ -14,8 +18,23 @@ public final class Hashing {
     }
 
     public static String checksumOf(final byte[] content) {
+        return HexFormat.of().formatHex(digest().digest(content));
+    }
+
+    // A mesma conta, lendo o arquivo **em blocos**: um upload de 100 MB não precisa estar em memória
+    // para ter o seu checksum. O `DigestInputStream` alimenta o digest enquanto o `transferTo`
+    // descarta os bytes lidos.
+    public static String checksumOf(final InputStream content) throws IOException {
+        final var digest = digest();
+        try (var hashing = new DigestInputStream(content, digest)) {
+            hashing.transferTo(OutputStream.nullOutputStream());
+        }
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private static MessageDigest digest() {
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance(ALGORITHM).digest(content));
+            return MessageDigest.getInstance(ALGORITHM);
         } catch (final NoSuchAlgorithmException exception) {
             throw new IllegalStateException("%s is not available".formatted(ALGORITHM), exception);
         }
