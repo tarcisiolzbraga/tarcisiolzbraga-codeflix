@@ -13,6 +13,8 @@ const video = {
   yearLaunched: 2021,
   duration: 155,
   rating: "14",
+  video: "raw/v1.mp4",
+  trailer: null,
   banner: "banners/v1.png",
   thumbnail: "thumbs/v1.png",
   thumbnailHalf: null,
@@ -91,6 +93,55 @@ describe("VideoScreen", () => {
 
     expect(await screen.findByText("D")).toBeInTheDocument();
     expect(linkCalls()).toHaveLength(0);
+  });
+
+  // O botão só aparece quando há arquivo: um que sempre responde "ainda não tem arquivo" é pior que
+  // nenhum, e a maioria dos títulos recém-cadastrados não tem nenhum dos cinco.
+  it("givenATitleWithAVideoFile_whenThePageRenders_thenOffersToWatch", async () => {
+    render(<VideoScreen id="v1" />);
+
+    expect(await screen.findByRole("button", { name: "Assistir" })).toBeInTheDocument();
+  });
+
+  it("givenATitleWithoutAnyFile_whenThePageRenders_thenOffersNothingAndSaysWhy", async () => {
+    respondWith({ ...video, video: null, trailer: null });
+
+    render(<VideoScreen id="v1" />);
+
+    expect(
+      await screen.findByText("Este título ainda não tem arquivo para reproduzir."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Assistir" })).not.toBeInTheDocument();
+  });
+
+  // O trailer é um dos cinco arquivos do admin, e tem botão próprio quando existe.
+  it("givenATitleWithATrailer_whenThePageRenders_thenOffersItSeparately", async () => {
+    respondWith({ ...video, trailer: "raw/trailer.mp4" });
+
+    render(<VideoScreen id="v1" />);
+
+    expect(await screen.findByRole("button", { name: "Ver o trailer" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Assistir" })).toBeInTheDocument();
+  });
+
+  it("givenATitleWithoutATrailer_whenThePageRenders_thenDoesNotOfferIt", async () => {
+    render(<VideoScreen id="v1" />);
+
+    await screen.findByRole("button", { name: "Assistir" });
+    expect(screen.queryByRole("button", { name: "Ver o trailer" })).not.toBeInTheDocument();
+  });
+
+  // **O trailer não tem regra de acesso própria.** O `MediaAccess` do catálogo decide por vídeo —
+  // pelo `opened` e pelo papel —, não por tipo de mídia: ele pede o endereço na mesma rota.
+  it("givenTheTrailerButton_whenClicked_thenAsksForTheTrailerAddress", async () => {
+    respondWith({ ...video, trailer: "raw/trailer.mp4" });
+
+    render(<VideoScreen id="v1" />);
+    (await screen.findByRole("button", { name: "Ver o trailer" })).click();
+
+    await waitFor(() =>
+      expect(linkCalls().some((url) => url.includes("/medias/TRAILER/link"))).toBe(true),
+    );
   });
 
   it("givenATitle_whenThePageRenders_thenKeepsTheSynopsisAndTheFacts", async () => {

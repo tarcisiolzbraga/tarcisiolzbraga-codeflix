@@ -17,6 +17,8 @@ const video = {
   yearLaunched: 2026,
   duration: 107,
   rating: "14",
+  video: "raw/v1.mp4",
+  trailer: null,
   banner: "banners/um-filme.png",
   thumbnail: "thumbs/um-filme.png",
   thumbnailHalf: null,

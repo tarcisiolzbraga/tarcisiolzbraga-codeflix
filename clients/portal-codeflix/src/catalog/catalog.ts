@@ -12,7 +12,10 @@ export type Video = {
   // alcance — é o que o schema do catálogo diz, e o que o admin publica. Eles servem para uma coisa
   // só aqui: saber se o título **tem** aquela arte, antes de pedir o endereço assinado dela.
   //
-  // Nulo quando o arquivo não foi enviado, e é caso comum: um título recém-cadastrado não tem arte.
+  // Nulo quando o arquivo não foi enviado, e é caso comum: um título recém-cadastrado não tem nada.
+  // Os dois primeiros são arquivo de áudio e vídeo; os três seguintes, imagem.
+  video: string | null;
+  trailer: string | null;
   banner: string | null;
   thumbnail: string | null;
   thumbnailHalf: string | null;
@@ -87,7 +90,7 @@ async function query<T>(document: string, variables: Record<string, unknown>, to
 
 const VIDEO_FIELDS = `
   id title description yearLaunched duration rating
-  banner thumbnail thumbnailHalf
+  video trailer banner thumbnail thumbnailHalf
   genres { id name }
   categories { id name }
   castMembers { id name }`;
