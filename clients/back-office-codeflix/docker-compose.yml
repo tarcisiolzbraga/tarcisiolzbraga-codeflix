@@ -1,0 +1,32 @@
+# O painel de administração do catálogo. Pacote estático servido por nginx — não há nada para
+# renderizar no servidor, porque tudo atrás da porta exige login.
+#
+# **As URLs entram como `build-arg`**, pelo mesmo motivo do portal: o Vite as substitui no código em
+# tempo de build.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
+services:
+  back-office-codeflix:
+    logging: *logging
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_PORT: ${APP_PORT}
+        KEYCLOAK_HOST: ${KEYCLOAK_HOST}
+        KEYCLOAK_PORT: ${KEYCLOAK_PORT}
+        KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+        FRONT_KEYCLOAK_CLIENT_ID: ${FRONT_KEYCLOAK_CLIENT_ID:-front-codeflix}
+        MEDIA_MAX_FILE_SIZE: ${MEDIA_MAX_FILE_SIZE:-100MB}
+        PUBLIC_ADMIN_API_URL: ${PUBLIC_ADMIN_API_URL:-}
+        PUBLIC_KEYCLOAK_ISSUER: ${PUBLIC_KEYCLOAK_ISSUER:-}
+    container_name: codeflix_back_office
+    ports:
+      # 3001 dentro e fora: a 3000 é do portal, e a 3001 é a que o `redirectUris` do realm libera.
+      - "3001:3001"
+    labels:
+      filebeat_collector: "true"
