@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.tarcisiolzbraga.codeflix.videos.e2e.category.CategoryE2EDsl;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.E2ETest;
+import com.tarcisiolzbraga.codeflix.videos.infrastructure.ListenerLogCapture;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.KeycloakTestToken;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.genre.GenreClient;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.genre.models.GenreDTO;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.awaitility.core.ConditionTimeoutException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,10 +66,20 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
 
     private RestClient adminClient;
 
+    // O que os listeners registrarem durante o teste, para a mensagem de falha poder dizer o motivo.
+    // Veja o porquê em ListenerLogCapture.
+    private ListenerLogCapture listenerLog;
+
     @BeforeEach
     void bindToTheRunningServer() {
         this.client = clientWith(this.token.catalogTest());
         this.adminClient = clientWith(this.token.admin());
+        this.listenerLog = ListenerLogCapture.start();
+    }
+
+    @AfterEach
+    void stopCapturingTheListenerLog() {
+        this.listenerLog.close();
     }
 
     // O token vai no cabeçalho padrão do cliente: é como um consumidor de verdade fala com a API,
@@ -155,18 +167,23 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
         assertTrue(actualPage.items().isEmpty());
     }
 
-    // Espera a contagem, e **diz o que encontrou** quando ela não vem.
+    // Espera a contagem, e **diz o que encontrou e o que os listeners registraram** quando ela não
+    // vem.
     //
-    // Esta classe teve uma intermitência que só aparecia no CI, e a mensagem era `expected: <2> but
-    // was: <1>` — uma contagem sem contexto, que não diz qual dos dois gêneros faltou nem o que mais
-    // está no índice. Três investigações terminaram em hipótese, e a próxima falha precisa chegar
-    // com evidência em vez de aritmética.
+    // Esta classe teve uma intermitência que só aparecia no CI, com a mensagem `expected: <2> but
+    // was: <1>` — uma contagem sem contexto. A primeira melhoria foi listar o índice; a segunda,
+    // esta, foi juntar o log dos listeners, porque **o log do CI não tinha o que aconteceu**: num
+    // job que falhou às 17:03:11, todas as 179 linhas de log da aplicação capturadas eram de 17:04,
+    // o encerramento. Agora o motivo viaja junto com a falha.
     private void awaitGenres(final long expected) {
         try {
             await().atMost(VISIBLE).untilAsserted(() -> assertEquals(expected, listGenres().meta().total()));
         } catch (final ConditionTimeoutException timeout) {
             final var page = listGenres();
-            fail("esperava %d gêneros em %s. O índice tem %d: %s"
+            final var avisos = this.listenerLog.warningsAndErrors();
+            fail("""
+                    esperava %d gêneros em %s. O índice tem %d: %s
+                    O que os listeners registraram (WARN e acima): %s"""
                     .formatted(
                             expected,
                             VISIBLE,
@@ -177,7 +194,8 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
                                                     it.id().substring(0, 8),
                                                     it.name(),
                                                     namesOf(it.categories())))
-                                    .toList()));
+                                    .toList(),
+                            avisos.isEmpty() ? "nada — nem aviso de gateway vazio, nem fila morta" : avisos));
         }
     }
 
