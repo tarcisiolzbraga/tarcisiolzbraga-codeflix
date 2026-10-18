@@ -1,13 +1,14 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { useAuth } from "react-oidc-context";
-import { listCategories, type CategoryQuery } from "@/categories/categoriesGateway";
+import { listCategories } from "@/categories/categoriesGateway";
+import type { SearchQuery } from "@/shared/search";
 
 // A chave carrega a consulta inteira: mudar página, ordenação ou busca é outra pergunta, e o cache
 // do TanStack trata como tal. Trocar de página e voltar não refaz a chamada.
 //
 // `keepPreviousData`: sem ele a tabela esvazia a cada página e o DataGrid perde a altura, o que faz
 // a tela pular. Com ele as linhas antigas ficam enquanto as novas vêm.
-export function useCategories(query: CategoryQuery) {
+export function useCategories(query: SearchQuery) {
   const auth = useAuth();
   const token = auth.user?.access_token;
 

@@ -26,6 +26,18 @@ const keycloakIssuer = () => {
   return `http://${host}:${port}/realms/${realm}`;
 };
 
+// O teto de upload vem do `.env` no formato do Spring (`100MB`), e o browser precisa de bytes. A
+// conversão fica aqui, do lado que lê o arquivo, porque é aqui que o formato é conhecido.
+const maxFileSize = () => {
+  const bruto = (process.env.MEDIA_MAX_FILE_SIZE ?? "100MB").trim();
+  const partes = /^(\d+)\s*(B|KB|MB|GB)?$/i.exec(bruto);
+  if (partes === null) {
+    throw new Error(`MEDIA_MAX_FILE_SIZE precisa ser algo como '100MB'; veio '${bruto}'`);
+  }
+  const fatores: Record<string, number> = { B: 1, KB: 1024, MB: 1024 ** 2, GB: 1024 ** 3 };
+  return Number(partes[1]) * fatores[(partes[2] ?? "B").toUpperCase()]!;
+};
+
 export default defineConfig({
   plugins: [react()],
   // O mesmo alias do portal, para o caminho de import dizer de onde a coisa vem.
@@ -44,6 +56,7 @@ export default defineConfig({
     "import.meta.env.VITE_KEYCLOAK_CLIENT_ID": JSON.stringify(
       process.env.FRONT_KEYCLOAK_CLIENT_ID ?? "front-codeflix",
     ),
+    "import.meta.env.VITE_MEDIA_MAX_FILE_SIZE": JSON.stringify(String(maxFileSize())),
   },
   // 500 kB é o padrão do Vite, pensado para pegar quem empacotou sem perceber. Aqui os dois pedaços
   // são Material e DataGrid, que custam isto mesmo — e o aviso disparando em todo build treinaria a

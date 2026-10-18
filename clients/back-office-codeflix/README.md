@@ -57,11 +57,19 @@ Por agregado e papel, como nos serviços Java — não por camada técnica:
 ```
 src/
 ├── auth/           entrar no Keycloak e o guarda de administração
-├── categories/     tudo de categoria: o gateway, a consulta e a tela
-├── shared/         o que não é de agregado nenhum: tema, layout, http, cliente de consultas
+├── categories/     tudo de categoria: o gateway, o esquema, as mutações e as telas
+├── castMembers/    o mesmo, para o elenco
+├── genres/         o mesmo, para os gêneros
+├── videos/         o maior: vínculos, três estados e cinco arquivos
+├── shared/         o que não é de agregado nenhum
 ├── App.tsx         provedores e rotas
 └── main.tsx        o ponto de entrada
 ```
+
+No `shared/` ficam o tema, o layout, o cliente da `admin-api`, o cliente de consultas, o aviso de
+canto, o diálogo de confirmação, **a consulta de listagem** e **a tabela**. As duas últimas entraram
+quando iam virar terceira cópia — o detalhe está em [A tabela que os agregados
+dividem](#a-tabela-que-os-agregados-dividem).
 
 ## O login, e o guarda que vem depois dele
 
@@ -175,6 +183,156 @@ disto é empilhar vários avisos — num painel a pessoa faz uma ação por vez.
 O aviso de erro fica o dobro do tempo do de sucesso: ele costuma ser uma frase para ler, e o de
 sucesso é uma palavra para conferir de canto de olho.
 
+## O elenco
+
+O mesmo CRUD da categoria, com uma diferença de contrato: em vez de descrição livre, um **papel
+fechado** — `ACTOR` ou `DIRECTOR`, os dois valores do `CastMemberType` do domínio.
+
+O campo é uma escolha, e não texto. A API aceita `diretor` em minúsculas (o `CastMemberType.of` usa
+`equalsIgnoreCase`), mas aceitar texto livre aqui deixaria a pessoa digitar "atriz" e tomar um 422 em
+inglês por algo que a tela sabia de antemão.
+
+O papel aparece em **português na tela** e viaja em **maiúsculas na API**. A ordenação é por `type`,
+que é o que está na coluna — ou seja, ordena por `ACTOR` e `DIRECTOR`, não pelo rótulo.
+
+Ator é o padrão da criação: é o papel mais comum num catálogo, e o campo é obrigatório — sem padrão,
+criar um ator exigiria uma escolha que não acrescenta nada.
+
+O 409 aqui é o mesmo de lá, e por motivo parecido: **membro usado por algum vídeo não se apaga, se
+desativa**.
+
+## Os gêneros
+
+O mesmo CRUD, com a primeira ligação entre agregados: um gênero tem **categorias**.
+
+### O nome aceita uma letra, e isso não é descuido
+
+O `GenreValidator` do domínio tem mínimo **1**, e não 3 como a categoria e o elenco. Copiar o 3 para
+cá recusaria o que a API aceita — e o esquema foi escrito a partir do validador, não por analogia.
+
+Gênero **sem categoria** também é estado válido: o `CreateGenreCommand` troca ausente por conjunto
+vazio. Exigir uma aqui seria uma regra que a API não tem.
+
+### A lista mostra a contagem, não os nomes
+
+O `GenreListResponse` da `admin-api` traz as categorias como **ids**, e não há rota que receba vários
+ids de uma vez. Mostrar nomes na tabela custaria uma chamada por categoria de **cada linha** — dez
+linhas com três categorias seriam trinta requisições por página.
+
+Então a coluna diz "3 categorias", e os nomes aparecem na tela de edição, onde a conta é limitada ao
+gênero aberto. Um gênero sem nenhuma diz "0 categorias", em vez de ficar com a célula vazia.
+
+### A escolha das categorias
+
+Autocomplete com **busca no servidor**, como a da tabela e pelo mesmo motivo: o catálogo não cabe num
+`<select>`. Vinte por busca basta para escolher digitando, e não é promessa de completude — quem não
+vê o que quer digita mais.
+
+Os ids que já vêm do gênero são resolvidos em nomes por uma consulta **por id**. Se um id não
+resolver (categoria removida fora daqui, ou falha de rede), **o id continua aparecendo**: esconder a
+etiqueta faria o gênero parecer ter menos categorias do que tem.
+
+O campo é o mesmo que o vídeo usa para os três vínculos dele — veja [A tabela que os agregados
+dividem](#a-tabela-que-os-agregados-dividem).
+
+### Salvar substitui a lista inteira
+
+`categories` no `PUT` **substitui**, não acrescenta — é o que o `UpdateGenreCommand` faz. Tirar a
+última categoria manda lista vazia, que é como a API desvincula; mandar o campo ausente deixaria a
+categoria lá.
+
+## Os vídeos
+
+O maior dos quatro, e o único com arquivo. Três coisas o separam dos outros.
+
+### Três estados independentes, e seis rotas
+
+`active`, `published` e `opened` são coisas diferentes, e nenhum passa pelo corpo da atualização:
+
+| Estado | O que significa |
+|---|---|
+| `active` | o registro existe no catálogo |
+| `published` | o vídeo aparece para quem navega |
+| `opened` | pode ser assistido **sem assinatura** |
+
+Cada um tem par de rotas (`publish`/`unpublish`, `open`/`close`, `activate`/`deactivate`). Na tela
+eles são três interruptores, **com o que significam escrito ao lado** — e ficam fora da lista, de
+propósito: `opened` libera o arquivo para quem não paga, e um interruptor ao lado de "remover"
+convida ao clique errado.
+
+Eles também salvam sozinhos, fora do botão "Salvar": cada um é uma chamada própria, e juntá-los ao
+formulário faria parecer que nada aconteceu até salvar — quando a mudança já foi gravada.
+
+### Os arquivos só entram depois de criar
+
+A rota de envio é `/videos/{id}/medias/{type}`, então sem o vídeo criado não há onde pôr o arquivo.
+A tela de criação **diz isso** em vez de mostrar um campo que falharia, e ao terminar vai para a
+**edição** do vídeo criado, e não para a lista: é lá que os arquivos entram, e criar um vídeo sem
+mídia é metade do trabalho.
+
+São cinco: vídeo, trailer, banner, miniatura e miniatura meia. Os dois primeiros trazem um `status`
+de codificação que os de imagem não têm — um vídeo recém-enviado fica em `PENDING` até o encoder
+responder pela fila.
+
+### O envio não passa pelo cliente comum, e o teto é conferido antes
+
+O `adminFetch` põe `Content-Type: application/json` em toda chamada com corpo. Aqui o cabeçalho tem
+de ser `multipart/form-data` **com o boundary**, que só o browser gera — definir o `Content-Type` à
+mão faria o Spring recusar o corpo por não achar o boundary, e o erro não diria isso.
+
+O teto vem do **`MEDIA_MAX_FILE_SIZE` do `.env` da raiz**, o mesmo valor que o
+`spring.servlet.multipart.max-file-size` da `admin-api` usa, convertido para bytes no `vite.config`.
+Ele é conferido **antes** de enviar porque a API responde **413 sem corpo nenhum** — medido contra a
+API de verdade. Sem a conferência, a pessoa esperaria o upload inteiro para ler "falhou" sem motivo.
+
+### Dois limites lidos do domínio, e não copiados
+
+O `VideoValidator` não é o `CategoryValidator`:
+
+| Campo | Vídeo | Categoria |
+|---|---|---|
+| título / nome | 1 a 255 | 3 a 255 |
+| sinopse / descrição | **obrigatória**, até 4000 | opcional, até 4000 |
+
+E a ordenação padrão é por **`title`**, não por `name`: é o único dos quatro agregados que difere, e
+copiar `name` pediria ordenação por uma coluna que não existe.
+
+Duração zero é válida (`duration < 0` é a única regra), e o ano não tem teto: catálogo tem filme de
+1902, e estreia marcada para o ano que vem é caso real.
+
+### Os filtros por vínculo
+
+Só a rota de vídeo os tem. Eles vão como **repetição do mesmo parâmetro**
+(`categories=a&categories=b`), que é como o Spring os lê num `Set<String>` — juntar com vírgula daria
+um id só, inexistente.
+
+## A tabela que os agregados dividem
+
+`search`, `page`, `perPage`, `sort` e `dir` são iguais nos quatro `*SearchRequest` da `admin-api`.
+Eles ficam no [`shared/search.ts`](src/shared/search.ts), e a tabela — campo de busca, aviso de
+falha, paginação e ordenação no servidor — no
+[`shared/AggregateTable.tsx`](src/shared/AggregateTable.tsx).
+
+Isto não estava no primeiro desenho, e entrou **quando ia virar a terceira cópia**. As duas primeiras
+ainda cabiam em cada tela; a terceira já seria a mesma decisão mantida em três lugares — a de não
+trazer `List` do banco, que é a razão pela qual nenhuma rota de listagem da `admin-api` devolve lista
+inteira.
+
+As colunas continuam em cada tela, inclusive a de ações: os rótulos e os avisos são diferentes, e
+genericizá-los esconderia a diferença em vez de a documentar.
+
+O **campo de escolha** seguiu o mesmo caminho, e pelo mesmo critério: ele nasceu para as categorias
+de um gênero, e o vídeo precisava de três. Os três recursos escolhíveis — categoria, gênero e elenco
+— têm a mesma forma no que importa (id e nome), então o
+[`ReferencePicker`](src/shared/ReferencePicker.tsx) recebe o recurso e serve aos quatro usos.
+
+A chave de cache de um registro lido por id é **a mesma** que a tela de edição dele usa. A rota é a
+mesma (`GET /{recurso}/{id}`) e devolve o mesmo corpo, então abrir um gênero depois de abrir uma
+categoria não refaz a chamada.
+
+O que a extração custou e rendeu, medido no build: os pedaços de cada agregado caíram para **1 a 3
+kB**, porque DataGrid e formulário agora são pedaço comum em vez de estarem dentro de cada tela.
+
 ## As escolhas de ferramenta, e onde elas divergem do curso
 
 A referência é o [FC3-admin-videos-react](https://github.com/devfullcycle/FC3-admin-videos-react). Ela
@@ -207,11 +365,12 @@ e um acesso a possível `null` falham a compilação.
 
 ## O que já existe, e o que não
 
-Existe: entrar, o guarda de administração, o layout com as quatro abas, e **as categorias por
-inteiro** — listar, criar, editar, ativar, desativar e remover.
+**Os quatro agregados por inteiro**: categorias, elenco, gêneros e vídeos — listar, criar, editar,
+ativar, desativar e remover, mais os três estados do vídeo e o envio dos cinco arquivos.
 
-Não existe ainda: gêneros, elenco e vídeos, com o envio de mídia. As abas estão lá e **dizem isso**,
-porque aba que abre página vazia parece defeito.
+O que **não** existe, e é escolha: o player. Rever a mídia enviada é trabalho do portal, e o
+back-office mostra o nome do arquivo e o status da codificação, que é o que quem administra precisa
+saber. A `admin-api` tem a rota de download (com `Range`), então isto é adicionável.
 
 ## O tamanho do pacote
 
@@ -225,10 +384,15 @@ ainda grita se uma dependência nova entrar.
 
 ## Os testes
 
-`npm test` roda o Vitest com jsdom. São 88, e cada guarda tem o seu: que o assinante não entra, que
+`npm test` roda o Vitest com jsdom. São 236, e cada guarda tem o seu: que o assinante não entra, que
 a consulta espera o token, que `search` vazio não vai na URL, que 4xx não é repetido, que 401 e 403
 dizem coisas diferentes, que `active` não vai no corpo da atualização, que remover pergunta antes,
-que o 409 manda desativar. Todos foram conferidos ao contrário — removendo o que eles guardam e vendo
+que o 409 manda desativar, que o papel do elenco é fechado nos dois valores do domínio, que a rota
+dele leva hífen, que o nome do gênero aceita uma letra, que a lista de gêneros mostra contagem e não
+ids, que tirar a última categoria manda lista vazia, que o vídeo ordena por `title`, que o filtro
+repete o parâmetro em vez de juntar com vírgula, que a sinopse é obrigatória, que o teto do arquivo é
+conferido antes de enviar, que o envio **não** define `Content-Type`, e que cada estado do vídeo vai
+na rota dele. Todos foram conferidos ao contrário — removendo o que eles guardam e vendo
 cada um falhar.
 
 Um deles ficou **verde** nessa conferência, e vale registrar o que ensinou: estreitar o tipo do corpo

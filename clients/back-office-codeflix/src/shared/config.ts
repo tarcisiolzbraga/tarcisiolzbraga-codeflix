@@ -37,3 +37,13 @@ export const KEYCLOAK_CLIENT_ID = required(
 // (CODEFLIX_CATEGORIES e companhia), mas o back-office administra os quatro, então quem entra aqui
 // precisa do papel que abre todos.
 export const ADMIN_ROLE = "CODEFLIX_ADMIN";
+
+// O teto de cada arquivo de mídia, em bytes. Vem do `MEDIA_MAX_FILE_SIZE` do `.env` da raiz — o
+// mesmo valor que o `spring.servlet.multipart.max-file-size` da admin-api usa.
+//
+// Conferir antes de enviar não é zelo: acima do teto a API responde **413 sem corpo nenhum**
+// (medido), então sem esta conferência a pessoa esperaria o upload inteiro para ler "falhou" sem
+// motivo. A API continua sendo quem decide — isto só evita a viagem.
+export const MEDIA_MAX_FILE_SIZE = Number(
+  required("VITE_MEDIA_MAX_FILE_SIZE", import.meta.env.VITE_MEDIA_MAX_FILE_SIZE),
+);
