@@ -17,6 +17,9 @@ const video = {
   yearLaunched: 2026,
   duration: 107,
   rating: "14",
+  banner: "banners/um-filme.png",
+  thumbnail: "thumbs/um-filme.png",
+  thumbnailHalf: null,
   genres: [{ id: "g1", name: "Ação" }],
   categories: [{ id: "c1", name: "Filmes" }],
   castMembers: [],
@@ -96,6 +99,52 @@ describe("fetchVideo", () => {
 
     // When busca / Then volta null, e a tela diz "não está no acervo"
     await expect(fetchVideo(video.id, "um-token")).resolves.toBeNull();
+  });
+
+  // Os campos de arte servem para **uma** coisa: saber se o título tem aquela imagem, antes de pedir
+  // o endereço assinado dela. Sem pedi-los, a tela não saberia quando mostrar o substituto — e
+  // pediria um endereço para arte que não existe.
+  it("givenASearch_whenQueries_thenAsksForTheArtworkFields", async () => {
+    // Given uma busca
+    const fetching = respondWith({
+      data: { videos: { meta: { currentPage: 0, perPage: 12, total: 1 }, items: [video] } },
+    });
+
+    // When a consulta é montada
+    await searchVideos({ search: "", page: 0 }, "token");
+
+    // Then os três campos de arte estão no documento
+    const sent = JSON.parse(String(fetching.mock.calls[0]![1]!.body)) as { query: string };
+    expect(sent.query).toContain("banner");
+    expect(sent.query).toContain("thumbnail");
+    expect(sent.query).toContain("thumbnailHalf");
+  });
+
+  it("givenAVideoWithoutArtwork_whenFetches_thenTheFieldsComeNull", async () => {
+    // Given um título sem arte nenhuma — o caso de quem acabou de cadastrar
+    respondWith({
+      data: { video: { ...video, banner: null, thumbnail: null, thumbnailHalf: null } },
+    });
+
+    // When o título é buscado
+    const found = await fetchVideo(video.id, "token");
+
+    // Then os campos chegam nulos, em vez de ausentes
+    expect(found?.banner).toBeNull();
+    expect(found?.thumbnail).toBeNull();
+  });
+
+  // THUMBNAIL_HALF entrou na união por completude do `VideoMediaType` do admin: a rota do catálogo
+  // repassa o tipo como texto, e os cinco valem.
+  it("givenTheHalfThumbnail_whenAsksForTheLink_thenTheTypeGoesInTheRoute", async () => {
+    // Given um título com meia miniatura
+    const fetching = respondWith({ path: "/videos/v1/medias/THUMBNAIL_HALF?x=1", expiresAt: "2026-01-01T00:00:00Z" });
+
+    // When o endereço é pedido
+    await fetchSignedMediaUrl("v1", "THUMBNAIL_HALF", "token");
+
+    // Then o tipo vai no caminho
+    expect(String(fetching.mock.calls[0]![0])).toContain("/medias/THUMBNAIL_HALF/link");
   });
 
   it("givenAVideoInTheCatalog_whenFetches_thenReturnsItResolved", async () => {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "react-oidc-context";
+import { Artwork } from "@/catalog/Artwork";
 import {
   CatalogRefused,
   formatDuration,
@@ -143,19 +144,32 @@ export function CatalogScreen() {
           <p className="text-sm text-neutral-500">
             {page.meta.total} {page.meta.total === 1 ? "título" : "títulos"}
           </p>
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Pôster em pé, 2:3, que é a proporção de cartaz de cinema — e a que o `THUMBNAIL`
+              do admin recebe. A sinopse saiu do cartão: numa grade de pôsteres ela é ruído, e a
+              página do título já a mostra inteira. */}
+          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {page.items.map((video) => (
               <li key={video.id}>
                 <Link
                   href={`/acervo/${video.id}`}
-                  className="flex h-full flex-col gap-2 rounded-lg border border-neutral-800 bg-neutral-900 p-4 hover:border-neutral-700"
+                  className="group flex h-full flex-col gap-2 rounded-lg border border-neutral-800 bg-neutral-900 transition hover:border-neutral-600"
                 >
-                  <h2 className="font-semibold text-neutral-100">{video.title}</h2>
-                  <p className="text-xs text-neutral-500">
-                    {video.yearLaunched} · {formatDuration(video.duration)} ·{" "}
-                    {ratingLabel(video.rating)}
-                  </p>
-                  <p className="line-clamp-3 text-sm text-neutral-400">{video.description}</p>
+                  <Artwork
+                    videoId={video.id}
+                    type="THUMBNAIL"
+                    location={video.thumbnail}
+                    title={video.title}
+                    className="aspect-2/3 w-full rounded-t-lg"
+                  />
+                  <div className="flex flex-col gap-1 p-3 pt-0">
+                    <h2 className="font-semibold text-neutral-100 group-hover:text-neutral-50">
+                      {video.title}
+                    </h2>
+                    <p className="text-xs text-neutral-500">
+                      {video.yearLaunched} · {formatDuration(video.duration)} ·{" "}
+                      {ratingLabel(video.rating)}
+                    </p>
+                  </div>
                 </Link>
               </li>
             ))}

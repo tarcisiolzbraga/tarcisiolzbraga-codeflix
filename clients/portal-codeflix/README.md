@@ -201,6 +201,33 @@ faria ela vencer na mão de quem leu a sinopse com calma.
 admin-api serve 206. O player não precisou de nada para isso — quem faz o pedido de trecho é o
 browser.
 
+### A arte dos títulos, e o custo dela
+
+Pôster na grade do acervo (2:3, proporção de cartaz, do `THUMBNAIL`) e banner no alto da página do
+título (16:6, do `BANNER`).
+
+**O endereço é assinado, pelo mesmo motivo do player:** `<img src>` também não carrega cabeçalho de
+`Authorization`. O browser busca o `src` por conta própria, sem token.
+
+A diferença é **quando** o endereço é pedido. O player pede no clique, porque a assinatura vale cinco
+minutos e pedi-la antes faria vencer na mão de quem leu a sinopse com calma. A arte pede **ao
+montar**: ninguém clica num pôster para que ele apareça, e cinco minutos bastam — imagem já carregada
+fica no cache do browser, e o que ainda não carregou pede um endereço novo.
+
+**O custo, dito em vez de escondido:** uma grade de doze títulos faz **doze** chamadas ao `/link`, uma
+por arte. Não há rota que assine várias de uma vez, e um bucket público resolveria isso ao preço de a
+arte deixar de ser restrita. Os campos `banner`, `thumbnail` e `thumbnailHalf` que a consulta pede
+guardam a **localização no armazenamento**, não uma URL que o browser alcance — eles servem para
+saber se o título **tem** aquela arte, e evitar a chamada quando não tem.
+
+**`<img>`, e não o `<Image>` do Next.** O otimizador dele busca a imagem no servidor, e este endereço
+vale cinco minutos e é emitido para quem está olhando. Guardar em cache um endereço que vence, num
+host que muda por ambiente, seria trocar um problema simples por dois.
+
+Título sem arte mostra a **inicial sobre um degradê** — e a mesma coisa aparece quando o endereço
+falha, porque para quem olha é o mesmo, e um retângulo vazio pareceria defeito. É caso comum: um
+título recém-cadastrado no back-office não tem nenhuma das cinco artes.
+
 ## O que dá para verificar sem browser, e o que não dá
 
 O login interativo não é automatizável aqui (não há browser de verdade na verificação), então o que
@@ -251,10 +278,11 @@ conta lendo `GET /accounts/me` **com** token, que é a primeira que exercita o C
 O cadastro, com a confirmação por e-mail. E a assinatura: assinar a partir do plano, ver a
 situação, pagar, cancelar e guardar o meio de pagamento.
 
-E o acervo: busca e página de título, pelo GraphQL da `videos-api`.
+E o acervo: busca, grade de pôsteres, página de título com banner, e **reprodução** — endereço
+assinado, reprodução progressiva e busca na linha de tempo.
 
-O que falta para o portal fazer o que o nome promete é **reprodução**, e ela depende de uma rota de
-mídia que a `videos-api` ainda não tem — está explicado abaixo.
+O que falta aqui é visual, não funcional: fila "continuar assistindo", trilhas por gênero na home, e
+o trailer, que tem arquivo no admin e ainda não tem lugar nesta tela.
 
 ## Duas coisas que vão morder quem continuar
 

@@ -8,10 +8,21 @@ export type Video = {
   yearLaunched: number;
   duration: number;
   rating: string;
+  // Os campos de mídia guardam a **localização no armazenamento**, não uma URL que o browser
+  // alcance — é o que o schema do catálogo diz, e o que o admin publica. Eles servem para uma coisa
+  // só aqui: saber se o título **tem** aquela arte, antes de pedir o endereço assinado dela.
+  //
+  // Nulo quando o arquivo não foi enviado, e é caso comum: um título recém-cadastrado não tem arte.
+  banner: string | null;
+  thumbnail: string | null;
+  thumbnailHalf: string | null;
   genres: { id: string; name: string }[];
   categories: { id: string; name: string }[];
   castMembers: { id: string; name: string }[];
 };
+
+// Os cinco tipos que a rota de mídia do catálogo repassa, com os nomes do `VideoMediaType` do admin.
+export type MediaType = "VIDEO" | "TRAILER" | "BANNER" | "THUMBNAIL" | "THUMBNAIL_HALF";
 
 export type VideoPage = {
   meta: { currentPage: number; perPage: number; total: number };
@@ -76,6 +87,7 @@ async function query<T>(document: string, variables: Record<string, unknown>, to
 
 const VIDEO_FIELDS = `
   id title description yearLaunched duration rating
+  banner thumbnail thumbnailHalf
   genres { id name }
   categories { id name }
   castMembers { id name }`;
@@ -121,7 +133,7 @@ export type SignedMedia = { url: string; expiresAt: string };
 
 export async function fetchSignedMediaUrl(
   id: string,
-  type: "VIDEO" | "TRAILER" | "BANNER" | "THUMBNAIL",
+  type: MediaType,
   token: string,
 ): Promise<SignedMedia | null> {
   const response = await fetch(`${CATALOG_API}/api/videos/${id}/medias/${type}/link`, {
