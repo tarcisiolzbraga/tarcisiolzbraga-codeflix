@@ -110,7 +110,7 @@ describe("CategoryList", () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it("givenALista_whenAbre_thenOferecCriarUmaNova", async () => {
+  it("givenALista_whenAbre_thenOfereceCriarUmaNova", async () => {
     renderiza();
 
     const botao = await screen.findByRole("link", { name: /Nova categoria/ });
