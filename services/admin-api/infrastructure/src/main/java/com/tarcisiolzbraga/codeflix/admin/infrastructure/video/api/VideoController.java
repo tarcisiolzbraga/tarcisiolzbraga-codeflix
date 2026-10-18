@@ -10,6 +10,7 @@ import com.tarcisiolzbraga.codeflix.admin.application.video.update.UpdateVideoCo
 import com.tarcisiolzbraga.codeflix.admin.application.video.update.UpdateVideoOutput;
 import com.tarcisiolzbraga.codeflix.admin.domain.pagination.Pagination;
 import com.tarcisiolzbraga.codeflix.admin.domain.validation.handler.Notification;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.MediaSource;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Resource;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoMediaType;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoResource;
@@ -26,6 +27,7 @@ import com.tarcisiolzbraga.codeflix.admin.infrastructure.video.models.VideoSearc
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.util.Hashing;
 import java.util.List;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
@@ -128,14 +130,12 @@ public class VideoController implements VideoAPI {
             final var media = this.mediaUseCases.getMedia().execute(new GetMediaCommand(id, type));
             // O caminho **sem** `Range` continua montando o corpo em memória, e isso é escolha: ele
             // serve as artes do catálogo — banner e miniatura —, que são pequenas, e o player sempre
-            // manda `Range`. O embrulho num `StreamingResponseBody` existe para a rota ter um tipo
-            // de retorno só.
-            final var content = media.content();
+            // manda `Range`. O que ele passa adiante já é a função que escreve, como no trecho.
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(media.contentType()))
                     .header(HttpHeaders.ACCEPT_RANGES, BYTES)
                     .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISPOSITION.formatted(media.name()))
-                    .body(destination -> destination.write(content));
+                    .body(media.content()::writeTo);
         }
         final var slice = this.mediaUseCases.getMediaSlice().execute(new GetMediaSliceCommand(id, type, range));
         // 206 e o `Content-Range` que o armazenamento calculou: refazer a conta do intervalo aqui
@@ -180,12 +180,36 @@ public class VideoController implements VideoAPI {
 
     // O tipo de conteúdo e o nome vêm do envio e são guardados junto do arquivo, para a rota de
     // download devolver o arquivo como ele entrou.
+    // **Duas passadas sobre o arquivo, e nenhuma cópia dele em memória.**
+    //
+    // O checksum é gravado como metadado do objeto no armazenamento, então tem de ser conhecido antes
+    // do PUT — não dá para calculá-lo durante o envio. Uma passada o calcula, lendo em blocos; a
+    // outra, dentro do `store`, envia.
+    //
+    // As duas são de graça: acima do limiar de memória, o Spring já gravou o multipart num arquivo
+    // temporário em disco, e abrir o `getInputStream()` dele duas vezes é ler duas vezes um arquivo
+    // local. A versão anterior fazia `getBytes()` e carregava os 100 MB para calcular o checksum —
+    // e depois os copiava mais duas vezes, por cópia defensiva.
     private Resource resourceOf(final MultipartFile file) {
-        try {
-            final var content = file.getBytes();
-            final var contentType = file.getContentType() == null ? FALLBACK_CONTENT_TYPE : file.getContentType();
-            final var name = file.getOriginalFilename() == null ? file.getName() : file.getOriginalFilename();
-            return Resource.with(content, Hashing.checksumOf(content), contentType, name);
+        final var contentType = file.getContentType() == null ? FALLBACK_CONTENT_TYPE : file.getContentType();
+        final var name = file.getOriginalFilename() == null ? file.getName() : file.getOriginalFilename();
+        final var source = new MediaSource() {
+            @Override
+            public InputStream open() throws IOException {
+                return file.getInputStream();
+            }
+
+            @Override
+            public long length() {
+                return file.getSize();
+            }
+        };
+        return Resource.with(source, checksumOf(source), contentType, name);
+    }
+
+    private static String checksumOf(final MediaSource source) {
+        try (var content = source.open()) {
+            return Hashing.checksumOf(content);
         } catch (final IOException exception) {
             throw new IllegalStateException("could not read the uploaded file", exception);
         }

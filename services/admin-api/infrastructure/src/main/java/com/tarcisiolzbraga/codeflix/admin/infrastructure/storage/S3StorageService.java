@@ -2,6 +2,9 @@ package com.tarcisiolzbraga.codeflix.admin.infrastructure.storage;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Resource;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.ResourceSlice;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -35,7 +38,18 @@ public class S3StorageService implements StorageService {
                         .contentType(resource.contentType())
                         .metadata(Map.of(
                                 CHECKSUM_METADATA, resource.checksum(), NAME_METADATA, resource.name())),
-                RequestBody.fromBytes(resource.content()));
+                // `fromInputStream` com o tamanho, e não `fromBytes`: o arquivo vai do disco para o
+                // armazenamento sem passar inteiro pela memória. O tamanho é obrigatório — sem
+                // `Content-Length` o SDK bufferiza o corpo para descobri-lo, o que anularia a troca.
+                RequestBody.fromInputStream(open(resource), resource.content().length()));
+    }
+
+    private static InputStream open(final Resource resource) {
+        try {
+            return resource.content().open();
+        } catch (final IOException failure) {
+            throw new UncheckedIOException("could not read the file to upload", failure);
+        }
     }
 
     private static final int RANGE_NOT_SATISFIABLE = 416;
@@ -47,6 +61,8 @@ public class S3StorageService implements StorageService {
                     request -> request.bucket(this.bucket).key(name));
             final var response = object.response();
             return Optional.of(Resource.with(
+                    // O download inteiro continua lendo para a memória, de propósito: ele serve as
+                    // artes do catálogo, que são pequenas, e o player sempre manda `Range`.
                     object.asByteArray(),
                     response.metadata().get(CHECKSUM_METADATA),
                     response.contentType(),
