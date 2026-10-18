@@ -28,14 +28,18 @@ class GetMediaUseCaseIT {
     private MediaResourceGateway mediaResourceGateway;
 
     @Test
-    void givenAStoredMedia_whenCallExecute_thenReceiveTheFileBack() {
+    void givenAStoredMedia_whenCallExecute_thenReceiveTheFileBack() throws java.io.IOException {
         final var id = VideoID.unique();
         final var resource = Resource.with("conteudo do arquivo".getBytes(), "abc1", "video/mp4", "duna.mp4");
         this.mediaResourceGateway.storeAudioVideo(id, VideoResource.with(VideoMediaType.VIDEO, resource));
 
         final var actualOutput = useCase.execute(new GetMediaCommand(id.getValue(), VideoMediaType.VIDEO));
 
-        assertArrayEquals("conteudo do arquivo".getBytes(), actualOutput.content());
+        // O conteúdo é escrito, e não lido: isto prova, de ponta a ponta com o armazenamento de
+        // verdade, que a função entrega o que foi guardado.
+        final var destination = new java.io.ByteArrayOutputStream();
+        actualOutput.content().writeTo(destination);
+        assertArrayEquals("conteudo do arquivo".getBytes(), destination.toByteArray());
         assertEquals("video/mp4", actualOutput.contentType());
         assertEquals("duna.mp4", actualOutput.name());
     }

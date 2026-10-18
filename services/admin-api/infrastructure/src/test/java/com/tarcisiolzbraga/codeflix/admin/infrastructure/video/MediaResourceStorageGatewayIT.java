@@ -1,5 +1,6 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.video;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -11,6 +12,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoMediaType;
 import com.tarcisiolzbraga.codeflix.admin.domain.video.VideoResource;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
 import java.util.Optional;
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -43,14 +45,15 @@ class MediaResourceStorageGatewayIT {
     }
 
     @Test
-    void givenAStoredResource_whenGetResource_thenReceiveItBack() {
+    void givenAStoredResource_whenGetResource_thenReceiveItBack() throws IOException {
         final var id = VideoID.unique();
         final var expectedResource = resource();
         this.mediaResourceGateway.storeAudioVideo(id, VideoResource.with(VideoMediaType.VIDEO, expectedResource));
 
         final var actualResource = this.mediaResourceGateway.getResource(id, VideoMediaType.VIDEO);
 
-        assertEquals(Optional.of(expectedResource), actualResource);
+        assertTrue(actualResource.isPresent());
+        assertSameResource(expectedResource, actualResource.get());
     }
 
     @Test
@@ -91,4 +94,18 @@ class MediaResourceStorageGatewayIT {
     private Resource resource() {
         return Resource.with("conteudo do arquivo".getBytes(), "abc123", "video/mp4", "duna.mp4");
     }
+
+    // Campo a campo, e o conteúdo **lido**: o `Resource` guarda uma fonte, não um arranjo, então o
+    // `equals` dele não compara bytes — comparar duas fontes exigiria abrir e ler as duas. Afirmar
+    // assim diz a mesma coisa, e de passagem prova que a fonte entrega o que foi guardado.
+    private static void assertSameResource(final Resource expected, final Resource actual) throws IOException {
+        assertEquals(expected.checksum(), actual.checksum());
+        assertEquals(expected.contentType(), actual.contentType());
+        assertEquals(expected.name(), actual.name());
+        try (var expectedContent = expected.content().open();
+                var actualContent = actual.content().open()) {
+            assertArrayEquals(expectedContent.readAllBytes(), actualContent.readAllBytes());
+        }
+    }
+
 }

@@ -1,5 +1,6 @@
 package com.tarcisiolzbraga.codeflix.admin.infrastructure.storage;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -24,13 +25,15 @@ class S3StorageServiceIT {
     private StorageService storageService;
 
     @Test
-    void givenAResource_whenStoreAndGet_thenReceiveItBackWholeWithItsMetadata() {
+    void givenAResource_whenStoreAndGet_thenReceiveItBackWholeWithItsMetadata() throws IOException {
         final var name = uniqueName();
         final var expectedResource = resource();
 
         this.storageService.store(name, expectedResource);
 
-        assertEquals(Optional.of(expectedResource), this.storageService.get(name));
+        final var actual = this.storageService.get(name);
+        assertTrue(actual.isPresent());
+        assertSameResource(expectedResource, actual.get());
     }
 
     @Test
@@ -127,6 +130,20 @@ class S3StorageServiceIT {
             throw new UncheckedIOException(failure);
         }
         return destination.toString(StandardCharsets.UTF_8);
+    }
+
+
+    // Campo a campo, e o conteúdo **lido**: o `Resource` guarda uma fonte, não um arranjo, então o
+    // `equals` dele não compara bytes — comparar duas fontes exigiria abrir e ler as duas. Afirmar
+    // assim diz a mesma coisa, e de passagem prova que a fonte entrega o que foi guardado.
+    private static void assertSameResource(final Resource expected, final Resource actual) throws IOException {
+        assertEquals(expected.checksum(), actual.checksum());
+        assertEquals(expected.contentType(), actual.contentType());
+        assertEquals(expected.name(), actual.name());
+        try (var expectedContent = expected.content().open();
+                var actualContent = actual.content().open()) {
+            assertArrayEquals(expectedContent.readAllBytes(), actualContent.readAllBytes());
+        }
     }
 
 }
