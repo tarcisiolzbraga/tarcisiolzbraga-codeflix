@@ -17,6 +17,28 @@ importa para quem chega pelo Google), o back-office é Vite (não renderiza nada
 tudo atrás dele exige login). Os dois expõem o mesmo `npm run check`, e é só isso que o CI precisa
 saber.
 
+A diferença aparece na imagem: o portal carrega um servidor Node e deu **286 MB**; o back-office é
+pacote estático num nginx e deu **90 MB**.
+
+## As URLs são decididas no build, e isso vale para os dois
+
+`NEXT_PUBLIC_*` no portal e o `define` do Vite no back-office fazem a mesma coisa: **substituem a URL
+no código em tempo de build**. Então ela entra como `build-arg`, e não como variável de ambiente do
+container — passá-la no `run` não mudaria nada, porque o valor já está no JavaScript que o browser
+baixa.
+
+| no `.env` da raiz | o que acontece |
+|---|---|
+| `PUBLIC_*` vazias | cada URL cai para `http://localhost:<porta>`, o padrão de desenvolvimento |
+| `PUBLIC_*` preenchidas | a URL inteira é usada, e a porta é ignorada |
+
+A primeira linha é o que a máquina de quem programa quer: as portas das APIs são publicadas no host,
+e é o **browser** que as alcança, não o container do front.
+
+A consequência, dita antes de alguém descobrir: **uma imagem construída para um ambiente não serve
+para outro.** É o preço de um front que não lê configuração em tempo de execução, e a alternativa —
+servir a configuração por uma rota e buscá-la ao abrir — custa uma ida à rede antes da primeira tela.
+
 ## Por que separado de services/
 
 É o mesmo argumento do [README da raiz](../README.md#por-que-num-repositório-só) para o monorepo
