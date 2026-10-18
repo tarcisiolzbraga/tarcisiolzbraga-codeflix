@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "react-oidc-context";
+import { Artwork } from "@/catalog/Artwork";
 import { Player } from "@/catalog/Player";
 import {
   fetchVideo,
@@ -81,18 +82,33 @@ export function VideoScreen({ id }: { id: string }) {
   const { video } = state;
   return (
     <article className="flex flex-col gap-6">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">{video.title}</h1>
-        <p className="text-sm text-neutral-500">
-          {video.yearLaunched} · {formatDuration(video.duration)} · {ratingLabel(video.rating)}
-        </p>
+      {/* O banner é deitado, 16:6, que é a proporção que o `BANNER` do admin recebe. O título vem
+          **sobre** ele, com um degradê por baixo: sem o degradê, título claro sobre cena clara fica
+          ilegível, e isso depende da arte — que não se controla daqui. */}
+      <header className="relative overflow-hidden rounded-lg">
+        <Artwork
+          videoId={video.id}
+          type="BANNER"
+          location={video.banner}
+          title={video.title}
+          className="aspect-16/6 w-full"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/50 to-transparent" />
+        <div className="absolute bottom-0 flex flex-col gap-1 p-4 sm:p-6">
+          <h1 className="text-3xl font-bold tracking-tight drop-shadow-lg sm:text-4xl">
+            {video.title}
+          </h1>
+          <p className="text-sm text-neutral-300">
+            {video.yearLaunched} · {formatDuration(video.duration)} · {ratingLabel(video.rating)}
+          </p>
+        </div>
       </header>
 
       <p className="max-w-3xl text-neutral-300">{video.description}</p>
 
       {/* O player veio depois do resto desta tela: a rota de mídia do catálogo não existia, e a
-          página dizia isso em vez de fingir. Agora existe, e com as limitações que o README registra
-          — arquivo baixado por inteiro, sem busca na linha de tempo. */}
+          página dizia isso em vez de fingir. Hoje existe, com endereço assinado e `Range` — a
+          reprodução é progressiva e a busca na linha de tempo funciona. */}
       <Player videoId={video.id} />
 
       <Facts label="Gêneros" values={video.genres.map((it) => it.name)} />
