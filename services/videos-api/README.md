@@ -365,11 +365,15 @@ Nos testes que esperam a chegada de uma mensagem, a presença é afirmada **ante
 `AssertionError`, e o Awaitility não a repetiria — o teste falharia na primeira tentativa em vez de
 esperar.
 
-### A intermitência do GenreE2ETest, e o que faltava para investigá-la
+### A intermitência da replicação, e o que faltava para investigá-la
 
-O `givenGenresInDifferentCategories_whenFilterByOne_thenSeeOnlyTheGenresOfThatCategory` falhava **só
-no CI**, com `expected: <2> but was: <1>`: um dos dois gêneros publicados não chegava ao índice em
-40 segundos. Três investigações terminaram em hipótese.
+O `GenreE2ETest` falhava **só no CI**, com `expected: <2> but was: <1>`: um dos dois gêneros
+publicados não chegava ao índice em 40 segundos. Três investigações terminaram em hipótese.
+
+**E ela não é do gênero.** Na mesma sessão em que o diagnóstico foi escrito, o CI falhou no
+`CastMemberE2ETest` — mesmo formato, outro agregado. Os quatro E2E deste serviço esperam replicação
+do mesmo jeito, então o diagnóstico é dos quatro, no
+[`ReplicationAwait`](infrastructure/src/test/java/com/tarcisiolzbraga/codeflix/videos/infrastructure/ReplicationAwait.java).
 
 **O que faltava era o log, e isso foi medido.** Num job que falhou às 17:03:11, as 179 linhas de log
 da aplicação capturadas eram **todas** de 17:04 — o encerramento. O que aconteceu durante o teste
@@ -378,7 +382,8 @@ dos containers parando, não causa. Construir uma teoria sobre ele seria constru
 
 Então a falha passou a carregar o motivo. O [`ListenerLogCapture`](infrastructure/src/test/java/com/tarcisiolzbraga/codeflix/videos/infrastructure/ListenerLogCapture.java)
 prende um appender nos dois lugares onde o motivo apareceria — o nosso listener e
-`org.springframework.kafka` — e o `awaitGenres` junta o que foi registrado à mensagem de falha.
+`org.springframework.kafka` — e o `awaitReplicated` junta o que foi registrado à mensagem de falha,
+com o estado do índice ao lado.
 
 As duas respostas que importam ficam visíveis:
 
@@ -387,8 +392,16 @@ As duas respostas que importam ficam visíveis:
 | o admin respondeu 404 para o gênero | `[WARN] GenreListener: gênero … não está mais no admin-codeflix; nada a replicar` |
 | a replicação estourou e esgotou as tentativas | `[ERROR] GenreListener: mensagem descartada para a fila morta em …` |
 
-**Os dois caminhos foram exercitados de propósito** antes de confiar na peça: um dublê devolvendo
-vazio, e um dublê estourando. Nos dois casos a mensagem de falha chegou com a linha certa.
+**Os dois caminhos foram exercitados de propósito** antes de confiar na peça — um dublê devolvendo
+vazio e um dublê estourando — e no gênero **e** no elenco. A mensagem do elenco, com a sonda no
+lugar:
+
+```
+a replicação não aconteceu em PT40S.
+O índice tem: [00000003=Denis Villeneuve/DIRECTOR]
+O que os listeners registraram (WARN e acima): [[WARN] CastMemberListener: membro de elenco
+00000003-9100-… não está mais no admin-codeflix; nada a replicar]
+```
 
 Dois detalhes que custaram uma volta cada:
 
@@ -402,9 +415,12 @@ A fila é concorrente, e não a lista do `ListAppender` do logback: quem escreve
 consumidor e quem lê é a do teste. Uma corrida dentro da peça que existe para explicar corrida seria
 irônica.
 
+Ler o índice na hora da falha também é protegido: é a mesma rede que acabou de não responder, e uma
+exceção ali trocaria o diagnóstico por um rastro de pilha.
+
 **Isto não conserta a intermitência** — ela não tem reprodução local, e 40 segundos de espera não
 foram atingidos em nenhuma execução daqui. O que mudou é que a próxima falha no CI chega com
-evidência em vez de aritmética.
+evidência em vez de aritmética, em **qualquer** dos quatro agregados.
 
 ### Regressão manual
 
