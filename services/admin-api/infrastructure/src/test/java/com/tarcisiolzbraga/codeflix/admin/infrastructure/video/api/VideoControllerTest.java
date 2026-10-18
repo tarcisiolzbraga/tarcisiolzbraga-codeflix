@@ -325,7 +325,14 @@ class VideoControllerTest {
     @Test
     void givenARangeHeader_whenCallGetMedia_thenReturnPartialContentWithTheContentRange() throws Exception {
         when(getMediaSliceUseCase.execute(any()))
-                .thenReturn(new MediaSliceOutput("conte".getBytes(), "video/mp4", "duna.mp4", "bytes 0-4/8"));
+                // O conteúdo é uma função que escreve, e não um `byte[]`: é assim que o trecho vai
+                // para a resposta sem passar inteiro pela memória. O `content().bytes(...)` abaixo
+                // prova que o que a função escreve é o que o cliente recebe.
+                .thenReturn(new MediaSliceOutput(
+                        destination -> destination.write("conte".getBytes()),
+                        "video/mp4",
+                        "duna.mp4",
+                        "bytes 0-4/8"));
 
         final var response = this.mockMvc.perform(
                 get(VIDEOS_PATH + "/" + EXPECTED_ID + "/medias/VIDEO").header(HttpHeaders.RANGE, "bytes=0-4"));

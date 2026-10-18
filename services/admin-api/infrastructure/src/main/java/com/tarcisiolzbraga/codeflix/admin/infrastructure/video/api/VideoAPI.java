@@ -45,6 +45,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 // Contrato HTTP e documentação OpenAPI dos vídeos; o VideoController só implementa.
 @Tag(name = "Vídeos", description = "Cadastro dos vídeos do catálogo")
@@ -156,13 +157,17 @@ public interface VideoAPI {
             description = "Responde com o arquivo, o tipo de conteúdo original e o nome com que foi enviado. "
                     + "Aceita `Range`: com ele, responde 206 e só o trecho pedido, que é o que permite a um "
                     + "player buscar na linha de tempo sem baixar o arquivo inteiro.")
-    @ApiResponse(responseCode = OK, description = "Arquivo encontrado")
-    @ApiResponse(responseCode = PARTIAL_CONTENT, description = "O trecho pedido no cabeçalho Range")
+    // O corpo é o arquivo, e o schema diz isso em vez de `StreamingResponseBody`: o tipo de retorno
+    // é detalhe de como a resposta é escrita, não do contrato.
+    @ApiResponse(responseCode = OK, description = "Arquivo encontrado",
+            content = @Content(schema = @Schema(type = "string", format = "binary")))
+    @ApiResponse(responseCode = PARTIAL_CONTENT, description = "O trecho pedido no cabeçalho Range",
+            content = @Content(schema = @Schema(type = "string", format = "binary")))
     @ApiResponse(responseCode = NOT_FOUND, description = "Nenhum arquivo desse tipo para o vídeo informado",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     @ApiResponse(responseCode = RANGE_NOT_SATISFIABLE, description = "O trecho pedido não existe no arquivo",
             content = @Content(schema = @Schema(implementation = ApiError.class)))
-    ResponseEntity<byte[]> getMedia(
+    ResponseEntity<StreamingResponseBody> getMedia(
             @Parameter(description = ID_DESCRIPTION) @PathVariable("id") String id,
             @Parameter(description = MEDIA_TYPE_DESCRIPTION) @PathVariable("type") VideoMediaType type,
             @Parameter(description = RANGE_DESCRIPTION) @RequestHeader(value = HttpHeaders.RANGE, required = false)

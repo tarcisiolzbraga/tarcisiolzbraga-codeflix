@@ -6,6 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tarcisiolzbraga.codeflix.admin.domain.video.Resource;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.IntegrationTest;
+import com.tarcisiolzbraga.codeflix.admin.domain.video.MediaContent;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.Set;
@@ -68,7 +72,7 @@ class S3StorageServiceIT {
         final var actual = this.storageService.getSlice(name, "bytes=0-7");
 
         assertTrue(actual.isPresent());
-        assertEquals("conteudo", new String(actual.get().content(), StandardCharsets.UTF_8));
+        assertEquals("conteudo", writtenBy(actual.get().content()));
         // "conteudo do arquivo" tem 19 bytes, e o total vem do próprio armazenamento.
         assertEquals("bytes 0-7/19", actual.get().contentRange());
         assertEquals("video/mp4", actual.get().contentType());
@@ -84,7 +88,7 @@ class S3StorageServiceIT {
         final var actual = this.storageService.getSlice(name, "bytes=9-");
 
         assertTrue(actual.isPresent());
-        assertEquals("do arquivo", new String(actual.get().content(), StandardCharsets.UTF_8));
+        assertEquals("do arquivo", writtenBy(actual.get().content()));
         assertEquals("bytes 9-18/19", actual.get().contentRange());
     }
 
@@ -111,4 +115,18 @@ class S3StorageServiceIT {
     private Resource resource() {
         return Resource.with("conteudo do arquivo".getBytes(), "abc123", "video/mp4", "duna.mp4");
     }
+
+    // O trecho é escrito, e não lido: o conteúdo é um `MediaContent`, que existe para o arquivo não
+    // passar inteiro pela memória. Escrever num destino e comparar o que saiu é afirmar a mesma
+    // coisa que antes — e, de passagem, prova que o fluxo do SDK entrega o que prometeu.
+    private static String writtenBy(final MediaContent content) {
+        final var destination = new ByteArrayOutputStream();
+        try {
+            content.writeTo(destination);
+        } catch (final IOException failure) {
+            throw new UncheckedIOException(failure);
+        }
+        return destination.toString(StandardCharsets.UTF_8);
+    }
+
 }

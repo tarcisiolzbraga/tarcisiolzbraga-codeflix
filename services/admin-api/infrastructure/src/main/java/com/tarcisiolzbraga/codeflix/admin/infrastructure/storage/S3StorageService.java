@@ -77,11 +77,21 @@ public class S3StorageService implements StorageService {
     @Override
     public Optional<ResourceSlice> getSlice(final String name, final String range) {
         try {
-            final var object =
-                    this.client.getObjectAsBytes(request -> request.bucket(this.bucket).key(name).range(range));
+            // `getObject`, e não `getObjectAsBytes`: o primeiro devolve o corpo como fluxo, e o
+            // segundo lê o trecho inteiro para a memória antes de qualquer coisa. O 416 e o 404
+            // chegam **aqui**, na abertura, e não durante a escrita — então a rota ainda pode mudar
+            // o status antes de começar a responder.
+            final var object = this.client.getObject(request -> request.bucket(this.bucket).key(name).range(range));
             final var response = object.response();
             return Optional.of(new ResourceSlice(
-                    object.asByteArray(),
+                    // Quem abriu fecha: o `try-with-resources` garante que o fluxo do SDK não fica
+                    // pendurado, inclusive quando a escrita falha no meio — um cliente que desiste
+                    // do vídeo é caso comum, não exceção.
+                    destination -> {
+                        try (var content = object) {
+                            content.transferTo(destination);
+                        }
+                    },
                     response.contentType(),
                     response.metadata().get(NAME_METADATA),
                     response.contentRange()));

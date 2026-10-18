@@ -5,7 +5,9 @@ import com.tarcisiolzbraga.codeflix.videos.infrastructure.video.models.VideoMedi
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.http.HttpHeaders;
+import java.io.IOException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -58,24 +60,44 @@ public class VideoRestClient implements VideoClient {
                         headers.set(HttpHeaders.RANGE, range);
                     }
                 })
-                .exchange((request, response) -> {
-            if (response.getStatusCode() == HttpStatus.NOT_FOUND) {
-                return Optional.<VideoMediaFile>empty();
-            }
-            // Igual ao videoOfId: 5xx é falha temporária e vira exceção, não "não existe".
-            if (!response.getStatusCode().is2xxSuccessful()) {
-                throw new IllegalStateException("admin-codeflix respondeu %s para a mídia %s de %s"
-                        .formatted(response.getStatusCode(), type, id));
-            }
-            final var headers = response.getHeaders();
-            return Optional.of(new VideoMediaFile(
-                    headers.getContentType() == null
-                            ? MediaType.APPLICATION_OCTET_STREAM_VALUE
-                            : headers.getContentType().toString(),
-                    filenameOf(headers),
-                    response.bodyTo(byte[].class),
-                    headers.getFirst(HttpHeaders.CONTENT_RANGE)));
-        });
+                // `exchange(fn, false)`: a resposta **não** é fechada quando o lambda retorna. É o
+                // que permite repasse de verdade — os cabeçalhos são lidos agora, para a rota montar
+                // a resposta dela, e o corpo é transferido depois, direto para o cliente. Fechar aqui
+                // obrigaria a ler o arquivo inteiro antes de responder, que é o que esta mudança
+                // existe para não fazer.
+                .exchange((request, response) -> fileFrom(response, id, type), false);
+    }
+
+    // Em método próprio, e não no lambda: com os dois ramos (vazio e presente) dentro dele, a
+    // inferência do `exchange` não fecha.
+    private static Optional<VideoMediaFile> fileFrom(
+            final ClientHttpResponse response, final String id, final String type) throws IOException {
+        if (response.getStatusCode() == HttpStatus.NOT_FOUND) {
+            response.close();
+            return Optional.empty();
+        }
+        // Igual ao videoOfId: 5xx é falha temporária e vira exceção, não "não existe".
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            final var status = response.getStatusCode();
+            response.close();
+            throw new IllegalStateException(
+                    "admin-codeflix respondeu %s para a mídia %s de %s".formatted(status, type, id));
+        }
+        final var headers = response.getHeaders();
+        return Optional.of(new VideoMediaFile(
+                headers.getContentType() == null
+                        ? MediaType.APPLICATION_OCTET_STREAM_VALUE
+                        : headers.getContentType().toString(),
+                filenameOf(headers),
+                // Quem abriu fecha: a conexão com o admin vive até aqui, e o `try-with-resources` a
+                // solta inclusive quando a escrita falha no meio — cliente que desiste do vídeo é
+                // caso comum, não exceção.
+                destination -> {
+                    try (var open = response) {
+                        open.getBody().transferTo(destination);
+                    }
+                },
+                headers.getFirst(HttpHeaders.CONTENT_RANGE)));
     }
 
     // O nome com que o arquivo foi enviado, que o admin manda no Content-Disposition. Sem ele o
