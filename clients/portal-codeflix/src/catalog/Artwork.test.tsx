@@ -119,3 +119,65 @@ describe("Artwork", () => {
     expect(String(vi.mocked(globalThis.fetch).mock.calls[0]![0])).toContain("/medias/BANNER/link");
   });
 });
+
+// O jsdom não tem `IntersectionObserver`, e é justamente por isso que o componente pede na hora
+// quando ele não existe — os casos acima provam esse caminho. Aqui ele é posto de pé para provar o
+// outro: com observador, a arte **espera** entrar na tela.
+describe("Artwork, quando o browser observa a tela", () => {
+  // Array comum, e não `vi.hoisted`: nada aqui é içado para antes do módulo — o observador falso é
+  // montado no `beforeEach`, não numa fábrica de `vi.mock`.
+  let callbacks: IntersectionObserverCallback[] = [];
+
+  beforeEach(() => {
+    callbacks = [];
+    session.current = { user: { access_token: "token" } };
+    respondWith(signed);
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(callback: IntersectionObserverCallback) {
+          callbacks.push(callback);
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+  });
+
+  function entraNaTela() {
+    for (const callback of callbacks) {
+      callback(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      );
+    }
+  }
+
+  // Sem isto, uma tela de trilhas pediria o endereço de dezenas de pôsteres que ninguém chegou a ver.
+  it("givenArtworkOffScreen_whenItRenders_thenAsksNothingYet", async () => {
+    render(<Artwork videoId="v1" type="THUMBNAIL" location="thumbs/v1.png" title="Um filme" />);
+
+    await screen.findByText("U");
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("givenArtworkThatScrollsIntoView_whenItDoes_thenAsksForTheAddress", async () => {
+    render(<Artwork videoId="v1" type="THUMBNAIL" location="thumbs/v1.png" title="Um filme" />);
+    await screen.findByText("U");
+
+    entraNaTela();
+
+    expect(await screen.findByRole("img", { name: "Arte de Um filme" })).toBeInTheDocument();
+    expect(globalThis.fetch).toHaveBeenCalledOnce();
+  });
+
+  // Mesmo visível, título sem arte não pede nada: a guarda de `location` vale nos dois caminhos.
+  it("givenNoArtwork_whenItScrollsIntoView_thenStillAsksNothing", async () => {
+    render(<Artwork videoId="v1" type="THUMBNAIL" location={null} title="Um filme" />);
+    await screen.findByText("U");
+
+    entraNaTela();
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+});
