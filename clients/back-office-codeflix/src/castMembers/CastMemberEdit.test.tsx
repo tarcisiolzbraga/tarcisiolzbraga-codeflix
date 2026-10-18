@@ -75,7 +75,10 @@ describe("CastMemberEdit", () => {
       type: "DIRECTOR",
     });
     expect(await screen.findByText("Membro de elenco salvo.")).toBeInTheDocument();
-    expect(screen.getByTestId("rota")).toHaveTextContent("/elenco");
+    // `waitFor`, e não asserção direta: o aviso de sucesso e a navegação saem do mesmo
+    // `onSuccess`, mas `navegate` do react-router é assíncrono — em máquina lenta os dois
+    // renders se separam, e a asserção direta lia a rota antiga. Foi o que o CI pegou.
+    await waitFor(() => expect(screen.getByTestId("rota")).toHaveTextContent("/elenco"));
   });
 
   it("givenMembroInexistente_whenAbre_thenMostraAMensagemDaApi", async () => {

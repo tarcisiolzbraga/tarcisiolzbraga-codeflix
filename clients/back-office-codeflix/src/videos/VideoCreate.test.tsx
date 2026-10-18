@@ -88,7 +88,10 @@ describe("VideoCreate", () => {
     await userEvent.click(screen.getByRole("button", { name: "Criar" }));
 
     expect(await screen.findByText("Vídeo criado. Agora envie os arquivos.")).toBeInTheDocument();
-    expect(screen.getByTestId("rota")).toHaveTextContent("/videos/vid-9");
+    // `waitFor`, e não asserção direta: o aviso de sucesso e a navegação saem do mesmo
+    // `onSuccess`, mas `navegate` do react-router é assíncrono — em máquina lenta os dois
+    // renders se separam, e a asserção direta lia a rota antiga. Foi o que o CI pegou.
+    await waitFor(() => expect(screen.getByTestId("rota")).toHaveTextContent("/videos/vid-9"));
   });
 
   it("givenSinopseVazia_whenTentaCriar_thenNaoChamaOPost", async () => {

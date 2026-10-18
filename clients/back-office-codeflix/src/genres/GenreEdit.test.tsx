@@ -95,7 +95,10 @@ describe("GenreEdit", () => {
       categories: ["cat-1"],
     });
     expect(await screen.findByText("Gênero salvo.")).toBeInTheDocument();
-    expect(screen.getByTestId("rota")).toHaveTextContent("/generos");
+    // `waitFor`, e não asserção direta: o aviso de sucesso e a navegação saem do mesmo
+    // `onSuccess`, mas `navegate` do react-router é assíncrono — em máquina lenta os dois
+    // renders se separam, e a asserção direta lia a rota antiga. Foi o que o CI pegou.
+    await waitFor(() => expect(screen.getByTestId("rota")).toHaveTextContent("/generos"));
   });
 
   // `categories` **substitui** a lista inteira: tirar a última manda lista vazia, que é como a API

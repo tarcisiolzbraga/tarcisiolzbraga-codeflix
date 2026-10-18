@@ -48,7 +48,10 @@ describe("GenreCreate", () => {
     await waitFor(() => expect(corpoDoPost()).toBeDefined());
     expect(corpoDoPost()).toEqual({ name: "Ação", categories: [], active: true });
     expect(await screen.findByText("Gênero criado.")).toBeInTheDocument();
-    expect(screen.getByTestId("rota")).toHaveTextContent("/generos");
+    // `waitFor`, e não asserção direta: o aviso de sucesso e a navegação saem do mesmo
+    // `onSuccess`, mas `navegate` do react-router é assíncrono — em máquina lenta os dois
+    // renders se separam, e a asserção direta lia a rota antiga. Foi o que o CI pegou.
+    await waitFor(() => expect(screen.getByTestId("rota")).toHaveTextContent("/generos"));
   });
 
   it("givenUmaCategoriaEscolhida_whenCria_thenMandaOIdDela", async () => {

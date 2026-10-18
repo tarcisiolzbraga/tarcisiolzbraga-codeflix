@@ -34,7 +34,10 @@ describe("CastMemberCreate", () => {
     expect(vi.mocked(globalThis.fetch).mock.calls[0]![0]).toBe(`${ADMIN_API}/cast-members`);
     expect(corpoEnviado()).toEqual({ name: "Vin Diesel", type: "ACTOR", active: true });
     expect(await screen.findByText("Membro de elenco criado.")).toBeInTheDocument();
-    expect(screen.getByTestId("rota")).toHaveTextContent("/elenco");
+    // `waitFor`, e não asserção direta: o aviso de sucesso e a navegação saem do mesmo
+    // `onSuccess`, mas `navegate` do react-router é assíncrono — em máquina lenta os dois
+    // renders se separam, e a asserção direta lia a rota antiga. Foi o que o CI pegou.
+    await waitFor(() => expect(screen.getByTestId("rota")).toHaveTextContent("/elenco"));
   });
 
   // O papel é escolha fechada: a API aceita `diretor` em minúsculas, mas texto livre deixaria a

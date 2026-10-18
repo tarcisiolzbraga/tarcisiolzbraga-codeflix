@@ -408,5 +408,22 @@ O DataGrid precisa de altura medida para desenhar linha, e o jsdom dá zero a tu
 da tela finge `offsetHeight`. Sem isso a tabela existiria sem nenhuma célula, e o teste acusaria um
 defeito que não existe.
 
+### Uma intermitência que eu escrevi, e como ela foi fechada
+
+Seis testes afirmavam a navegação **direto** depois de esperar o aviso de sucesso:
+
+```ts
+expect(await screen.findByText("Vídeo criado…")).toBeInTheDocument();
+expect(screen.getByTestId("rota")).toHaveTextContent("/videos/vid-9");
+```
+
+Os dois saem do mesmo `onSuccess`, mas o `navigate` do react-router é **assíncrono**: em máquina
+lenta os dois renders se separam, e a asserção direta lia a rota antiga. Passou 236 de 236 aqui
+várias vezes e falhou no CI — que é o retrato de uma corrida.
+
+A correção foi `waitFor` nas seis, e foi conferida nas duas pontas: atrasando a navegação em 50 ms
+nas sete telas que navegam, a forma antiga fica **vermelha** e a nova passa. Reproduzir a corrida de
+propósito é mais barato que esperar o CI pegá-la de novo.
+
 **O que os testes não cobrem:** a volta do Keycloak. Trocar o `?code=` por token exige um navegador
 de verdade; aqui o `useAuth` é dublado. É o mesmo limite registrado no portal.

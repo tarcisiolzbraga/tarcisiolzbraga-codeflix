@@ -37,7 +37,10 @@ describe("CategoryCreate", () => {
       active: true,
     });
     expect(await screen.findByText("Categoria criada.")).toBeInTheDocument();
-    expect(screen.getByTestId("rota")).toHaveTextContent("/categorias");
+    // `waitFor`, e não asserção direta: o aviso de sucesso e a navegação saem do mesmo
+    // `onSuccess`, mas `navegate` do react-router é assíncrono — em máquina lenta os dois
+    // renders se separam, e a asserção direta lia a rota antiga. Foi o que o CI pegou.
+    await waitFor(() => expect(screen.getByTestId("rota")).toHaveTextContent("/categorias"));
   });
 
   // Validação do formulário: o nome curto nem sai da tela, porque o limite é conhecido e a mensagem
