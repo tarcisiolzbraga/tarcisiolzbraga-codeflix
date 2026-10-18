@@ -1,0 +1,5 @@
+O diretório existe para o `COPY --from=build /app/public ./public` da Dockerfile não falhar: o git
+não guarda diretório vazio, e sem este arquivo o build da imagem passa na máquina de quem tem a
+pasta e falha no CI, que faz checkout limpo. Foi o que aconteceu.
+
+Quando houver arquivo público de verdade aqui — robots.txt, um ícone —, ele substitui este.
