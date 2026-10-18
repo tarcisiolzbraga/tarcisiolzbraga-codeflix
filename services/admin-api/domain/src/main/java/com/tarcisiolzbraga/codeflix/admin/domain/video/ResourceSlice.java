@@ -1,6 +1,5 @@
 package com.tarcisiolzbraga.codeflix.admin.domain.video;
 
-import java.util.Arrays;
 import java.util.Objects;
 
 // Um trecho do arquivo, como o armazenamento o devolve quando se pede um Range.
@@ -8,37 +7,17 @@ import java.util.Objects;
 // Existe separado do Resource porque carrega o que só faz sentido num trecho: **o `Content-Range`
 // que o armazenamento calculou**, com o intervalo servido e o tamanho total. Recalculá-lo aqui seria
 // repetir uma conta que o S3 já fez e já devolveu.
-public record ResourceSlice(byte[] content, String contentType, String name, String contentRange) {
+//
+// O conteúdo é um `MediaContent`, e não um `byte[]`: o trecho é escrito direto na resposta, sem
+// passar inteiro pela memória. Por isso **não há cópia defensiva nem `equals` por bytes** — não há
+// bytes para copiar nem comparar, e um conteúdo só pode ser escrito uma vez. Quem quiser afirmar o
+// conteúdo num teste escreve-o num destino e compara o que saiu, que é o que a rota faz.
+public record ResourceSlice(MediaContent content, String contentType, String name, String contentRange) {
 
     public ResourceSlice {
         Objects.requireNonNull(content, "'content' should not be null");
         Objects.requireNonNull(contentType, "'contentType' should not be null");
         Objects.requireNonNull(name, "'name' should not be null");
         Objects.requireNonNull(contentRange, "'contentRange' should not be null");
-        content = content.clone();
-    }
-
-    @Override
-    public byte[] content() {
-        return this.content.clone();
-    }
-
-    @Override
-    public boolean equals(final Object other) {
-        if (this == other) {
-            return true;
-        }
-        if (!(other instanceof ResourceSlice that)) {
-            return false;
-        }
-        return Arrays.equals(this.content, that.content)
-                && Objects.equals(this.contentType, that.contentType)
-                && Objects.equals(this.name, that.name)
-                && Objects.equals(this.contentRange, that.contentRange);
-    }
-
-    @Override
-    public int hashCode() {
-        return 31 * Objects.hash(this.contentType, this.name, this.contentRange) + Arrays.hashCode(this.content);
     }
 }
