@@ -34,6 +34,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 @RestController
 public class VideoController implements VideoAPI {
@@ -118,17 +119,23 @@ public class VideoController implements VideoAPI {
     }
 
     @Override
-    public ResponseEntity<byte[]> getMedia(final String id, final VideoMediaType type, final String range) {
+    public ResponseEntity<StreamingResponseBody> getMedia(
+            final String id, final VideoMediaType type, final String range) {
         // `Accept-Ranges` vai nas duas respostas: é por ele que o player descobre que pode pedir
         // trecho. Sem o cabeçalho, o browser baixa o arquivo inteiro mesmo que a rota saiba servir
         // partes.
         if (range == null || range.isBlank()) {
             final var media = this.mediaUseCases.getMedia().execute(new GetMediaCommand(id, type));
+            // O caminho **sem** `Range` continua montando o corpo em memória, e isso é escolha: ele
+            // serve as artes do catálogo — banner e miniatura —, que são pequenas, e o player sempre
+            // manda `Range`. O embrulho num `StreamingResponseBody` existe para a rota ter um tipo
+            // de retorno só.
+            final var content = media.content();
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(media.contentType()))
                     .header(HttpHeaders.ACCEPT_RANGES, BYTES)
                     .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISPOSITION.formatted(media.name()))
-                    .body(media.content());
+                    .body(destination -> destination.write(content));
         }
         final var slice = this.mediaUseCases.getMediaSlice().execute(new GetMediaSliceCommand(id, type, range));
         // 206 e o `Content-Range` que o armazenamento calculou: refazer a conta do intervalo aqui
@@ -138,7 +145,7 @@ public class VideoController implements VideoAPI {
                 .header(HttpHeaders.ACCEPT_RANGES, BYTES)
                 .header(HttpHeaders.CONTENT_RANGE, slice.contentRange())
                 .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISPOSITION.formatted(slice.name()))
-                .body(slice.content());
+                .body(slice.content()::writeTo);
     }
 
     // O armazenamento recusou o trecho. Traduzido aqui, e não num tratador global, porque **só esta
