@@ -17,9 +17,30 @@ if (existsSync(rootEnv)) {
   process.loadEnvFile(rootEnv);
 }
 
+// Uma URL pública, com duas fontes e nesta ordem:
+//
+// 1. a **URL inteira**, quando ela é dada — é assim que se constrói a imagem de homologação ou de
+//    produção, onde a API não está em `localhost`;
+// 2. `http://localhost:<porta>`, derivada da mesma porta que o compose usa — o padrão de
+//    desenvolvimento.
+//
+// A ordem importa: sem a primeira fonte, **toda** imagem aponta para `localhost`, e uma construída
+// para outro ambiente é impossível. Era o caso até aqui.
+const publicUrl = (url: string | undefined, port: string | undefined, fallbackPort: string) => {
+  const explicit = url?.trim();
+  return explicit !== undefined && explicit !== ""
+    ? explicit.replace(/\/+$/, "")
+    : `http://localhost:${port ?? fallbackPort}`;
+};
+
 // O emissor, montado das mesmas variáveis que o `keycloak.issuer-uri` dos serviços usa: divergir aqui
-// faria o token ser recusado pelo `iss`, que é o defeito que o .env único existe para evitar.
+// faria o token ser recusado pelo `iss`, que é o defeito que o .env único existe para evitar. Aceita
+// a URL inteira pelo mesmo motivo de cima.
 const keycloakIssuer = () => {
+  const explicit = process.env.PUBLIC_KEYCLOAK_ISSUER?.trim();
+  if (explicit !== undefined && explicit !== "") {
+    return explicit.replace(/\/+$/, "");
+  }
   const host = process.env.KEYCLOAK_HOST ?? "localhost";
   const port = process.env.KEYCLOAK_PORT ?? "8081";
   const realm = process.env.KEYCLOAK_REALM ?? "codeflix";
@@ -50,7 +71,7 @@ export default defineConfig({
   // Aqui os valores são derivados do que já existe lá.
   define: {
     "import.meta.env.VITE_ADMIN_API_URL": JSON.stringify(
-      `http://localhost:${process.env.APP_PORT ?? "8080"}`,
+      publicUrl(process.env.PUBLIC_ADMIN_API_URL, process.env.APP_PORT, "8080"),
     ),
     "import.meta.env.VITE_KEYCLOAK_ISSUER": JSON.stringify(keycloakIssuer()),
     "import.meta.env.VITE_KEYCLOAK_CLIENT_ID": JSON.stringify(
