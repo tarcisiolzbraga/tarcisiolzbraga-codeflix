@@ -12,7 +12,10 @@ export type Video = {
   // alcance — é o que o schema do catálogo diz, e o que o admin publica. Eles servem para uma coisa
   // só aqui: saber se o título **tem** aquela arte, antes de pedir o endereço assinado dela.
   //
-  // Nulo quando o arquivo não foi enviado, e é caso comum: um título recém-cadastrado não tem arte.
+  // Nulo quando o arquivo não foi enviado, e é caso comum: um título recém-cadastrado não tem nada.
+  // Os dois primeiros são arquivo de áudio e vídeo; os três seguintes, imagem.
+  video: string | null;
+  trailer: string | null;
   banner: string | null;
   thumbnail: string | null;
   thumbnailHalf: string | null;
@@ -87,7 +90,7 @@ async function query<T>(document: string, variables: Record<string, unknown>, to
 
 const VIDEO_FIELDS = `
   id title description yearLaunched duration rating
-  banner thumbnail thumbnailHalf
+  video trailer banner thumbnail thumbnailHalf
   genres { id name }
   categories { id name }
   castMembers { id name }`;
@@ -107,6 +110,64 @@ export async function searchVideos(
     token,
   );
   return data.videos;
+}
+
+export type Genre = { id: string; name: string };
+
+// Os gêneros do acervo, para montar as trilhas. Poucos de propósito: cada trilha é uma linha na
+// tela, e vinte linhas não são navegação, são rolagem.
+export async function fetchGenres(token: string, perPage = 6): Promise<Genre[]> {
+  const data = await query<{ genres: { items: Genre[] } }>(
+    `query Generos($perPage: Int) {
+       genres(perPage: $perPage) { items { id name } }
+     }`,
+    { perPage },
+    token,
+  );
+  return data.genres.items;
+}
+
+export type Rail = { genre: Genre; items: Video[] };
+
+// As trilhas, **numa requisição só**.
+//
+// Seis trilhas seriam seis consultas em REST. Em GraphQL elas são seis campos no mesmo documento,
+// cada um com o seu apelido (`t0`, `t1`…) e a sua variável de gênero — e isto é um dos poucos lugares
+// onde a escolha do catálogo pelo GraphQL se paga de verdade.
+//
+// O documento é **montado**, e não escrito à mão, porque o número de trilhas vem dos gêneros que o
+// acervo tem. Os ids viajam como **variáveis**, nunca interpolados no texto da consulta: id vem de
+// fora, e consulta montada por concatenação de valor é como se escreve injeção.
+export async function fetchRails(genres: Genre[], token: string, perPage = 8): Promise<Rail[]> {
+  if (genres.length === 0) {
+    return [];
+  }
+
+  const assinatura = genres.map((_, indice) => `$g${indice}: ID!`).join(", ");
+  const campos = genres
+    .map(
+      (_, indice) =>
+        `t${indice}: videos(genres: [$g${indice}], perPage: $perPage) { items {${VIDEO_FIELDS} } }`,
+    )
+    .join("\n       ");
+  const variables: Record<string, unknown> = { perPage };
+  genres.forEach((genre, indice) => {
+    variables[`g${indice}`] = genre.id;
+  });
+
+  const data = await query<Record<string, { items: Video[] }>>(
+    `query Trilhas($perPage: Int, ${assinatura}) {
+       ${campos}
+     }`,
+    variables,
+    token,
+  );
+
+  // Trilha vazia é descartada aqui, e não na tela: gênero sem título publicado existe no acervo, e
+  // uma linha com cabeçalho e nada embaixo parece defeito.
+  return genres
+    .map((genre, indice) => ({ genre, items: data[`t${indice}`]?.items ?? [] }))
+    .filter((trilha) => trilha.items.length > 0);
 }
 
 // **Nulo quando o vídeo não é servido aqui**, como o schema diz: o acervo só mostra o que está

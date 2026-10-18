@@ -214,11 +214,11 @@ minutos e pedi-la antes faria vencer na mão de quem leu a sinopse com calma. A 
 montar**: ninguém clica num pôster para que ele apareça, e cinco minutos bastam — imagem já carregada
 fica no cache do browser, e o que ainda não carregou pede um endereço novo.
 
-**O custo, dito em vez de escondido:** uma grade de doze títulos faz **doze** chamadas ao `/link`, uma
-por arte. Não há rota que assine várias de uma vez, e um bucket público resolveria isso ao preço de a
-arte deixar de ser restrita. Os campos `banner`, `thumbnail` e `thumbnailHalf` que a consulta pede
-guardam a **localização no armazenamento**, não uma URL que o browser alcance — eles servem para
-saber se o título **tem** aquela arte, e evitar a chamada quando não tem.
+**O custo:** uma arte, uma chamada ao `/link`. Não há rota que assine várias de uma vez, e um bucket
+público resolveria isso ao preço de a arte deixar de ser restrita — por isso o pedido é preguiçoso,
+como está logo abaixo. Os cinco campos de mídia que a consulta pede guardam a **localização no
+armazenamento**, não uma URL que o browser alcance: eles servem para saber se o título **tem** aquele
+arquivo, e evitar a chamada quando não tem.
 
 **`<img>`, e não o `<Image>` do Next.** O otimizador dele busca a imagem no servidor, e este endereço
 vale cinco minutos e é emitido para quem está olhando. Guardar em cache um endereço que vence, num
@@ -227,6 +227,50 @@ host que muda por ambiente, seria trocar um problema simples por dois.
 Título sem arte mostra a **inicial sobre um degradê** — e a mesma coisa aparece quando o endereço
 falha, porque para quem olha é o mesmo, e um retângulo vazio pareceria defeito. É caso comum: um
 título recém-cadastrado no back-office não tem nenhuma das cinco artes.
+
+### As trilhas por gênero, e a requisição única
+
+Quem chega sem termo nenhum vê **trilhas por gênero**; quem digita um termo vê a grade. Trilha para
+quem quer descobrir, grade para quem quer o que casa com o termo — e trilha num resultado de busca
+esconderia títulos atrás de rolagem horizontal.
+
+**Seis trilhas são uma requisição, não seis.** Em REST seriam seis chamadas; aqui são seis campos
+apelidados (`t0`, `t1`…) no mesmo documento GraphQL, cada um com a sua variável de gênero. É um dos
+poucos lugares onde a escolha do catálogo pelo GraphQL se paga de verdade.
+
+O documento é **montado**, porque o número de trilhas vem dos gêneros que o acervo tem. Os ids viajam
+como **variáveis**, nunca interpolados no texto: id vem de fora, e consulta montada por concatenação
+de valor é como se escreve injeção. Tem teste que confere que o id **não** aparece no texto.
+
+Seis gêneros de propósito: cada trilha é uma linha, e vinte linhas não são navegação, são rolagem.
+Gênero sem título publicado tem a trilha **descartada** — e o descarte é no gateway, não na tela,
+porque uma linha com cabeçalho e nada embaixo parece defeito.
+
+As trilhas carregam **uma vez**: elas são a vitrine de quem chega sem termo, e refazê-las ao digitar
+seria trabalho jogado fora. Se elas falharem, o acervo não sai do ar — aparece a grade.
+
+### A arte espera entrar na tela
+
+Com as trilhas, a conta de antes mudou de tamanho: seis linhas de oito pôsteres seriam **quarenta e
+oito** chamadas ao `/link`, a maioria de arte que ninguém chegou a ver.
+
+Então a arte só pede o endereço quando entra na tela, por `IntersectionObserver`, com uma margem de
+200px para o pedido começar **antes** de aparecer — pedir no instante exato mostraria o substituto por
+um piscar em toda rolagem.
+
+Onde o observador não existe — jsdom, browser antigo — ela pede na hora. Preguiça que esconde
+conteúdo é pior que o custo que ela evita.
+
+### O trailer
+
+Tem botão próprio na página do título, e **só aparece quando o arquivo existe**: a consulta já diz se
+o título tem vídeo e trailer, e um botão que sempre responde "ainda não tem arquivo" é pior que
+nenhum. O estado de ausência do player continua lá para a corrida — o arquivo pode sair do ar entre a
+consulta e o clique.
+
+**O trailer não tem regra de acesso própria**, e isso não é descuido: o `MediaAccess` do catálogo
+decide **por vídeo** — pelo `opened` do título e pelo papel de quem pede —, não por tipo de mídia.
+Inventar aqui um trailer aberto a todos seria o front prometendo o que a API recusa.
 
 ## O que dá para verificar sem browser, e o que não dá
 
@@ -278,11 +322,17 @@ conta lendo `GET /accounts/me` **com** token, que é a primeira que exercita o C
 O cadastro, com a confirmação por e-mail. E a assinatura: assinar a partir do plano, ver a
 situação, pagar, cancelar e guardar o meio de pagamento.
 
-E o acervo: busca, grade de pôsteres, página de título com banner, e **reprodução** — endereço
-assinado, reprodução progressiva e busca na linha de tempo.
+E o acervo: trilhas por gênero para quem chega sem termo, grade de pôsteres para quem busca, página
+de título com banner, **reprodução** — endereço assinado, progressiva, com busca na linha de tempo —
+e o **trailer**.
 
-O que falta aqui é visual, não funcional: fila "continuar assistindo", trilhas por gênero na home, e
-o trailer, que tem arquivo no admin e ainda não tem lugar nesta tela.
+O que falta, e o porquê de cada um:
+
+- **fila "continuar assistindo"** — depende de guardar o progresso de quem assiste, e **nenhuma API
+  do monorepo tem isso**. Não é trabalho de front: é um agregado que não existe;
+- **a home como vitrine de quem já assina** — hoje `/` é a porta de quem ainda não assinou, e as
+  trilhas vivem em `/acervo`. Juntar as duas é decisão de produto, não de código;
+- **legenda** — o acervo não publica o campo, então o `<video>` sai sem `<track>`.
 
 ## Duas coisas que vão morder quem continuar
 

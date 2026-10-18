@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "react-oidc-context";
 import { fetchSignedMediaUrl, type MediaType } from "@/catalog/catalog";
 
@@ -14,9 +14,14 @@ import { fetchSignedMediaUrl, type MediaType } from "@/catalog/catalog";
 // para que ele apareça. A assinatura vale cinco minutos, o que basta: imagem já carregada fica no
 // cache do browser, e o que ainda não carregou pede um endereço novo.
 //
-// **O custo está aqui, dito em vez de escondido:** uma grade de doze títulos faz doze chamadas ao
-// `/link`, uma por arte. Não há rota que assine várias de uma vez, e um bucket público resolveria
-// isso ao preço de a arte deixar de ser restrita.
+// **O custo está aqui, e é por isso que o pedido é preguiçoso:** uma arte, uma chamada ao `/link` —
+// não há rota que assine várias de uma vez, e um bucket público resolveria isso ao preço de a arte
+// deixar de ser restrita. Numa grade de doze isso já era doze chamadas; com as trilhas por gênero
+// seriam dezenas, a maioria de pôster que ninguém chegou a ver.
+//
+// Então a arte só pede o endereço **quando entra na tela**, por `IntersectionObserver`. Onde o
+// observador não existe — jsdom, browser antigo — ela pede na hora: a alternativa seria arte que
+// nunca aparece, e preguiça que esconde conteúdo é pior que o custo que ela evita.
 
 export function Artwork({
   videoId,
@@ -34,13 +39,36 @@ export function Artwork({
   className?: string;
 }) {
   const token = useAuth().user?.access_token;
+  const alvo = useRef<HTMLDivElement>(null);
+  const [visivel, setVisivel] = useState(typeof IntersectionObserver === "undefined");
   // **Um estado, e não três.** A primeira versão tinha `idle`, `ready` e `none` — e a conferência ao
   // contrário mostrou que `none` não mudava nada na tela: ele e `idle` desenham o mesmo substituto,
   // de propósito. Estado que nenhum teste consegue distinguir é estado que não existe.
   const [url, setUrl] = useState<string | null>(null);
 
+  // O observador vive num efeito próprio, separado do que busca: um observa o DOM, o outro a rede,
+  // e misturá-los faria o observador ser recriado a cada volta de requisição.
   useEffect(() => {
-    if (location === null || token === undefined) {
+    const elemento = alvo.current;
+    if (visivel || elemento === null) {
+      return;
+    }
+    // `rootMargin` para a arte começar a ser pedida **antes** de aparecer: pedir no instante em que
+    // entra na tela mostraria o substituto por um piscar em toda rolagem.
+    const observador = new IntersectionObserver(
+      (entradas) => {
+        if (entradas.some((entrada) => entrada.isIntersecting)) {
+          setVisivel(true);
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    observador.observe(elemento);
+    return () => observador.disconnect();
+  }, [visivel]);
+
+  useEffect(() => {
+    if (!visivel || location === null || token === undefined) {
       return;
     }
     let atual = true;
@@ -56,7 +84,7 @@ export function Artwork({
     return () => {
       atual = false;
     };
-  }, [videoId, type, location, token]);
+  }, [videoId, type, location, token, visivel]);
 
   // O substituto: a inicial do título sobre um degradê. Vale para três casos que, para quem olha,
   // são o mesmo — título sem arte, endereço ainda a caminho, e falha ao pedi-lo. Um retângulo vazio
@@ -64,6 +92,7 @@ export function Artwork({
   if (url === null) {
     return (
       <div
+        ref={alvo}
         aria-hidden
         className={`flex items-center justify-center bg-gradient-to-br from-neutral-800 to-neutral-950 ${className ?? ""}`}
       >

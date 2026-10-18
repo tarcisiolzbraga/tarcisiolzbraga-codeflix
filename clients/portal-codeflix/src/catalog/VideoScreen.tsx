@@ -109,7 +109,24 @@ export function VideoScreen({ id }: { id: string }) {
       {/* O player veio depois do resto desta tela: a rota de mídia do catálogo não existia, e a
           página dizia isso em vez de fingir. Hoje existe, com endereço assinado e `Range` — a
           reprodução é progressiva e a busca na linha de tempo funciona. */}
-      <Player videoId={video.id} />
+      {/* **O botão só aparece quando há arquivo.** A consulta já diz se o título tem vídeo e
+          trailer, e um botão que sempre responde "ainda não tem arquivo" é pior que nenhum — a
+          maioria dos títulos recém-cadastrados no back-office não tem nenhum dos cinco.
+
+          O estado de ausência do próprio player continua existindo, para a corrida: o arquivo pode
+          sair do ar entre a consulta e o clique. */}
+      {video.video === null && video.trailer === null ? (
+        <p className="text-sm text-neutral-500">
+          Este título ainda não tem arquivo para reproduzir.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {video.video !== null && <Player videoId={video.id} />}
+          {video.trailer !== null && (
+            <Player videoId={video.id} type="TRAILER" label="Ver o trailer" />
+          )}
+        </div>
+      )}
 
       <Facts label="Gêneros" values={video.genres.map((it) => it.name)} />
       <Facts label="Categorias" values={video.categories.map((it) => it.name)} />

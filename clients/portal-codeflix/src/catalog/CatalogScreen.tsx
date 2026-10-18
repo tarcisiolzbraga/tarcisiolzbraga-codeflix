@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "react-oidc-context";
-import { Artwork } from "@/catalog/Artwork";
+import { Poster } from "@/catalog/Poster";
+import { Rail } from "@/catalog/Rail";
 import {
   CatalogRefused,
-  formatDuration,
+  fetchGenres,
+  fetchRails,
   isMissingCatalogRole,
-  ratingLabel,
   searchVideos,
+  type Rail as RailData,
   type VideoPage,
 } from "@/catalog/catalog";
 
@@ -20,6 +22,7 @@ export function CatalogScreen() {
   const [term, setTerm] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState<VideoPage | null>(null);
+  const [rails, setRails] = useState<RailData[] | null>(null);
   const [refused, setRefused] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [renewing, setRenewing] = useState(false);
@@ -55,6 +58,33 @@ export function CatalogScreen() {
       load(token, search);
     }
   }, [token, search, load]);
+
+  // As trilhas são carregadas **uma vez**, e não a cada busca: elas são a vitrine de quem chega sem
+  // termo nenhum, e refazê-las ao digitar seria trabalho jogado fora.
+  useEffect(() => {
+    if (token === undefined || rails !== null) {
+      return;
+    }
+    let atual = true;
+    fetchGenres(token)
+      .then((genres) => fetchRails(genres, token))
+      .then((carregadas) => {
+        if (atual) {
+          setRails(carregadas);
+        }
+      })
+      .catch((error: unknown) => {
+        // Trilha que não carrega não tira o acervo do ar: a busca continua funcionando, e o que
+        // aparece é a grade. Lista vazia marca "já tentei", para não repetir a cada render.
+        console.error("falha ao carregar as trilhas", error);
+        if (atual) {
+          setRails([]);
+        }
+      });
+    return () => {
+      atual = false;
+    };
+  }, [token, rails]);
 
   if (auth.isLoading) {
     return <p className="text-neutral-400">Carregando…</p>;
@@ -139,38 +169,26 @@ export function CatalogScreen() {
         </p>
       )}
 
-      {page && page.items.length > 0 && (
+      {/* **Trilhas quando ninguém buscou, grade quando buscou.** Quem chega sem termo quer
+          descobrir, e trilha por gênero é como se descobre; quem digitou um termo quer o que casa
+          com ele, e trilha ali esconderia resultado atrás de rolagem horizontal. */}
+      {search === "" && rails !== null && rails.length > 0 && (
+        <div className="flex flex-col gap-8">
+          {rails.map((rail) => (
+            <Rail key={rail.genre.id} rail={rail} />
+          ))}
+        </div>
+      )}
+
+      {page && page.items.length > 0 && (search !== "" || rails?.length === 0) && (
         <>
           <p className="text-sm text-neutral-500">
             {page.meta.total} {page.meta.total === 1 ? "título" : "títulos"}
           </p>
-          {/* Pôster em pé, 2:3, que é a proporção de cartaz de cinema — e a que o `THUMBNAIL`
-              do admin recebe. A sinopse saiu do cartão: numa grade de pôsteres ela é ruído, e a
-              página do título já a mostra inteira. */}
           <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {page.items.map((video) => (
               <li key={video.id}>
-                <Link
-                  href={`/acervo/${video.id}`}
-                  className="group flex h-full flex-col gap-2 rounded-lg border border-neutral-800 bg-neutral-900 transition hover:border-neutral-600"
-                >
-                  <Artwork
-                    videoId={video.id}
-                    type="THUMBNAIL"
-                    location={video.thumbnail}
-                    title={video.title}
-                    className="aspect-2/3 w-full rounded-t-lg"
-                  />
-                  <div className="flex flex-col gap-1 p-3 pt-0">
-                    <h2 className="font-semibold text-neutral-100 group-hover:text-neutral-50">
-                      {video.title}
-                    </h2>
-                    <p className="text-xs text-neutral-500">
-                      {video.yearLaunched} · {formatDuration(video.duration)} ·{" "}
-                      {ratingLabel(video.rating)}
-                    </p>
-                  </div>
-                </Link>
+                <Poster video={video} />
               </li>
             ))}
           </ul>
