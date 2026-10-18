@@ -15,6 +15,7 @@ import com.tarcisiolzbraga.codeflix.videos.infrastructure.KeycloakTestToken;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.video.VideoClient;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.video.models.MediaContent;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.video.models.VideoMediaFile;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Optional;
@@ -25,6 +26,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.client.RestClient;
 
@@ -66,7 +68,7 @@ class VideoMediaE2ETest {
     void givenTheSubscriberRole_whenAsksForTheMedia_thenServeItWithTheOriginalContentType() {
         // Given o admin tendo o arquivo
         when(this.videoClient.mediaOf(any(), any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), null)));
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, null)));
 
         // When quem assina pede a mídia
         final var actual = clientWith(this.token.catalogTest())
@@ -87,14 +89,16 @@ class VideoMediaE2ETest {
     void givenTheSubscriberRole_whenAsksForTheMedia_thenTheDispositionIsInlineWithTheOriginalName() {
         // Given o admin tendo o arquivo
         when(this.videoClient.mediaOf(any(), any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), null)));
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, null)));
 
         // When pede a mídia
         final var actual = clientWith(this.token.catalogTest())
                 .get()
                 .uri("/videos/{id}/medias/{type}", A_VIDEO, "VIDEO")
                 .retrieve()
-                .toBodilessEntity();
+                // `toEntity(byte[].class)`, e não `toBodilessEntity()`: o segundo descarta o corpo
+                // sem o ler, e com a resposta em fluxo isso deixa a conexão pela metade.
+                .toEntity(byte[].class);
 
         // Then o nome original vem junto, para quem salvar não receber o nome da rota
         final var disposition = String.valueOf(actual.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION));
@@ -133,7 +137,7 @@ class VideoMediaE2ETest {
     void givenTheAdminRole_whenAsksForTheMedia_thenServeIt() {
         // Given o admin tendo o arquivo
         when(this.videoClient.mediaOf(any(), any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), null)));
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, null)));
 
         // When o administrador pede / Then é servido
         assertEquals(HttpStatus.OK, statusOf(this.token.admin()));
@@ -163,7 +167,7 @@ class VideoMediaE2ETest {
     void givenASignedPath_whenAsksForTheMediaWithoutAnyToken_thenServeIt() {
         // Given o admin tendo o arquivo, e um link assinado emitido a quem assina
         when(this.videoClient.mediaOf(any(), any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), null)));
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, null)));
         final var link = clientWith(this.token.catalogTest())
                 .get()
                 .uri("/videos/{id}/medias/{type}/link", A_VIDEO, "VIDEO")
@@ -193,7 +197,7 @@ class VideoMediaE2ETest {
         final var actual = clientWith(null)
                 .get()
                 .uri(mexido)
-                .exchange((request, response) -> response.getStatusCode());
+                .exchange((request, response) -> statusAfterDraining(response));
         assertEquals(HttpStatus.FORBIDDEN, actual);
     }
 
@@ -204,7 +208,7 @@ class VideoMediaE2ETest {
         final var actual = clientWith(null)
                 .get()
                 .uri("/videos/{id}/medias/{type}/link", A_VIDEO, "VIDEO")
-                .exchange((request, response) -> response.getStatusCode());
+                .exchange((request, response) -> statusAfterDraining(response));
         assertEquals(HttpStatus.UNAUTHORIZED, actual);
     }
 
@@ -215,7 +219,7 @@ class VideoMediaE2ETest {
         // Given um título marcado como aberto no catálogo
         when(this.getVideoUseCase.execute(any())).thenReturn(Optional.of(openTitle()));
         when(this.videoClient.mediaOf(any(), any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), null)));
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, null)));
 
         // When alguém identificado e sem o papel pede / Then é servido
         assertEquals(HttpStatus.OK, statusOf(this.token.bearerOf(KeycloakTestToken.STRANGER)));
@@ -243,7 +247,7 @@ class VideoMediaE2ETest {
     void givenARangeHeader_whenAsksForTheMedia_thenRelayTheRangeAndAnswerPartialContent() {
         // Given o admin devolvendo um trecho, com o Content-Range que o armazenamento calculou
         when(this.videoClient.mediaOf(any(), any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), "bytes 0-9/100")));
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, "bytes 0-9/100")));
 
         // When o player pede um trecho
         final var actual = clientWith(this.token.catalogTest())
@@ -265,14 +269,14 @@ class VideoMediaE2ETest {
     void givenARangeThatTheAdminIgnored_whenAsksForTheMedia_thenAnswerTwoHundredAndNotPartial() {
         // Given o admin devolvendo o arquivo inteiro, sem Content-Range, apesar do pedido
         when(this.videoClient.mediaOf(any(), any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), null)));
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, null)));
 
         // When o player pede um trecho
         final var actual = clientWith(this.token.catalogTest())
                 .get()
                 .uri("/videos/{id}/medias/{type}", A_VIDEO, "VIDEO")
                 .header(HttpHeaders.RANGE, "bytes=0-9")
-                .exchange((request, response) -> response.getStatusCode());
+                .exchange((request, response) -> statusAfterDraining(response));
 
         // Then é 200: a resposta descreve o que foi servido, não o que foi pedido
         assertEquals(HttpStatus.OK, actual);
@@ -283,14 +287,16 @@ class VideoMediaE2ETest {
     void givenTheMediaServed_whenReadTheHeaders_thenRangesAreAnnounced() {
         // Given o admin devolvendo o arquivo
         when(this.videoClient.mediaOf(any(), any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), null)));
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, null)));
 
         // When pede a mídia
         final var actual = clientWith(this.token.catalogTest())
                 .get()
                 .uri("/videos/{id}/medias/{type}", A_VIDEO, "VIDEO")
                 .retrieve()
-                .toBodilessEntity();
+                // `toEntity(byte[].class)`, e não `toBodilessEntity()`: o segundo descarta o corpo
+                // sem o ler, e com a resposta em fluxo isso deixa a conexão pela metade.
+                .toEntity(byte[].class);
 
         // Then a rota anuncia que aceita trecho
         assertEquals("bytes", actual.getHeaders().getFirst(HttpHeaders.ACCEPT_RANGES));
@@ -300,23 +306,28 @@ class VideoMediaE2ETest {
         return clientWith(bearer)
                 .get()
                 .uri("/videos/{id}/medias/{type}", A_VIDEO, "VIDEO")
-                .exchange((request, response) -> response.getStatusCode());
+                .exchange((request, response) -> statusAfterDraining(response));
+    }
+
+    // **Lê o status e drena o corpo**, que é o que qualquer cliente de verdade faz.
+    //
+    // Sem drenar, o `exchange` fecha a resposta com bytes ainda no socket, e o HttpClient devolve a
+    // conexão ao pool pela metade. O **pedido seguinte** lê o resto do corpo anterior como se fosse
+    // a linha de status, e falha com `Invalid header; error at offset 0: <: >` — longe da causa, e só
+    // às vezes.
+    //
+    // Enquanto o corpo era um `byte[]` isso era inofensivo: a resposta já estava escrita. Reproduzido
+    // no build inteiro, que é a condição em que acontece — a classe rodando sozinha fica verde.
+    private static HttpStatusCode statusAfterDraining(final ClientHttpResponse response) throws IOException {
+        try (var body = response.getBody()) {
+            body.readAllBytes();
+        }
+        return response.getStatusCode();
     }
 
     private RestClient clientWith(final String bearer) {
         final var builder = RestClient.builder()
-                .baseUrl("http://localhost:%d/api".formatted(this.port))
-                // **Uma conexão por pedido.** Vários testes desta classe leem só o status ou só os
-                // cabeçalhos e fecham, e a rota responde **em fluxo**: fechar no meio da escrita
-                // devolve a conexão ao pool pela metade, e é o **pedido seguinte** que falha ao ler a
-                // resposta — longe da causa e só às vezes. Reproduzido aqui na terceira execução
-                // seguida, noutro teste da classe, que é o retrato disso.
-                //
-                // Enquanto o corpo era um `byte[]`, a resposta saía com `Content-Length` e já
-                // escrita, então fechar cedo era inofensivo. É artefato do cliente de teste, e não
-                // da rota: um browser drena ou descarta a conexão, e o `ClientHttpResponse.close()`
-                // que o catálogo usa no repasse também.
-                .defaultHeader(HttpHeaders.CONNECTION, "close");
+                .baseUrl("http://localhost:%d/api".formatted(this.port));
         return bearer == null ? builder.build() : builder.defaultHeader(HttpHeaders.AUTHORIZATION, bearer).build();
     }
 

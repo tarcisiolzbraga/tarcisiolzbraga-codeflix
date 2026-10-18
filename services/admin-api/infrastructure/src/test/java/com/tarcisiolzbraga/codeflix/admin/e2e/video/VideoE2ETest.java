@@ -45,20 +45,6 @@ class VideoE2ETest implements VideoE2EDsl, CategoryE2EDsl {
         this.client = RestClient.builder()
                 .baseUrl("http://localhost:" + this.port)
                 .defaultHeader(HttpHeaders.AUTHORIZATION, this.token.bearer())
-                // **Uma conexão por pedido.** A rota de mídia responde com `StreamingResponseBody`,
-                // que faz o Spring despachar a escrita de forma assíncrona e sem `Content-Length` —
-                // o corpo sai em chunks. Com keep-alive, a devolução da conexão ao pool corre com a
-                // finalização da resposta, e o **pedido seguinte** falha com
-                // `NoHttpResponseException`: o servidor não responde porque está terminando a
-                // anterior.
-                //
-                // A evidência: esta classe **nunca** falhou no CI antes de a rota passar a
-                // responder em fluxo, e falhou em 2 de 4 execuções depois. É a mesma correção que o
-                // `VideoMediaE2ETest` do catálogo já levou, pelo mesmo sintoma.
-                //
-                // É artefato do cliente de teste, e não da rota: um browser não reaproveita conexão
-                // cuja resposta ainda não terminou.
-                .defaultHeader(HttpHeaders.CONNECTION, "close")
                 .build();
     }
 
