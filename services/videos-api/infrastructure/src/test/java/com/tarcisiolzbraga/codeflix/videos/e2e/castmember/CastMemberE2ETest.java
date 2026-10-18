@@ -1,12 +1,13 @@
 package com.tarcisiolzbraga.codeflix.videos.e2e.castmember;
 
-import static org.awaitility.Awaitility.await;
+import static com.tarcisiolzbraga.codeflix.videos.infrastructure.ReplicationAwait.awaitReplicated;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 import com.tarcisiolzbraga.codeflix.videos.domain.castmember.CastMemberType;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.E2ETest;
+import com.tarcisiolzbraga.codeflix.videos.infrastructure.ListenerLogCapture;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.KeycloakTestToken;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.castmember.CastMemberClient;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.castmember.models.CastMemberDTO;
@@ -16,6 +17,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,9 +61,19 @@ class CastMemberE2ETest implements CastMemberE2EDsl {
 
     private RestClient client;
 
+    // O que os listeners registrarem durante o teste, para a falha poder dizer o motivo.
+    // Veja o porquê em ListenerLogCapture.
+    private ListenerLogCapture listenerLog;
+
     @BeforeEach
     void bindToTheRunningServer() {
         this.client = clientWith(this.token.catalogTest());
+        this.listenerLog = ListenerLogCapture.start();
+    }
+
+    @AfterEach
+    void stopCapturingTheListenerLog() {
+        this.listenerLog.close();
     }
 
     // O token vai no cabeçalho padrão do cliente: é como um consumidor de verdade fala com a API,
@@ -82,7 +94,7 @@ class CastMemberE2ETest implements CastMemberE2EDsl {
     void givenAChangeArrivingFromTheAdmin_whenAClientListsThem_thenSeeItOverHttp() {
         givenAMemberPublishedByTheAdmin("00000003-6000-0000-0000-000000000000", "Denis Villeneuve", "DIRECTOR");
 
-        await().atMost(VISIBLE).untilAsserted(() -> {
+        awaitReplicated(VISIBLE, this.listenerLog, "a replicação", this::indexState, () -> {
             final var actualPage = listCastMembers();
 
             assertEquals(1L, actualPage.meta().total());
@@ -98,7 +110,7 @@ class CastMemberE2ETest implements CastMemberE2EDsl {
         givenAMemberPublishedByTheAdmin("00000003-8000-0000-0000-000000000000", "Denis Villeneuve", "DIRECTOR");
         givenAMemberPublishedByTheAdmin("00000003-8100-0000-0000-000000000000", "Rebecca Ferguson", "ACTOR");
 
-        await().atMost(VISIBLE).untilAsserted(() -> {
+        awaitReplicated(VISIBLE, this.listenerLog, "a replicação", this::indexState, () -> {
             final var actualPage = listCastMembers();
 
             assertEquals(0, actualPage.meta().currentPage());
@@ -113,7 +125,7 @@ class CastMemberE2ETest implements CastMemberE2EDsl {
         givenAMemberPublishedByTheAdmin("00000003-9000-0000-0000-000000000000", "Denis Villeneuve", "DIRECTOR");
         givenAMemberPublishedByTheAdmin("00000003-9100-0000-0000-000000000000", "Rebecca Ferguson", "ACTOR");
 
-        await().atMost(VISIBLE).untilAsserted(() -> {
+        awaitReplicated(VISIBLE, this.listenerLog, "a replicação", this::indexState, () -> {
             final var actualPage = listCastMembers("Rebecca");
 
             assertEquals(1L, actualPage.meta().total());
@@ -164,4 +176,12 @@ class CastMemberE2ETest implements CastMemberE2EDsl {
     private static List<String> namesOf(final List<GqlCastMember> items) {
         return items.stream().map(GqlCastMember::name).sorted().toList();
     }
+    // O que o índice tinha quando a espera desistiu. Um lugar só, para a chamada caber numa linha.
+    private String indexState() {
+        return listCastMembers().items().stream()
+                .map(it -> "%s=%s/%s".formatted(it.id().substring(0, 8), it.name(), it.type()))
+                .toList()
+                .toString();
+    }
+
 }
