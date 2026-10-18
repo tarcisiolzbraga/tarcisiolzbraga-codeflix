@@ -296,7 +296,7 @@ class VideoControllerTest {
     @Test
     void givenAStoredMedia_whenCallGetMedia_thenReturnTheFileWithItsTypeAndName() throws Exception {
         when(getMediaUseCase.execute(any()))
-                .thenReturn(new MediaOutput(destination -> destination.write("conteudo".getBytes()), "video/mp4", "duna.mp4"));
+                .thenReturn(new MediaOutput(destination -> destination.write("conteudo".getBytes()), "conteudo".length(), "video/mp4", "duna.mp4"));
 
         final var response = this.mockMvc.perform(get(VIDEOS_PATH + "/" + EXPECTED_ID + "/medias/VIDEO"));
 
@@ -330,6 +330,7 @@ class VideoControllerTest {
                 // prova que o que a função escreve é o que o cliente recebe.
                 .thenReturn(new MediaSliceOutput(
                         destination -> destination.write("conte".getBytes()),
+                        "conte".length(),
                         "video/mp4",
                         "duna.mp4",
                         "bytes 0-4/8"));
@@ -345,12 +346,51 @@ class VideoControllerTest {
         verify(getMediaSliceUseCase).execute(argThat(command -> "bytes=0-4".equals(command.range())));
     }
 
+    // **`Content-Length` mesmo respondendo em fluxo.** Sem ele o Tomcat usa chunked, e aí o player
+    // perde o tamanho do que está baixando — e o cliente HTTP perde a informação que lhe diz que a
+    // resposta terminou por inteiro. Fluxo e tamanho conhecido não se excluem.
+    @Test
+    void givenNoRangeHeader_whenCallGetMedia_thenTheResponseDeclaresItsLength() throws Exception {
+        when(getMediaUseCase.execute(any()))
+                .thenReturn(new MediaOutput(
+                        destination -> destination.write("conteudo".getBytes()),
+                        "conteudo".length(),
+                        "video/mp4",
+                        "duna.mp4"));
+
+        final var response =
+                this.mockMvc.perform(get(VIDEOS_PATH + "/" + EXPECTED_ID + "/medias/VIDEO"));
+
+        response.andExpect(status().isOk())
+                .andExpect(header().longValue(HttpHeaders.CONTENT_LENGTH, "conteudo".length()));
+    }
+
+    // No 206 o tamanho é **do trecho**, não o do arquivo: é o que o status declara, e o
+    // `Content-Range` ao lado diz onde ele está no arquivo inteiro.
+    @Test
+    void givenARangeHeader_whenCallGetMedia_thenTheLengthIsTheSliceAndNotTheWholeFile() throws Exception {
+        when(getMediaSliceUseCase.execute(any()))
+                .thenReturn(new MediaSliceOutput(
+                        destination -> destination.write("conte".getBytes()),
+                        "conte".length(),
+                        "video/mp4",
+                        "duna.mp4",
+                        "bytes 0-4/19"));
+
+        final var response = this.mockMvc.perform(
+                get(VIDEOS_PATH + "/" + EXPECTED_ID + "/medias/VIDEO").header(HttpHeaders.RANGE, "bytes=0-4"));
+
+        response.andExpect(status().isPartialContent())
+                .andExpect(header().longValue(HttpHeaders.CONTENT_LENGTH, 5))
+                .andExpect(header().string(HttpHeaders.CONTENT_RANGE, "bytes 0-4/19"));
+    }
+
     // `Accept-Ranges` também na resposta inteira: é por ele que o player descobre que pode pedir
     // trecho. Sem o cabeçalho, o browser baixa tudo mesmo que a rota saiba servir partes.
     @Test
     void givenNoRangeHeader_whenCallGetMedia_thenStillAnnounceThatRangesAreAccepted() throws Exception {
         when(getMediaUseCase.execute(any()))
-                .thenReturn(new MediaOutput(destination -> destination.write("conteudo".getBytes()), "video/mp4", "duna.mp4"));
+                .thenReturn(new MediaOutput(destination -> destination.write("conteudo".getBytes()), "conteudo".length(), "video/mp4", "duna.mp4"));
 
         final var response = this.mockMvc.perform(get(VIDEOS_PATH + "/" + EXPECTED_ID + "/medias/VIDEO"));
 

@@ -12,8 +12,11 @@ import java.util.Objects;
 // `contentRange` é nulo quando o arquivo veio inteiro, e traz o intervalo servido quando veio um
 // trecho — é por ele que a rota sabe responder 200 ou 206, sem refazer a conta que o armazenamento
 // já fez.
+// O `length` é o tamanho que o admin informou. Ele existe para a resposta do catálogo poder levar
+// `Content-Length` mesmo em fluxo: sem ele o Tomcat usa chunked, e o player perde o tamanho do que
+// está baixando.
 public record VideoMediaFile(
-        String contentType, String filename, MediaContent content, String contentRange) {
+        String contentType, String filename, MediaContent content, long length, String contentRange) {
 
     public VideoMediaFile {
         Objects.requireNonNull(content, "'content' should not be null");

@@ -97,6 +97,7 @@ public class VideoRestClient implements VideoClient {
                         open.getBody().transferTo(destination);
                     }
                 },
+                headers.getContentLength(),
                 headers.getFirst(HttpHeaders.CONTENT_RANGE)));
     }
 

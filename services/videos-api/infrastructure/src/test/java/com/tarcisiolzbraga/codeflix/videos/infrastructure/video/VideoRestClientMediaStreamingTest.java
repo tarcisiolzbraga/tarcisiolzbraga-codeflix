@@ -120,6 +120,25 @@ class VideoRestClientMediaStreamingTest {
         assertEquals("conte", destination.toString(StandardCharsets.UTF_8));
     }
 
+    // O tamanho que o admin informou é repassado: é com ele que a rota do catálogo põe
+    // `Content-Length` na própria resposta, em vez de sair em chunks.
+    @Test
+    void givenTheAdminDeclaringTheLength_whenTheMediaIsRelayed_thenItIsCarriedOver() throws Exception {
+        this.server.createContext("/videos/v1/medias/VIDEO", exchange -> {
+            exchange.getResponseHeaders().add(HttpHeaders.CONTENT_TYPE, "video/mp4");
+            final var body = "conteudo".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            try (var out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+        });
+
+        final var relayed = boundToTheStub().mediaOf("v1", "VIDEO", null);
+
+        assertTrue(relayed.isPresent());
+        assertEquals("conteudo".length(), relayed.get().length());
+    }
+
     // 404 fecha a resposta e devolve vazio: vídeo sem aquela mídia é caso comum, e deixar a conexão
     // pendurada por ele vazaria uma por pedido.
     @Test

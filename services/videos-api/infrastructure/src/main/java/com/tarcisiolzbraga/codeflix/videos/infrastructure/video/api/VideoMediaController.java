@@ -100,6 +100,9 @@ public class VideoMediaController {
                         // `Accept-Ranges` é o que faz o player saber que pode pedir trecho; sem ele o
                         // browser baixa tudo mesmo que a rota saiba servir partes.
                         .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                        // O tamanho que o admin informou, repassado: sem ele a resposta sai em
+                        // chunks e o player não sabe o tamanho do que está baixando.
+                        .contentLength(file.length())
                         .headers(headers -> {
                             if (file.contentRange() != null) {
                                 headers.set(HttpHeaders.CONTENT_RANGE, file.contentRange());

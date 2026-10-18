@@ -108,6 +108,9 @@ public class S3StorageService implements StorageService {
                             content.transferTo(destination);
                         }
                     },
+                    // O tamanho do trecho, como o armazenamento o informou: é ele que vai no
+                    // `Content-Length` da resposta.
+                    response.contentLength(),
                     response.contentType(),
                     response.metadata().get(NAME_METADATA),
                     response.contentRange()));

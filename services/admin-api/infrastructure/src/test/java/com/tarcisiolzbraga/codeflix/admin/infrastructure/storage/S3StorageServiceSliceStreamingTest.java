@@ -51,6 +51,9 @@ class S3StorageServiceSliceStreamingTest {
         final var counting = new CountingInputStream(new ByteArrayInputStream(CONTENT.getBytes()));
         final var response = GetObjectResponse.builder()
                 .contentType("video/mp4")
+                // O tamanho vem do armazenamento, e a rota o usa no `Content-Length`: sem ele aqui o
+                // dublê mente sobre o que o S3 devolve.
+                .contentLength((long) CONTENT.length())
                 .contentRange("bytes 0-18/19")
                 .metadata(Map.of(NAME_METADATA, "duna.mp4"))
                 .build();
