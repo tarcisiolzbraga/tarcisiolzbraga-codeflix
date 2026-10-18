@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 // As rotas REST do catálogo — as únicas do serviço, e elas existem para **servir mídia a quem
 // assina**. Até aqui o acervo publicava os dados do título e nada mais: os campos de mídia guardam a
@@ -67,7 +68,7 @@ public class VideoMediaController {
     // a requisição sem token antes de o selo ser conferido. A regra está no código, logo abaixo, e os
     // seis casos têm teste de ponta a ponta.
     @GetMapping("/{id}/medias/{type}")
-    public ResponseEntity<byte[]> media(
+    public ResponseEntity<StreamingResponseBody> media(
             @PathVariable("id") final String id,
             @PathVariable("type") final String type,
             @RequestParam(name = "expires", required = false) final String expires,
@@ -90,7 +91,7 @@ public class VideoMediaController {
     // O status sai do que o admin devolveu: com `Content-Range` é 206, sem ele é 200. Decidir pela
     // presença do cabeçalho de **pedido** seria adivinhar — o admin pode ignorar um Range que não
     // souber atender, e aí 206 com o arquivo inteiro enganaria o player.
-    private ResponseEntity<byte[]> serve(final String id, final String type, final String range) {
+    private ResponseEntity<StreamingResponseBody> serve(final String id, final String type, final String range) {
         return this.videoClient
                 .mediaOf(id, type, range)
                 .map(file -> ResponseEntity.status(
@@ -107,7 +108,9 @@ public class VideoMediaController {
                         // inline, e não attachment: o player aponta para esta rota, e attachment faria
                         // o browser baixar em vez de reproduzir.
                         .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"%s\"".formatted(file.filename()))
-                        .body(file.content()))
+                        // A testemunha de tipo é necessária: uma referência de método num parâmetro
+                        // genérico, dentro do `map`, não é inferível sozinha.
+                        .<StreamingResponseBody>body(file.content()::writeTo))
                 // Vídeo sem aquela mídia é 404 limpo: existe no acervo e não tem o que reproduzir,
                 // que é o caso de um título cadastrado sem upload.
                 .orElseGet(() -> ResponseEntity.notFound().build());
