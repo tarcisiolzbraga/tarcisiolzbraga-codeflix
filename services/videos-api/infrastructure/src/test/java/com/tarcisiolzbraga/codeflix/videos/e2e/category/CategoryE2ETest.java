@@ -1,14 +1,16 @@
 package com.tarcisiolzbraga.codeflix.videos.e2e.category;
 
-import static org.awaitility.Awaitility.await;
+import static com.tarcisiolzbraga.codeflix.videos.infrastructure.ReplicationAwait.awaitReplicated;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.E2ETest;
+import com.tarcisiolzbraga.codeflix.videos.infrastructure.ListenerLogCapture;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.KeycloakTestToken;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.category.models.GqlCategory;
 import java.time.Duration;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,10 +38,20 @@ class CategoryE2ETest implements CategoryE2EDsl {
 
     private RestClient adminClient;
 
+    // O que os listeners registrarem durante o teste, para a falha poder dizer o motivo.
+    // Veja o porquê em ListenerLogCapture.
+    private ListenerLogCapture listenerLog;
+
     @BeforeEach
     void bindToTheRunningServer() {
         this.client = clientWith(this.token.catalogTest());
         this.adminClient = clientWith(this.token.admin());
+        this.listenerLog = ListenerLogCapture.start();
+    }
+
+    @AfterEach
+    void stopCapturingTheListenerLog() {
+        this.listenerLog.close();
     }
 
     // O token vai no cabeçalho padrão do cliente: é como um consumidor de verdade fala com a API,
@@ -66,7 +78,7 @@ class CategoryE2ETest implements CategoryE2EDsl {
         givenACategory("00000003-6000-0000-0000-000000000000", "Filmes", "A mais assistida");
         givenACategory("00000003-7000-0000-0000-000000000000", "Séries", "A segunda mais assistida");
 
-        await().atMost(VISIBLE).untilAsserted(() -> {
+        awaitReplicated(VISIBLE, this.listenerLog, "a replicação", this::indexState, () -> {
             final var actualPage = listCategories();
 
             assertEquals(0, actualPage.meta().currentPage());
@@ -81,7 +93,7 @@ class CategoryE2ETest implements CategoryE2EDsl {
         givenACategory("00000003-6000-0000-0000-000000000000", "Filmes", "A mais assistida");
         givenACategory("00000003-7000-0000-0000-000000000000", "Séries", "A segunda mais assistida");
 
-        await().atMost(VISIBLE).untilAsserted(() -> {
+        awaitReplicated(VISIBLE, this.listenerLog, "a replicação", this::indexState, () -> {
             final var actualPage = listCategories("segunda");
 
             assertEquals(1L, actualPage.meta().total());
@@ -95,7 +107,7 @@ class CategoryE2ETest implements CategoryE2EDsl {
         givenACategory("00000003-7000-0000-0000-000000000000", "Documentários", "Catálogo de documentários");
         givenACategory("00000011-0000-0000-0000-000000000000", "Filmes", "A mais assistida");
 
-        await().atMost(VISIBLE).untilAsserted(() -> {
+        awaitReplicated(VISIBLE, this.listenerLog, "a replicação", this::indexState, () -> {
             final var actualPage = listCategories("", 1, 2);
 
             assertEquals(1, actualPage.meta().currentPage());
@@ -110,7 +122,7 @@ class CategoryE2ETest implements CategoryE2EDsl {
 
         givenACategory("00000003-6000-0000-0000-000000000000", "Filmes e séries", "texto novo");
 
-        await().atMost(VISIBLE).untilAsserted(() -> {
+        awaitReplicated(VISIBLE, this.listenerLog, "a replicação", this::indexState, () -> {
             final var actualPage = listCategories();
 
             assertEquals(1L, actualPage.meta().total());
@@ -129,4 +141,12 @@ class CategoryE2ETest implements CategoryE2EDsl {
     private static List<String> namesOf(final List<GqlCategory> items) {
         return items.stream().map(GqlCategory::name).sorted().toList();
     }
+    // O que o índice tinha quando a espera desistiu. Um lugar só, para a chamada caber numa linha.
+    private String indexState() {
+        return listCategories().items().stream()
+                .map(it -> "%s=%s".formatted(it.id().substring(0, 8), it.name()))
+                .toList()
+                .toString();
+    }
+
 }

@@ -1,10 +1,9 @@
 package com.tarcisiolzbraga.codeflix.videos.e2e.genre;
 
-import static org.awaitility.Awaitility.await;
+import static com.tarcisiolzbraga.codeflix.videos.infrastructure.ReplicationAwait.awaitReplicated;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.when;
 
 import com.tarcisiolzbraga.codeflix.videos.e2e.category.CategoryE2EDsl;
@@ -19,7 +18,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import org.awaitility.core.ConditionTimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -107,7 +105,7 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
         givenAnInactiveCategory("00000006-0000-0000-0000-000000000000", "Desativada", "Fora do catálogo");
         givenAGenrePublishedByTheAdmin("00000021-0000-0000-0000-000000000000", "Ação", Set.of("00000004-0000-0000-0000-000000000000", "00000006-0000-0000-0000-000000000000"));
 
-        await().atMost(VISIBLE).untilAsserted(() -> {
+        awaitReplicated(VISIBLE, this.listenerLog, "a replicação", this::indexState, () -> {
             final var actualPage = listGenres();
 
             assertEquals(1L, actualPage.meta().total());
@@ -123,7 +121,7 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
         givenACategory("00000010-0000-0000-0000-000000000000", "Séries", "A segunda mais assistida");
         givenAGenrePublishedByTheAdmin("00000022-0000-0000-0000-000000000000", "Ação", Set.of("00000009-0000-0000-0000-000000000000", "00000010-0000-0000-0000-000000000000"));
 
-        await().atMost(VISIBLE).untilAsserted(() -> {
+        awaitReplicated(VISIBLE, this.listenerLog, "a replicação", this::indexState, () -> {
             final var actualItems = listGenres().items();
 
             // A presença é afirmada antes de ler: getFirst() numa lista vazia lança
@@ -151,7 +149,7 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
     void givenAGenreWithoutCategories_whenAClientReadsIt_thenSeeAnEmptyList() {
         givenAGenrePublishedByTheAdmin("00000025-0000-0000-0000-000000000000", "Sem categoria", Set.of());
 
-        await().atMost(VISIBLE).untilAsserted(() -> {
+        awaitReplicated(VISIBLE, this.listenerLog, "a replicação", this::indexState, () -> {
             final var actualItems = listGenres().items();
 
             assertFalse(actualItems.isEmpty());
@@ -167,36 +165,15 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
         assertTrue(actualPage.items().isEmpty());
     }
 
-    // Espera a contagem, e **diz o que encontrou e o que os listeners registraram** quando ela não
-    // vem.
-    //
-    // Esta classe teve uma intermitência que só aparecia no CI, com a mensagem `expected: <2> but
-    // was: <1>` — uma contagem sem contexto. A primeira melhoria foi listar o índice; a segunda,
-    // esta, foi juntar o log dos listeners, porque **o log do CI não tinha o que aconteceu**: num
-    // job que falhou às 17:03:11, todas as 179 linhas de log da aplicação capturadas eram de 17:04,
-    // o encerramento. Agora o motivo viaja junto com a falha.
+    // Delega à peça comum: os quatro E2E deste serviço esperam replicação do mesmo jeito, e o CI
+    // provou que a intermitência não é de um agregado — ela apareceu no gênero e no elenco.
     private void awaitGenres(final long expected) {
-        try {
-            await().atMost(VISIBLE).untilAsserted(() -> assertEquals(expected, listGenres().meta().total()));
-        } catch (final ConditionTimeoutException timeout) {
-            final var page = listGenres();
-            final var avisos = this.listenerLog.warningsAndErrors();
-            fail("""
-                    esperava %d gêneros em %s. O índice tem %d: %s
-                    O que os listeners registraram (WARN e acima): %s"""
-                    .formatted(
-                            expected,
-                            VISIBLE,
-                            page.meta().total(),
-                            page.items().stream()
-                                    .map(it -> "%s=%s%s"
-                                            .formatted(
-                                                    it.id().substring(0, 8),
-                                                    it.name(),
-                                                    namesOf(it.categories())))
-                                    .toList(),
-                            avisos.isEmpty() ? "nada — nem aviso de gateway vazio, nem fila morta" : avisos));
-        }
+        awaitReplicated(
+                VISIBLE,
+                this.listenerLog,
+                "a chegada de %d gêneros".formatted(expected),
+                this::indexState,
+                () -> assertEquals(expected, listGenres().meta().total()));
     }
 
     // Publica no tópico a mensagem que o Debezium publicaria, e prepara a resposta da API do admin,
@@ -225,4 +202,12 @@ class GenreE2ETest implements GenreE2EDsl, CategoryE2EDsl {
     private static List<String> namesOf(final List<CategoryView> categories) {
         return categories.stream().map(CategoryView::name).toList();
     }
+    // O que o índice tinha quando a espera desistiu. Um lugar só, para a chamada caber numa linha.
+    private String indexState() {
+        return listGenres().items().stream()
+                .map(it -> "%s=%s%s".formatted(it.id().substring(0, 8), it.name(), namesOf(it.categories())))
+                .toList()
+                .toString();
+    }
+
 }

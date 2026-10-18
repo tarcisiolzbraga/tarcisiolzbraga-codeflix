@@ -1,6 +1,7 @@
 package com.tarcisiolzbraga.codeflix.videos.e2e.video;
 
-import static org.awaitility.Awaitility.await;
+import static com.tarcisiolzbraga.codeflix.videos.infrastructure.ReplicationAwait.awaitDuring;
+import static com.tarcisiolzbraga.codeflix.videos.infrastructure.ReplicationAwait.awaitReplicated;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.tarcisiolzbraga.codeflix.videos.e2e.category.CategoryE2EDsl;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.E2ETest;
+import com.tarcisiolzbraga.codeflix.videos.infrastructure.ListenerLogCapture;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.KeycloakTestToken;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.castmember.CastMemberClient;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.castmember.models.CastMemberDTO;
@@ -25,6 +27,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -85,10 +88,20 @@ class VideoE2ETest implements VideoE2EDsl, CategoryE2EDsl {
 
     private RestClient adminClient;
 
+    // O que os listeners registrarem durante o teste, para a falha poder dizer o motivo.
+    // Veja o porquê em ListenerLogCapture.
+    private ListenerLogCapture listenerLog;
+
     @BeforeEach
     void bindToTheRunningServer() {
         this.client = clientWith(this.token.catalogTest());
         this.adminClient = clientWith(this.token.admin());
+        this.listenerLog = ListenerLogCapture.start();
+    }
+
+    @AfterEach
+    void stopCapturingTheListenerLog() {
+        this.listenerLog.close();
     }
 
     // O token vai no cabeçalho padrão do cliente: é como um consumidor de verdade fala com a API,
@@ -120,7 +133,7 @@ class VideoE2ETest implements VideoE2EDsl, CategoryE2EDsl {
         givenACastMember("00000020-0000-0000-0000-000000000000", "Desativado", false);
         givenAVideo("00000025-0000-0000-0000-000000000000", "Duna", true, Set.of("00000004-0000-0000-0000-000000000000", "00000006-0000-0000-0000-000000000000"), Set.of("00000013-0000-0000-0000-000000000000", "00000015-0000-0000-0000-000000000000"), Set.of("00000018-0000-0000-0000-000000000000", "00000020-0000-0000-0000-000000000000"));
 
-        await().atMost(VISIBLE).untilAsserted(() -> {
+        awaitReplicated(VISIBLE, this.listenerLog, "a replicação", this::indexState, () -> {
             final var actualVideo = video("00000025-0000-0000-0000-000000000000");
 
             assertNotNull(actualVideo, "o vídeo ainda não chegou ao catálogo");
@@ -136,7 +149,7 @@ class VideoE2ETest implements VideoE2EDsl, CategoryE2EDsl {
     void givenAVideoFromTheAdmin_whenAClientListsThem_thenSeeItWithItsFields() {
         givenAVideo("00000025-0000-0000-0000-000000000000", "Duna", true, Set.of(), Set.of(), Set.of());
 
-        await().atMost(VISIBLE).untilAsserted(() -> {
+        awaitReplicated(VISIBLE, this.listenerLog, "a replicação", this::indexState, () -> {
             final var actualPage = listVideos();
 
             assertEquals(1L, actualPage.meta().total());
@@ -153,7 +166,8 @@ class VideoE2ETest implements VideoE2EDsl, CategoryE2EDsl {
     void givenAnUnpublishedVideo_whenAClientReadsIt_thenSeeNothing() {
         givenAVideo("00000025-0000-0000-0000-000000000000", "Nao publicado", false, Set.of(), Set.of(), Set.of());
 
-        await().during(Duration.ofSeconds(5)).atMost(VISIBLE).untilAsserted(() -> {
+        awaitDuring(
+                Duration.ofSeconds(5), VISIBLE, this.listenerLog, "a ausência", this::indexState, () -> {
             assertNull(video("00000025-0000-0000-0000-000000000000"));
             assertEquals(0L, listVideos().meta().total());
         });
@@ -162,7 +176,8 @@ class VideoE2ETest implements VideoE2EDsl, CategoryE2EDsl {
     @Test
     void givenVideosWithDifferentRatings_whenFilterByOne_thenSeeOnlyThatOne() {
         givenAVideo("00000025-0000-0000-0000-000000000000", "Duna", true, Set.of(), Set.of(), Set.of());
-        await().atMost(VISIBLE).untilAsserted(() -> assertEquals(1L, listVideos().meta().total()));
+        awaitReplicated(VISIBLE, this.listenerLog, "a replicação", this::indexState,
+                () -> assertEquals(1L, listVideos().meta().total()));
 
         final var actualPage = listVideos("rating: \"16\"");
 
@@ -226,4 +241,12 @@ class VideoE2ETest implements VideoE2EDsl, CategoryE2EDsl {
             throw new IllegalStateException("não foi possível publicar " + resource + " para " + id, e);
         }
     }
+    // O que o índice tinha quando a espera desistiu. Um lugar só, para a chamada caber numa linha.
+    private String indexState() {
+        return listVideos().items().stream()
+                .map(it -> "%s=%s".formatted(it.id().substring(0, 8), it.title()))
+                .toList()
+                .toString();
+    }
+
 }
