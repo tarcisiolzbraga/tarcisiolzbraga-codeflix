@@ -304,7 +304,19 @@ class VideoMediaE2ETest {
     }
 
     private RestClient clientWith(final String bearer) {
-        final var builder = RestClient.builder().baseUrl("http://localhost:%d/api".formatted(this.port));
+        final var builder = RestClient.builder()
+                .baseUrl("http://localhost:%d/api".formatted(this.port))
+                // **Uma conexão por pedido.** Vários testes desta classe leem só o status ou só os
+                // cabeçalhos e fecham, e a rota responde **em fluxo**: fechar no meio da escrita
+                // devolve a conexão ao pool pela metade, e é o **pedido seguinte** que falha ao ler a
+                // resposta — longe da causa e só às vezes. Reproduzido aqui na terceira execução
+                // seguida, noutro teste da classe, que é o retrato disso.
+                //
+                // Enquanto o corpo era um `byte[]`, a resposta saía com `Content-Length` e já
+                // escrita, então fechar cedo era inofensivo. É artefato do cliente de teste, e não
+                // da rota: um browser drena ou descarta a conexão, e o `ClientHttpResponse.close()`
+                // que o catálogo usa no repasse também.
+                .defaultHeader(HttpHeaders.CONNECTION, "close");
         return bearer == null ? builder.build() : builder.defaultHeader(HttpHeaders.AUTHORIZATION, bearer).build();
     }
 
