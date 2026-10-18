@@ -139,6 +139,36 @@ O caso de uso do trecho é separado do caso de uso do arquivo inteiro, de propó
 outra, e misturar os dois num só com parâmetro opcional faria a rota decidir o status por `if` de
 campo nulo.
 
+### O trecho sai em fluxo, e o que isso custava antes
+
+O trecho vai do armazenamento para o socket **sem passar inteiro pela memória**. Isso não era verdade
+até aqui, e o preço era contável: um pedido de 10 MB chegava a **nove** cópias do mesmo trecho entre
+este serviço e o catálogo.
+
+| onde | cópias |
+|---|---|
+| admin-api | `getObjectAsBytes`, `asByteArray`, construtor do `ResourceSlice`, accessor dele, construtor do `MediaSliceOutput`, accessor dele |
+| catálogo | `bodyTo(byte[])`, construtor do `VideoMediaFile`, accessor dele |
+
+Quatro delas eram **cópia defensiva** — necessária enquanto o conteúdo era um arranjo mutável dentro
+de um value object, e desnecessária depois: não há bytes para copiar.
+
+O conteúdo virou um [`MediaContent`](domain/src/main/java/com/tarcisiolzbraga/codeflix/admin/domain/video/MediaContent.java):
+uma função que recebe o destino e escreve nele. É função, e não `InputStream`, porque `InputStream`
+no domínio traria um recurso com ciclo de vida para um lugar que não sabe fechá-lo — aqui quem abre
+fecha, dentro do `writeTo`, inclusive quando a escrita falha no meio.
+
+O 404 e o 416 continuam chegando **na abertura** do objeto, e não durante a escrita: é isso que
+permite a rota escolher o status antes de começar a responder.
+
+**O caminho sem `Range` continua montando o corpo em memória, e é escolha.** Ele serve as artes do
+catálogo — banner e miniatura —, que são pequenas, e o player sempre manda `Range`.
+
+**O envio ainda sobe inteiro em memória**, e isso continua em aberto: o checksum é calculado sobre o
+conteúdo e gravado como metadado do objeto, então o arquivo precisa ser lido **antes** do PUT. O
+conserto é uma passada para o checksum e outra para o envio, sobre o arquivo temporário que o Spring
+já grava em disco — não foi feito aqui.
+
 ### Codificação dos vídeos
 
 O arquivo de áudio e vídeo nasce com status `PENDING` e é o codificador que o move. A conversa acontece por uma

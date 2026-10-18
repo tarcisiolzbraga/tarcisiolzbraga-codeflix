@@ -159,11 +159,30 @@ O status sai **do que o admin devolveu**, e não da presença do cabeçalho no p
 
 `Accept-Ranges: bytes` vai nas duas respostas: é por ele que o player descobre que pode pedir trecho.
 
+### O repasse é repasse, e não cópia
+
+O arquivo atravessa o catálogo **em fluxo**: os cabeçalhos do admin são lidos para montar a resposta,
+e o corpo é transferido depois, direto para quem pediu. A conexão com o admin fica aberta até alguém
+escrever o conteúdo, e é o `writeTo` que a fecha.
+
+Isso não era verdade até aqui: o conteúdo era um `byte[]`, e "repassar" significava montar o trecho
+inteiro em memória antes de escrevê-lo — três cópias deste lado, somadas às seis da admin-api, para
+um pedido só.
+
+Quem permite isso é o `exchange(fn, **false**)` do `RestClient`: com `false`, a resposta não é fechada
+quando o lambda retorna. Fechar ali obrigaria a ler o arquivo inteiro antes de responder.
+
+A prova precisou de um servidor HTTP de verdade — um `HttpServer` do próprio JDK, sem dependência
+nova: o `VideoMediaE2ETest` dubla o `VideoClient`, então nunca exercitou essa parte. O teste faz o
+servidor escrever o primeiro bloco e **só escrever o segundo depois de o primeiro chegar ao destino
+do cliente**; se o catálogo bufferizasse, o servidor esperaria para sempre.
+
 ### O que ainda custa
 
-**O arquivo passa pela memória dos dois serviços**: a rota do admin responde `byte[]`. Com `Range` o
-tamanho de cada resposta deixou de ser o do arquivo inteiro, o que torna o custo proporcional ao que
-o player pede — mas um trecho grande continua sendo um arranjo em memória nos dois lados.
+**O envio ainda sobe inteiro em memória, do lado do admin.** Não é deste serviço — o catálogo não
+recebe upload —, mas é a outra metade do mesmo problema, e está registrada no README da admin-api: o
+checksum é calculado sobre o conteúdo e gravado como metadado do objeto, então o arquivo precisa ser
+lido antes do PUT.
 
 ## Por que repasse, e não URL assinada
 
