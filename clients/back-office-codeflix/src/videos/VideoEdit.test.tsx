@@ -126,20 +126,44 @@ describe("VideoEdit", () => {
     expect(screen.getAllByText("Nenhum arquivo enviado.")).toHaveLength(4);
   });
 
-  // O envio é por XHR, e não `fetch`: é o único que reporta progresso. O dublê deixa o teste decidir
-  // quando a resposta chega.
-  it("givenUmArquivoEscolhido_whenEnviado_thenVaiDePostNaRotaDaMidia", async () => {
+  // **Escolher um arquivo agora o põe na fila**, e é a fila que envia. O POST continua acontecendo —
+  // por XHR, porque é o único que reporta progresso de envio.
+  it("givenUmArquivoEscolhido_whenEnfileirado_thenAFilaOEnviaParaARotaDaMidia", async () => {
     const xhr = installXhrDouble();
     renderiza();
 
     await screen.findByText("duna.mp4");
-    const campo = screen.getByLabelText("Arquivo de Trailer");
-    await userEvent.upload(campo, new File(["x"], "trailer.mp4", { type: "video/mp4" }));
+    await userEvent.upload(
+      screen.getByLabelText("Arquivo de Trailer"),
+      new File(["x"], "trailer.mp4", { type: "video/mp4" }),
+    );
 
     await waitFor(() => expect(xhr.sent).toHaveLength(1));
     expect(xhr.sent[0]!.url).toBe(`${ADMIN_API}/videos/vid-1/medias/TRAILER`);
+    expect(xhr.sent[0]!.method).toBe("POST");
+  });
+
+  // A fila envia **um por vez**: cinco arquivos de 100 MB em paralelo disputam a banda de subida, e
+  // aí nenhum termina até perto do fim — a barra de progresso deixa de informar.
+  it("givenDoisArquivosEscolhidos_whenEnfileirados_thenApenasUmSobeDeCadaVez", async () => {
+    const xhr = installXhrDouble();
+    renderiza();
+
+    await screen.findByText("duna.mp4");
+    await userEvent.upload(
+      screen.getByLabelText("Arquivo de Trailer"),
+      new File(["x"], "trailer.mp4", { type: "video/mp4" }),
+    );
+    await userEvent.upload(
+      screen.getByLabelText("Arquivo de Banner"),
+      new File(["y"], "banner.png", { type: "image/png" }),
+    );
+
+    await waitFor(() => expect(xhr.sent).toHaveLength(1));
+    // O segundo só sai depois de o primeiro responder.
     xhr.respond(0, 201);
-    expect(await screen.findByText("Trailer enviado.")).toBeInTheDocument();
+    await waitFor(() => expect(xhr.sent).toHaveLength(2));
+    expect(xhr.sent[1]!.url).toBe(`${ADMIN_API}/videos/vid-1/medias/BANNER`);
   });
 
   it("givenOsCamposTrocados_whenSalva_thenMandaPutNoRecurso", async () => {
