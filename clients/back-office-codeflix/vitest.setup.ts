@@ -12,4 +12,9 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+
+  // O `localStorage` do jsdom é um só para todos os testes de um arquivo. Sem limpar, a escolha de
+  // tema que um teste faz vira o estado inicial do próximo — foi o que aconteceu com o `ThemeToggle`,
+  // e o sintoma aparece no teste seguinte, não no que mexeu.
+  localStorage.clear();
 });
