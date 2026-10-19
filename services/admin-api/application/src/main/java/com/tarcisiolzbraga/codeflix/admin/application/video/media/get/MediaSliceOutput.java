@@ -9,9 +9,11 @@ import com.tarcisiolzbraga.codeflix.admin.domain.video.ResourceSlice;
 // O conteúdo é um `MediaContent`: ele atravessa este record sem ser lido, e é escrito direto na
 // resposta. A versão anterior copiava o trecho duas vezes só aqui, por cópia defensiva no construtor
 // e no accessor.
-public record MediaSliceOutput(MediaContent content, String contentType, String name, String contentRange) {
+public record MediaSliceOutput(
+        MediaContent content, long length, String contentType, String name, String contentRange) {
 
     public static MediaSliceOutput from(final ResourceSlice slice) {
-        return new MediaSliceOutput(slice.content(), slice.contentType(), slice.name(), slice.contentRange());
+        return new MediaSliceOutput(
+                slice.content(), slice.length(), slice.contentType(), slice.name(), slice.contentRange());
     }
 }

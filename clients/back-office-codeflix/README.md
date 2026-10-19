@@ -31,6 +31,28 @@ O realm cria um humano para isto: **`operador-de-teste`**, com `CODEFLIX_ADMIN`.
 Entrar com uma conta de assinante **funciona** — o client é o mesmo —, e o painel diz que falta
 permissão em vez de mostrar a interface. O porquê está mais abaixo.
 
+### Em container
+
+```bash
+docker compose up -d --build back-office-codeflix     # da raiz do monorepo
+```
+
+Dois estágios: o `vite build`, e um nginx com o resultado. Deu 90 MB — contra 286 MB do portal,
+porque aqui não há servidor Node: o back-office não renderiza nada no servidor, já que tudo atrás da
+porta exige login.
+
+**A linha que faz o roteador funcionar** está no [`nginx.conf`](nginx.conf):
+`try_files $uri $uri/ /index.html`. O react-router usa caminhos de verdade (`/categorias/nova`), e
+recarregar a página nessa URL pede ao nginx um arquivo que não existe — sem o fallback, a resposta é
+404, e parece defeito da aplicação. Conferido: `GET /categorias` devolve o mesmo `index.html` que
+`GET /`.
+
+Os pacotes têm hash no nome e são guardados por um ano; o `index.html` não tem, e vai com
+`no-store` — guardá-lo faria uma versão nova demorar a aparecer.
+
+**As URLs entram como `build-arg`**, pelo mesmo motivo do portal: o Vite as substitui no código em
+tempo de build. Sem argumento, caem para `http://localhost:<porta>` do `.env` da raiz.
+
 ## De onde vem a configuração
 
 **Do `.env` da raiz do monorepo, que é um só.** O [`vite.config.ts`](vite.config.ts) o lê com

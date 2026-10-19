@@ -1,0 +1,44 @@
+# O portal do assinante. Diferente das aplicações Java, o pacote é montado **dentro** da imagem — não
+# há jar para empacotar no host antes.
+#
+# **As URLs entram como `build-arg`, e não no `environment`.** Elas são embutidas no JavaScript em
+# tempo de build, então mudá-las depois exige reconstruir a imagem. É o preço de um front que não lê
+# configuração em tempo de execução, e está dito no README.
+#
+# Sem perfil, como as aplicações: `docker compose up -d` da raiz sobe o portal junto do resto.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
+services:
+  portal-codeflix:
+    logging: *logging
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # As portas vêm do .env da raiz, e as URLs inteiras ficam vazias no desenvolvimento: aí o
+        # `buildEnv.ts` cai para `http://localhost:<porta>`, que é o endereço que o **browser** de
+        # quem está programando alcança. As portas das APIs são publicadas no host.
+        SUBSCRIPTION_APP_PORT: ${SUBSCRIPTION_APP_PORT}
+        CATALOG_APP_PORT: ${CATALOG_APP_PORT}
+        APP_PORT: ${APP_PORT}
+        KEYCLOAK_HOST: ${KEYCLOAK_HOST}
+        KEYCLOAK_PORT: ${KEYCLOAK_PORT}
+        KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+        FRONT_KEYCLOAK_CLIENT_ID: ${FRONT_KEYCLOAK_CLIENT_ID:-front-codeflix}
+        # Para construir a imagem de outro ambiente, preencha estas no .env. A porta é ignorada
+        # quando a URL inteira vem.
+        PUBLIC_SUBSCRIPTION_API_URL: ${PUBLIC_SUBSCRIPTION_API_URL:-}
+        PUBLIC_CATALOG_API_URL: ${PUBLIC_CATALOG_API_URL:-}
+        PUBLIC_ADMIN_API_URL: ${PUBLIC_ADMIN_API_URL:-}
+        PUBLIC_KEYCLOAK_ISSUER: ${PUBLIC_KEYCLOAK_ISSUER:-}
+    container_name: codeflix_portal
+    ports:
+      # 3000 dentro e fora: é a porta que o `redirectUris` do client do realm libera, e o Keycloak
+      # recusaria uma volta para outra.
+      - "3000:3000"
+    labels:
+      filebeat_collector: "true"

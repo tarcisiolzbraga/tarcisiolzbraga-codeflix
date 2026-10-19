@@ -159,24 +159,31 @@ O status sai **do que o admin devolveu**, e não da presença do cabeçalho no p
 
 `Accept-Ranges: bytes` vai nas duas respostas: é por ele que o player descobre que pode pedir trecho.
 
-### O repasse é repasse, e não cópia
+### O repasse volta a bufferizar, e isso é um recuo medido
 
-O arquivo atravessa o catálogo **em fluxo**: os cabeçalhos do admin são lidos para montar a resposta,
-e o corpo é transferido depois, direto para quem pediu. A conexão com o admin fica aberta até alguém
-escrever o conteúdo, e é o `writeTo` que a fecha.
+O trecho passa pela memória deste serviço antes de ser escrito: três cópias, como antes.
 
-Isso não era verdade até aqui: o conteúdo era um `byte[]`, e "repassar" significava montar o trecho
-inteiro em memória antes de escrevê-lo — três cópias deste lado, somadas às seis da admin-api, para
-um pedido só.
+**Chegou a ser em fluxo, e funcionava.** Com `exchange(fn, false)` a resposta do admin ficava aberta
+até alguém escrever o corpo, e um teste contra um `HttpServer` do JDK provava a progressividade — o
+servidor só escrevia o segundo bloco depois de o primeiro chegar ao cliente.
 
-Quem permite isso é o `exchange(fn, **false**)` do `RestClient`: com `false`, a resposta não é fechada
-quando o lambda retorna. Fechar ali obrigaria a ler o arquivo inteiro antes de responder.
+O que derrubou foi uma instabilidade que eu **não consegui fechar**: com a resposta saindo por
+`StreamingResponseBody`, o despacho assíncrono do Spring e o pool do cliente HTTP entram numa corrida
+que faz um pedido falhar com `ParseException` de vez em quando. Quatro tentativas — cabeçalho
+`Connection: close`, drenar o corpo nos testes, tipo de retorno curinga, `Content-Length` — e o CI
+continuou vermelho neste serviço.
 
-A prova precisou de um servidor HTTP de verdade — um `HttpServer` do próprio JDK, sem dependência
-nova: o `VideoMediaE2ETest` dubla o `VideoClient`, então nunca exercitou essa parte. O teste faz o
-servidor escrever o primeiro bloco e **só escrever o segundo depois de o primeiro chegar ao destino
-do cliente**; se o catálogo bufferizasse, o servidor esperaria para sempre.
+**O que se mantém é a parte que importava mais:** as seis cópias do lado da admin-api, que é de onde
+o arquivo sai do armazenamento, deixaram de existir, e aquela ponta está estável. Dois terços do
+ganho, sem a instabilidade.
 
+E o `Content-Length` ficou: a resposta declara o tamanho que o admin informou, o que é melhor para o
+player de qualquer jeito.
+
+> **Para quem retomar:** o caminho é entender por que uma resposta assíncrona **curta** corrompe a
+> conexão do cliente de teste sob carga. A hipótese que sobrou é Tomcat com `StreamingResponseBody` e
+> muitas respostas curtas em sequência. E o lugar de medir é o **build inteiro** — a classe isolada
+> passa sempre, e foi essa medição errada que custou duas das quatro tentativas.
 ### O que ainda custa
 
 Do caminho da mídia, nada: ele atravessa os dois serviços em fluxo, nos dois sentidos. O envio, que

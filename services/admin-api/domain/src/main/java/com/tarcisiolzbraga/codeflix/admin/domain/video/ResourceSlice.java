@@ -12,7 +12,12 @@ import java.util.Objects;
 // passar inteiro pela memória. Por isso **não há cópia defensiva nem `equals` por bytes** — não há
 // bytes para copiar nem comparar, e um conteúdo só pode ser escrito uma vez. Quem quiser afirmar o
 // conteúdo num teste escreve-o num destino e compara o que saiu, que é o que a rota faz.
-public record ResourceSlice(MediaContent content, String contentType, String name, String contentRange) {
+//
+// O `length` é o tamanho **do trecho**, como o armazenamento o informou. Ele existe para a resposta
+// poder levar `Content-Length`: sem ele, uma resposta em fluxo sai em chunks, e o player perde o
+// tamanho do que está baixando.
+public record ResourceSlice(
+        MediaContent content, long length, String contentType, String name, String contentRange) {
 
     public ResourceSlice {
         Objects.requireNonNull(content, "'content' should not be null");

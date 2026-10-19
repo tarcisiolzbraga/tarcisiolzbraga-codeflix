@@ -57,7 +57,11 @@ public interface CategoryE2EDsl {
                 .uri(CATEGORIES_PATH + "/{id}", id)
                 .body(new UpdateCategoryRequest(name, description))
                 .retrieve()
-                .toBodilessEntity();
+                // `toEntity(byte[].class)`, e não `toBodilessEntity()`: o segundo **descarta** o
+                // corpo sem o ler, e aí a conexão volta ao pool com bytes no socket. Com a rota de
+                // mídia respondendo em fluxo, o pedido seguinte lê o resto da resposta anterior como
+                // linha de status e falha com `ParseException` — longe da causa, e só às vezes.
+                .toEntity(byte[].class);
     }
 
     default CategoryResponse activateACategory(final String id) {
@@ -69,7 +73,7 @@ public interface CategoryE2EDsl {
     }
 
     default void deleteACategory(final String id) {
-        client().delete().uri(CATEGORIES_PATH + "/{id}", id).retrieve().toBodilessEntity();
+        client().delete().uri(CATEGORIES_PATH + "/{id}", id).retrieve().toEntity(byte[].class);
     }
 
     private CategoryResponse changeActivation(final String id, final String action) {

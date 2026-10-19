@@ -83,7 +83,8 @@ cd services/admin-api && ./gradlew bootRun    # ou videos-api
 O serviço continua sendo o build de entrada; `build-logic/` entra como build incluído, compilado
 antes dele. Não há wrapper na raiz, e não se roda Gradle de lá.
 
-Os fronts sobem do mesmo jeito, da pasta de cada um:
+Os fronts sobem do mesmo jeito, da pasta de cada um — ou em container, junto do resto, com o
+`docker compose up -d` da raiz. Para programar neles, o `npm run dev`:
 
 ```bash
 cd clients/portal-codeflix     && npm install && npm run dev    # http://localhost:3000
@@ -100,6 +101,31 @@ Para subir as aplicações em container, empacote o jar antes e depois use o com
 cd services/admin-api && ./gradlew bootJar && cd ../..
 docker compose up -d --build admin-api
 ```
+
+Os dois fronts e os dois serviços em Go **não** precisam disso: eles compilam dentro da própria
+imagem. Só as três aplicações Java empacotam o jar no host.
+
+### As URLs dos fronts são decididas no build, não no run
+
+`docker compose up -d` da raiz sobe tudo, inclusive os fronts. Mas eles têm uma diferença que importa
+na hora de implantar: **as URLs das APIs são embutidas no JavaScript em tempo de build**, então
+passá-las no `run` não muda nada — o valor já está no pacote que o browser baixa.
+
+Por isso elas são `build-arg`, e não variável de ambiente do container:
+
+| no `.env` | o que acontece |
+|---|---|
+| `PUBLIC_*` vazias | cada URL cai para `http://localhost:<porta>`, o padrão de desenvolvimento |
+| `PUBLIC_*` preenchidas | a URL inteira é usada, e a porta é ignorada |
+
+A primeira coluna é o que a máquina de quem programa quer: as portas das APIs são publicadas no
+host, e é o **browser** que as alcança — não o container do front. A segunda é como se constrói a
+imagem de homologação ou de produção.
+
+Isso significa que **uma imagem construída para um ambiente não serve para outro**, e é o preço de um
+front que não lê configuração em tempo de execução. Conferido: a mesma Dockerfile, com
+`--build-arg PUBLIC_CATALOG_API_URL=https://h.tarcisiolzbraga.codeflix.com`, produz um pacote com
+aquela URL; sem o argumento, produz um com `localhost:8082`.
 
 O `.env` único é mais do que arrumação: `KEYCLOAK_HOST` agora **não pode** divergir entre os dois
 lados, e era a divergência dele que fazia o admin recusar o token do catálogo pelo `iss`.

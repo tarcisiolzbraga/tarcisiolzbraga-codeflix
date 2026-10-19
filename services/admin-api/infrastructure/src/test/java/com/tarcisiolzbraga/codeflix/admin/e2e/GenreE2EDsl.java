@@ -57,7 +57,11 @@ public interface GenreE2EDsl {
                 .uri(GENRES_PATH + "/{id}", id)
                 .body(new UpdateGenreRequest(name, Set.of(categories)))
                 .retrieve()
-                .toBodilessEntity();
+                // `toEntity(byte[].class)`, e não `toBodilessEntity()`: o segundo **descarta** o
+                // corpo sem o ler, e aí a conexão volta ao pool com bytes no socket. Com a rota de
+                // mídia respondendo em fluxo, o pedido seguinte lê o resto da resposta anterior como
+                // linha de status e falha com `ParseException` — longe da causa, e só às vezes.
+                .toEntity(byte[].class);
     }
 
     default GenreResponse activateAGenre(final String id) {
@@ -69,7 +73,7 @@ public interface GenreE2EDsl {
     }
 
     default void deleteAGenre(final String id) {
-        client().delete().uri(GENRES_PATH + "/{id}", id).retrieve().toBodilessEntity();
+        client().delete().uri(GENRES_PATH + "/{id}", id).retrieve().toEntity(byte[].class);
     }
 
     private GenreResponse changeActivation(final String id, final String action) {

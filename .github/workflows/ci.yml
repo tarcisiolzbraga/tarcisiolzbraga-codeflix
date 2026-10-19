@@ -184,3 +184,14 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: 1
         run: npm run check
+
+      # Constrói sem publicar, como nas aplicações Java: não exige credencial nenhuma, e passa a
+      # verificar os Dockerfiles dos fronts, que de outro modo só seriam exercitados na máquina de
+      # quem os escreveu. Sem `build-args`: a imagem do CI é a de desenvolvimento, e o que está sob
+      # teste é o Dockerfile, não a URL.
+      - name: Constrói a imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: clients/${{ matrix.client }}
+          push: false
+          tags: ${{ matrix.client }}:${{ github.sha }}

@@ -133,6 +133,12 @@ public class VideoController implements VideoAPI {
             // manda `Range`. O que ele passa adiante já é a função que escreve, como no trecho.
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(media.contentType()))
+                    // **`Content-Length` mesmo respondendo em fluxo.** Sem ele o Tomcat usa chunked,
+                    // e aí o player não sabe o tamanho do que está baixando — e o cliente HTTP perde
+                    // a única informação que lhe permite saber que a resposta terminou por inteiro.
+                    // Fluxo e tamanho conhecido não se excluem: o tamanho vem do armazenamento, e o
+                    // corpo continua sendo escrito conforme é lido.
+                    .contentLength(media.length())
                     .header(HttpHeaders.ACCEPT_RANGES, BYTES)
                     .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISPOSITION.formatted(media.name()))
                     .body(media.content()::writeTo);
@@ -142,6 +148,9 @@ public class VideoController implements VideoAPI {
         // seria repetir o que o S3 já devolveu, e errar nas pontas.
         return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
                 .contentType(MediaType.parseMediaType(slice.contentType()))
+                // O tamanho **do trecho**, não o do arquivo: é o que o 206 declara, e o
+                // `Content-Range` ao lado diz onde ele está no arquivo inteiro.
+                .contentLength(slice.length())
                 .header(HttpHeaders.ACCEPT_RANGES, BYTES)
                 .header(HttpHeaders.CONTENT_RANGE, slice.contentRange())
                 .header(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISPOSITION.formatted(slice.name()))

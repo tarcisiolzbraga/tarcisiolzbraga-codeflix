@@ -9,7 +9,7 @@ import com.tarcisiolzbraga.codeflix.admin.domain.video.Resource;
 // ele vem: aqui a fonte é o `Resource` que o armazenamento devolveu, e **esse caminho continua
 // montando o corpo em memória**, de propósito. Ele serve as artes do catálogo (banner e miniatura),
 // que são pequenas, e o player sempre manda `Range`.
-public record MediaOutput(MediaContent content, String contentType, String name) {
+public record MediaOutput(MediaContent content, long length, String contentType, String name) {
 
     public static MediaOutput from(final Resource resource) {
         return new MediaOutput(
@@ -18,6 +18,7 @@ public record MediaOutput(MediaContent content, String contentType, String name)
                         content.transferTo(destination);
                     }
                 },
+                resource.content().length(),
                 resource.contentType(),
                 resource.name());
     }

@@ -24,6 +24,30 @@ O `typecheck` roda `next typegen` antes do `tsc`, e não é zelo: tipos como `La
 A telemetria do Next, que é ligada por padrão e manda dado de build para fora, fica desligada no CI
 pela variável `NEXT_TELEMETRY_DISABLED`.
 
+### Em container
+
+```bash
+docker compose up -d --build portal-codeflix     # da raiz do monorepo
+```
+
+A imagem monta o pacote **dentro** dela — não há `bootJar` para rodar antes, como nas aplicações
+Java. Três estágios: instala com o lock, roda o `next build`, e o `runner` carrega só a pasta
+`standalone`, que o `next build` monta com o servidor e as dependências que ele de fato usa. Deu
+286 MB.
+
+**As URLs das APIs entram como `build-arg`**, e não como variável de ambiente do container:
+`NEXT_PUBLIC_*` é embutido no pacote em tempo de build, então passá-las no `run` não mudaria nada — o
+valor já está no JavaScript que o browser baixa. Uma imagem construída para homologação não serve
+para produção.
+
+Sem argumento nenhum, cada URL cai para `http://localhost:<porta>` do `.env` da raiz, que é o que a
+máquina de quem programa quer: as portas das APIs são publicadas no host, e é o **browser** que as
+alcança — não o container do front.
+
+As regras de precedência estão no [`buildEnv.ts`](buildEnv.ts), com teste: a URL inteira ganha da
+porta, a barra final cai, e variável vazia conta como ausente — que é o caso comum de um `build-arg`
+sem valor no `.env`.
+
 ## De onde vem a configuração
 
 **Do `.env` da raiz do monorepo, que é um só.** O [`next.config.ts`](next.config.ts) o lê com
