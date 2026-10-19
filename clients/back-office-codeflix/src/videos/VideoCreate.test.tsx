@@ -41,14 +41,18 @@ describe("VideoCreate", () => {
     respondeCom();
   });
 
-  // Os arquivos **não** aparecem aqui: a rota de envio é `/videos/{id}/medias/{type}`, e sem o
-  // vídeo criado não há onde pôr o arquivo. A tela diz isso em vez de mostrar um campo que falharia.
-  it("givenATelaDeCriacao_whenAbre_thenNaoOfereceEnvioDeArquivo", async () => {
+  // **Os arquivos agora são escolhidos aqui**, e enviados depois da criação: a rota de envio é
+  // `/videos/{id}/medias/{type}`, e o id só existe depois. Antes esta tela não os oferecia, e era
+  // preciso passar pela edição.
+  it("givenATelaDeCriacao_whenAbre_thenOfereceEscolherOsCincoArquivos", async () => {
     renderWithProviders(<VideoCreate />, { path: "/videos/novo", route: "/videos/novo" });
 
-    expect(screen.queryByLabelText("Arquivo de Vídeo")).not.toBeInTheDocument();
-    expect(await screen.findByText(/Os arquivos entram depois de criar/)).toBeInTheDocument();
+    for (const rotulo of ["Vídeo", "Trailer", "Banner", "Miniatura", "Miniatura (meia)"]) {
+      expect(await screen.findByLabelText(`Arquivo de ${rotulo}`)).toBeInTheDocument();
+    }
+    expect(screen.getByText(/entram na fila de envio/)).toBeInTheDocument();
   });
+
 
   // Os três estados também não: o vídeo nasce ativo, não publicado e fechado, e mudar isso é ação
   // da tela de edição.
