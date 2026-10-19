@@ -27,11 +27,8 @@ export function withMeasuredHeight() {
   }
 }
 
-export function renderWithProviders(
-  element: React.ReactNode,
-  { path = "/", route = "/" }: { path?: string; route?: string } = {},
-) {
-  return render(
+function Provedores({ route, children }: { route: string; children: React.ReactNode }) {
+  return (
     <QueryClientProvider client={newQueryClient()}>
       <FeedbackProvider>
         {/* A fila de envios entra aqui porque ela vive acima do roteador no App: a tela de vídeo a
@@ -39,14 +36,32 @@ export function renderWithProviders(
         <UploadQueueProvider>
           <MemoryRouter initialEntries={[route]}>
             <Onde />
-            <Routes>
-              <Route path={path} element={element} />
-            </Routes>
+            {children}
           </MemoryRouter>
         </UploadQueueProvider>
       </FeedbackProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+}
+
+export function renderWithProviders(
+  element: React.ReactNode,
+  { path = "/", route = "/" }: { path?: string; route?: string } = {},
+) {
+  return render(
+    <Provedores route={route}>
+      <Routes>
+        <Route path={path} element={element} />
+      </Routes>
+    </Provedores>,
+  );
+}
+
+// Para quem traz a **própria** tabela de rotas — o `AppRoutes`. O `renderWithProviders` monta uma
+// rota em volta do que recebe, e uma tabela aninhada dentro dela casaria contra o resto do caminho,
+// não contra o endereço inteiro: o teste mediria a rota do helper em vez da do aplicativo.
+export function renderAtRoute(element: React.ReactNode, route: string) {
+  return render(<Provedores route={route}>{element}</Provedores>);
 }
 
 // Uma `Response` nova por chamada: reaproveitar a mesma instância faz a segunda leitura estourar com
