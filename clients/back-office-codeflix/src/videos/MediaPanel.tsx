@@ -8,12 +8,10 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useRef, useState } from "react";
-import { explainFailure } from "@/shared/explainFailure";
-import { useFeedback } from "@/shared/feedback";
+import { useRef } from "react";
 import { megabytes } from "@/videos/mediaGateway";
 import { MEDIA_MAX_FILE_SIZE } from "@/shared/config";
-import { useUploadMedia } from "@/videos/useVideoMutations";
+import { useUploadQueue } from "@/videos/uploadQueue";
 import {
   MEDIA_LABELS,
   MEDIA_TYPES,
@@ -47,13 +45,13 @@ function arquivoDe(video: VideoDetail, type: MediaType) {
 function MediaCard({
   video,
   type,
-  onUpload,
+  onChoose,
   enviando,
 }: {
   video: VideoDetail;
   type: MediaType;
-  onUpload: (type: MediaType, file: File) => void;
-  enviando: MediaType | null;
+  onChoose: (type: MediaType, file: File) => void;
+  enviando: boolean;
 }) {
   const campo = useRef<HTMLInputElement>(null);
   const arquivo = arquivoDe(video, type);
@@ -88,7 +86,7 @@ function MediaCard({
             onChange={(evento) => {
               const escolhido = evento.target.files?.[0];
               if (escolhido !== undefined) {
-                onUpload(type, escolhido);
+                onChoose(type, escolhido);
               }
               // Limpa o campo para escolher o **mesmo** arquivo de novo depois de uma falha: sem
               // isso o `change` não dispara na segunda escolha igual.
@@ -99,7 +97,7 @@ function MediaCard({
           <Button
             size="small"
             startIcon={<UploadIcon />}
-            loading={enviando === type}
+            loading={enviando}
             onClick={() => campo.current?.click()}
           >
             {arquivo === null ? "Enviar" : "Substituir"}
@@ -111,17 +109,26 @@ function MediaCard({
 }
 
 export function MediaPanel({ video }: { video: VideoDetail }) {
-  const avisar = useFeedback();
-  const enviar = useUploadMedia(video.id);
-  const [enviando, setEnviando] = useState<MediaType | null>(null);
+  const fila = useUploadQueue();
+
+  // O que já está na fila para este vídeo: é o que deixa o botão em estado de envio sem o painel ter
+  // estado próprio. A fila é a fonte, e duplicá-la aqui daria duas verdades.
+  const naFila = (type: MediaType) =>
+    fila.uploads.some(
+      (upload) =>
+        upload.videoId === video.id &&
+        upload.type === type &&
+        (upload.status === "waiting" || upload.status === "sending"),
+    );
 
   return (
     <Stack spacing={2}>
       <Typography variant="h6">Mídias</Typography>
 
       <Alert severity="info">
-        Até {megabytes(MEDIA_MAX_FILE_SIZE)} por arquivo. O vídeo e o trailer entram na fila de
-        codificação depois do envio, e o status aparece aqui.
+        Até {megabytes(MEDIA_MAX_FILE_SIZE)} por arquivo. O envio entra na fila do canto da tela e
+        continua se você navegar. O vídeo e o trailer entram na fila de codificação depois, e o status
+        aparece aqui.
       </Alert>
 
       <Stack direction="row" spacing={2} sx={{ flexWrap: "wrap", gap: 2 }}>
@@ -130,23 +137,12 @@ export function MediaPanel({ video }: { video: VideoDetail }) {
             key={type}
             video={video}
             type={type}
-            enviando={enviando}
-            onUpload={(escolhido, file) => {
-              setEnviando(escolhido);
-              enviar.mutate(
-                { type: escolhido, file },
-                {
-                  onSuccess: () => {
-                    setEnviando(null);
-                    avisar({ kind: "success", message: `${MEDIA_LABELS[escolhido]} enviado.` });
-                  },
-                  onError: (erro) => {
-                    setEnviando(null);
-                    avisar({ kind: "error", message: explainFailure(erro) });
-                  },
-                },
-              );
-            }}
+            enviando={naFila(type)}
+            onChoose={(escolhido, file) =>
+              fila.enqueue([
+                { videoId: video.id, videoTitle: video.title, type: escolhido, file },
+              ])
+            }
           />
         ))}
       </Stack>

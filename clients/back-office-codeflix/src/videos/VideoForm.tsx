@@ -23,12 +23,16 @@ export function VideoForm({
   submitLabel,
   failure,
   pending,
+  extra,
   onSubmit,
 }: {
   initial?: VideoFormValues;
   submitLabel: string;
   failure: unknown;
   pending: boolean;
+  // O que a tela de criação põe no fim do formulário: a escolha dos arquivos. Vem por prop, e não
+  // por um `if` lendo a rota — quem renderiza sabe se é criação, este arquivo não precisa.
+  extra?: React.ReactNode;
   onSubmit: (values: VideoFormValues) => void;
 }) {
   const form = useForm<VideoFormValues>({
@@ -133,6 +137,8 @@ export function VideoForm({
           <ReferencePicker resource="cast-members" value={field.value} onChange={field.onChange} />
         )}
       />
+
+      {extra}
 
       <Stack direction="row" spacing={2}>
         <Button type="submit" variant="contained" loading={pending}>

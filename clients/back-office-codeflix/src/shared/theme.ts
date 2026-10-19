@@ -1,10 +1,11 @@
 import { createTheme } from "@mui/material/styles";
 
 // Escuro por padrão, e vermelho Codeflix como cor primária: é um painel de catálogo de vídeo, usado
-// por horas seguidas. A referência do curso usa o mesmo partido.
+// por horas seguidas.
 //
-// `colorSchemes` em vez de `palette.mode`: no Material 7 é assim que o tema acompanha a preferência
-// do sistema sem um segundo render — a decisão sai por CSS, não por JavaScript.
+// `colorSchemes` com `cssVariables`, e não `palette.mode`: é assim que o Material 7 troca de tema
+// **por CSS**, sem um segundo render da árvore. O `colorSchemeSelector: "class"` é o que permite o
+// `useColorScheme` alternar escrevendo uma classe na raiz — e é o que o botão de alternância usa.
 export const theme = createTheme({
   colorSchemes: { dark: true, light: true },
   defaultColorScheme: "dark",
