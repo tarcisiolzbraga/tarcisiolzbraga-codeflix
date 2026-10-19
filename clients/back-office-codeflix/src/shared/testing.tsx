@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { vi } from "vitest";
 import { FeedbackProvider } from "@/shared/FeedbackProvider";
 import { newQueryClient } from "@/shared/queryClient";
+import { UploadQueueProvider } from "@/videos/UploadQueueProvider";
 
 // Os mesmos provedores do App, menos a autenticação — ela é dublada em cada teste, porque trocar o
 // `?code=` por token exige um navegador de verdade.
@@ -33,12 +34,16 @@ export function renderWithProviders(
   return render(
     <QueryClientProvider client={newQueryClient()}>
       <FeedbackProvider>
-        <MemoryRouter initialEntries={[route]}>
-          <Onde />
-          <Routes>
-            <Route path={path} element={element} />
-          </Routes>
-        </MemoryRouter>
+        {/* A fila de envios entra aqui porque ela vive acima do roteador no App: a tela de vídeo a
+            usa, e sem ela o `useUploadQueue` estoura dizendo que falta o provedor. */}
+        <UploadQueueProvider>
+          <MemoryRouter initialEntries={[route]}>
+            <Onde />
+            <Routes>
+              <Route path={path} element={element} />
+            </Routes>
+          </MemoryRouter>
+        </UploadQueueProvider>
       </FeedbackProvider>
     </QueryClientProvider>,
   );

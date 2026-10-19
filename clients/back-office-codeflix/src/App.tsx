@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { AuthProvider } from "@/auth/AuthProvider";
 import { RequireAdmin } from "@/auth/RequireAdmin";
 import { FeedbackProvider } from "@/shared/FeedbackProvider";
+import { UploadQueueProvider } from "@/videos/UploadQueueProvider";
 import { Layout } from "@/shared/Layout";
 import { QueryProvider } from "@/shared/QueryProvider";
 import { theme } from "@/shared/theme";
@@ -58,31 +59,36 @@ export function App() {
       <AuthProvider>
         <QueryProvider>
           <FeedbackProvider>
-            <BrowserRouter>
-              <RequireAdmin>
-                <Suspense fallback={<Carregando />}>
-                  <Routes>
-                    <Route element={<Layout />}>
-                      <Route index element={<Navigate to="/categorias" replace />} />
-                      <Route path="categorias" element={<CategoryList />} />
-                      {/* `nova` antes de `:id`, senão a rota com parâmetro casaria com ela e a
-                          tela de criação tentaria carregar uma categoria de id "nova". */}
-                      <Route path="categorias/nova" element={<CategoryCreate />} />
-                      <Route path="categorias/:id" element={<CategoryEdit />} />
-                      <Route path="generos" element={<GenreList />} />
-                      <Route path="generos/novo" element={<GenreCreate />} />
-                      <Route path="generos/:id" element={<GenreEdit />} />
-                      <Route path="elenco" element={<CastMemberList />} />
-                      <Route path="elenco/novo" element={<CastMemberCreate />} />
-                      <Route path="elenco/:id" element={<CastMemberEdit />} />
-                      <Route path="videos" element={<VideoList />} />
-                      <Route path="videos/novo" element={<VideoCreate />} />
-                      <Route path="videos/:id" element={<VideoEdit />} />
-                    </Route>
-                  </Routes>
-                </Suspense>
-              </RequireAdmin>
-            </BrowserRouter>
+            {/* A fila de envios fica **acima do roteador**: é isso que a faz sobreviver à
+                navegação, e é o que a torna fila em vez de um botão com estado. Dentro do
+                QueryProvider porque ela invalida o vídeo quando um arquivo chega. */}
+            <UploadQueueProvider>
+              <BrowserRouter>
+                <RequireAdmin>
+                  <Suspense fallback={<Carregando />}>
+                    <Routes>
+                      <Route element={<Layout />}>
+                        <Route index element={<Navigate to="/categorias" replace />} />
+                        <Route path="categorias" element={<CategoryList />} />
+                        {/* `nova` antes de `:id`, senão a rota com parâmetro casaria com ela e a
+                            tela de criação tentaria carregar uma categoria de id "nova". */}
+                        <Route path="categorias/nova" element={<CategoryCreate />} />
+                        <Route path="categorias/:id" element={<CategoryEdit />} />
+                        <Route path="generos" element={<GenreList />} />
+                        <Route path="generos/novo" element={<GenreCreate />} />
+                        <Route path="generos/:id" element={<GenreEdit />} />
+                        <Route path="elenco" element={<CastMemberList />} />
+                        <Route path="elenco/novo" element={<CastMemberCreate />} />
+                        <Route path="elenco/:id" element={<CastMemberEdit />} />
+                        <Route path="videos" element={<VideoList />} />
+                        <Route path="videos/novo" element={<VideoCreate />} />
+                        <Route path="videos/:id" element={<VideoEdit />} />
+                      </Route>
+                    </Routes>
+                  </Suspense>
+                </RequireAdmin>
+              </BrowserRouter>
+            </UploadQueueProvider>
           </FeedbackProvider>
         </QueryProvider>
       </AuthProvider>
