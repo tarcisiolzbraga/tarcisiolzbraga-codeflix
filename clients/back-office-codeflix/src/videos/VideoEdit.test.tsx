@@ -2,7 +2,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ADMIN_API } from "@/shared/config";
-import { jsonResponse, renderWithProviders } from "@/shared/testing";
+import { installXhrDouble, jsonResponse, renderWithProviders } from "@/shared/testing";
 
 const sessao = vi.hoisted(() => ({ atual: {} as Record<string, unknown> }));
 vi.mock("react-oidc-context", () => ({ useAuth: () => sessao.atual }));
@@ -126,15 +126,19 @@ describe("VideoEdit", () => {
     expect(screen.getAllByText("Nenhum arquivo enviado.")).toHaveLength(4);
   });
 
+  // O envio é por XHR, e não `fetch`: é o único que reporta progresso. O dublê deixa o teste decidir
+  // quando a resposta chega.
   it("givenUmArquivoEscolhido_whenEnviado_thenVaiDePostNaRotaDaMidia", async () => {
+    const xhr = installXhrDouble();
     renderiza();
 
     await screen.findByText("duna.mp4");
     const campo = screen.getByLabelText("Arquivo de Trailer");
     await userEvent.upload(campo, new File(["x"], "trailer.mp4", { type: "video/mp4" }));
 
-    await waitFor(() => expect(escritas("POST")).not.toHaveLength(0));
-    expect(escritas("POST")[0]![0]).toBe(`${ADMIN_API}/videos/vid-1/medias/TRAILER`);
+    await waitFor(() => expect(xhr.sent).toHaveLength(1));
+    expect(xhr.sent[0]!.url).toBe(`${ADMIN_API}/videos/vid-1/medias/TRAILER`);
+    xhr.respond(0, 201);
     expect(await screen.findByText("Trailer enviado.")).toBeInTheDocument();
   });
 

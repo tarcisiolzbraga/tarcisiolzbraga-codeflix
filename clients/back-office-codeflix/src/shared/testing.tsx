@@ -54,3 +54,94 @@ export function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
         headers: { "Content-Type": "application/json" },
       });
 }
+
+// **Um dublê de `XMLHttpRequest`**, porque o envio de mídia usa XHR e não `fetch`: é o único que
+// expõe o progresso do envio, e um arquivo de 100 MB sem barra de progresso é uma tela que parece
+// travada.
+//
+// O jsdom tem um `XMLHttpRequest` de verdade, e ele tentaria falar com a rede. Este substitui a
+// classe e devolve um controlador: o teste vê o que foi pedido e decide quando a resposta chega.
+export type SentRequest = {
+  method: string;
+  url: string;
+  headers: Record<string, string>;
+  body: unknown;
+};
+
+export type XhrDouble = {
+  sent: SentRequest[];
+  /** Entrega o progresso do envio, como o browser o entregaria. */
+  progress: (index: number, loaded: number, total: number) => void;
+  respond: (index: number, status: number, body?: string) => void;
+  /** Rede caída: o browser emite `error`, e não um status. */
+  fail: (index: number) => void;
+};
+
+export function installXhrDouble(): XhrDouble {
+  const sent: SentRequest[] = [];
+  const instancias: FakeXhr[] = [];
+
+  class FakeXhr {
+    private readonly ouvintes = new Map<string, ((event: unknown) => void)[]>();
+    private readonly doEnvio = new Map<string, ((event: unknown) => void)[]>();
+    private readonly cabecalhos: Record<string, string> = {};
+    private metodo = "";
+    private endereco = "";
+
+    status = 0;
+    responseText = "";
+
+    readonly upload = {
+      addEventListener: (nome: string, ouvinte: (event: unknown) => void) => {
+        this.doEnvio.set(nome, [...(this.doEnvio.get(nome) ?? []), ouvinte]);
+      },
+    };
+
+    open(metodo: string, endereco: string) {
+      this.metodo = metodo;
+      this.endereco = endereco;
+    }
+
+    setRequestHeader(nome: string, valor: string) {
+      this.cabecalhos[nome] = valor;
+    }
+
+    addEventListener(nome: string, ouvinte: (event: unknown) => void) {
+      this.ouvintes.set(nome, [...(this.ouvintes.get(nome) ?? []), ouvinte]);
+    }
+
+    send(corpo: unknown) {
+      sent.push({ method: this.metodo, url: this.endereco, headers: this.cabecalhos, body: corpo });
+      instancias.push(this);
+    }
+
+    emitirProgresso(loaded: number, total: number) {
+      for (const ouvinte of this.doEnvio.get("progress") ?? []) {
+        ouvinte({ lengthComputable: true, loaded, total });
+      }
+    }
+
+    emitir(nome: string) {
+      for (const ouvinte of this.ouvintes.get(nome) ?? []) {
+        ouvinte({});
+      }
+    }
+  }
+
+  vi.stubGlobal("XMLHttpRequest", FakeXhr);
+
+  return {
+    sent,
+    progress: (index, loaded, total) => instancias[index]?.emitirProgresso(loaded, total),
+    respond: (index, status, body = "{}") => {
+      const instancia = instancias[index];
+      if (instancia === undefined) {
+        return;
+      }
+      instancia.status = status;
+      instancia.responseText = body;
+      instancia.emitir("load");
+    },
+    fail: (index) => instancias[index]?.emitir("error"),
+  };
+}
