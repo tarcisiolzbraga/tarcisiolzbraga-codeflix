@@ -20,12 +20,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.client.RestClient;
 
-// O que prova que o catálogo **repassa** o arquivo, em vez de o montar em memória antes de responder.
+// O que o repasse de mídia promete, contra um servidor HTTP de verdade — um `HttpServer` do próprio
+// JDK, sem dependência nova. O `VideoMediaE2ETest` dubla o `VideoClient`, então ele nunca exercita
+// esta parte.
 //
-// Isto precisa de um servidor HTTP de verdade: o `VideoMediaE2ETest` dubla o `VideoClient`, então ele
-// nunca exercita o `exchange(fn, false)` — a parte que mantém a resposta do admin aberta até alguém
-// escrever o corpo. É um `HttpServer` do próprio JDK, sem dependência nova.
-class VideoRestClientMediaStreamingTest {
+// A versão anterior destes testes afirmava que o repasse era **em fluxo**, com o servidor só
+// escrevendo o segundo bloco depois de o primeiro chegar ao cliente. Aquilo funcionava, e foi
+// desfeito: o porquê está no `VideoMediaFile`. O que ficou é o que ainda se promete — os metadados
+// lidos dos cabeçalhos, o tamanho repassado, e o corpo entregue.
+class VideoRestClientMediaTest {
 
     private HttpServer server;
     private VideoRestClient client;
@@ -44,54 +47,6 @@ class VideoRestClientMediaStreamingTest {
         this.server.start();
         final var base = "http://127.0.0.1:%d".formatted(this.server.getAddress().getPort());
         return new VideoRestClient(RestClient.builder().baseUrl(base).build());
-    }
-
-    // **A prova do repasse:** o servidor escreve o primeiro bloco, e só escreve o segundo depois de o
-    // primeiro ter chegado ao destino do cliente. Se o catálogo lesse o corpo inteiro antes de
-    // devolver o arquivo, o servidor esperaria para sempre — e o teste falha no tempo, com mensagem.
-    @Test
-    void givenABodyInTwoChunks_whenTheMediaIsRelayed_thenTheSecondOnlyGoesAfterTheFirstArrives()
-            throws Exception {
-        final var firstArrived = new CountDownLatch(1);
-        final var secondWasWritten = new AtomicBoolean(false);
-        this.server.createContext("/videos/v1/medias/VIDEO", exchange -> {
-            exchange.getResponseHeaders().add(HttpHeaders.CONTENT_TYPE, "video/mp4");
-            exchange.getResponseHeaders().add(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"duna.mp4\"");
-            exchange.sendResponseHeaders(200, 0);
-            try (var body = exchange.getResponseBody()) {
-                body.write("primeiro-".getBytes(StandardCharsets.UTF_8));
-                body.flush();
-                if (!firstArrived.await(5, TimeUnit.SECONDS)) {
-                    // Não escreve o segundo: o cliente não entregou o primeiro, então ele bufferizou.
-                    return;
-                }
-                secondWasWritten.set(true);
-                body.write("segundo".getBytes(StandardCharsets.UTF_8));
-            } catch (final InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-            }
-        });
-
-        final var relayed = boundToTheStub().mediaOf("v1", "VIDEO", null);
-
-        assertTrue(relayed.isPresent());
-        final var destination = new ByteArrayOutputStream();
-        relayed.get().content().writeTo(new OutputStream() {
-            @Override
-            public void write(final int singleByte) throws IOException {
-                destination.write(singleByte);
-                firstArrived.countDown();
-            }
-
-            @Override
-            public void write(final byte[] bytes, final int offset, final int length) throws IOException {
-                destination.write(bytes, offset, length);
-                firstArrived.countDown();
-            }
-        });
-
-        assertTrue(secondWasWritten.get(), "o segundo bloco nunca foi escrito: o corpo foi bufferizado");
-        assertEquals("primeiro-segundo", destination.toString(StandardCharsets.UTF_8));
     }
 
     // Os cabeçalhos são lidos **antes** do corpo: é com eles que a rota decide 200 ou 206, e é por
@@ -115,9 +70,7 @@ class VideoRestClientMediaStreamingTest {
         assertEquals("bytes 0-4/19", relayed.get().contentRange());
         assertEquals("duna.mp4", relayed.get().filename());
 
-        final var destination = new ByteArrayOutputStream();
-        relayed.get().content().writeTo(destination);
-        assertEquals("conte", destination.toString(StandardCharsets.UTF_8));
+        assertEquals("conte", new String(relayed.get().content(), StandardCharsets.UTF_8));
     }
 
     // O tamanho que o admin informou é repassado: é com ele que a rota do catálogo põe

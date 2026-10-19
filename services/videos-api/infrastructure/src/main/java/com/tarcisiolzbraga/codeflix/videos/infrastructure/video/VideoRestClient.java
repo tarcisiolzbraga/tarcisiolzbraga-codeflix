@@ -60,12 +60,10 @@ public class VideoRestClient implements VideoClient {
                         headers.set(HttpHeaders.RANGE, range);
                     }
                 })
-                // `exchange(fn, false)`: a resposta **não** é fechada quando o lambda retorna. É o
-                // que permite repasse de verdade — os cabeçalhos são lidos agora, para a rota montar
-                // a resposta dela, e o corpo é transferido depois, direto para o cliente. Fechar aqui
-                // obrigaria a ler o arquivo inteiro antes de responder, que é o que esta mudança
-                // existe para não fazer.
-                .exchange((request, response) -> fileFrom(response, id, type), false);
+                // `exchange` que **fecha** a resposta, e o corpo lido aqui: o repasse em fluxo foi
+                // desfeito por causa de uma instabilidade que eu não consegui fechar. O porquê está
+                // no `VideoMediaFile`.
+                .exchange((request, response) -> fileFrom(response, id, type));
     }
 
     // Em método próprio, e não no lambda: com os dois ramos (vazio e presente) dentro dele, a
@@ -89,14 +87,7 @@ public class VideoRestClient implements VideoClient {
                         ? MediaType.APPLICATION_OCTET_STREAM_VALUE
                         : headers.getContentType().toString(),
                 filenameOf(headers),
-                // Quem abriu fecha: a conexão com o admin vive até aqui, e o `try-with-resources` a
-                // solta inclusive quando a escrita falha no meio — cliente que desiste do vídeo é
-                // caso comum, não exceção.
-                destination -> {
-                    try (var open = response) {
-                        open.getBody().transferTo(destination);
-                    }
-                },
+                response.getBody().readAllBytes(),
                 headers.getContentLength(),
                 headers.getFirst(HttpHeaders.CONTENT_RANGE)));
     }
