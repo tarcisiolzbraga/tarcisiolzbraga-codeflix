@@ -69,7 +69,11 @@ public interface VideoE2EDsl {
                 .body(new UpdateVideoRequest(
                         title, DEFAULT_DESCRIPTION, 2024, 166.0, "14", Set.of(categories), Set.of(), Set.of()))
                 .retrieve()
-                .toBodilessEntity();
+                // `toEntity(byte[].class)`, e não `toBodilessEntity()`: o segundo **descarta** o
+                // corpo sem o ler, e aí a conexão volta ao pool com bytes no socket. Com a rota de
+                // mídia respondendo em fluxo, o pedido seguinte lê o resto da resposta anterior como
+                // linha de status e falha com `ParseException` — longe da causa, e só às vezes.
+                .toEntity(byte[].class);
     }
 
     default VideoResponse publishAVideo(final String id) {
@@ -109,7 +113,7 @@ public interface VideoE2EDsl {
     }
 
     default void deleteAVideo(final String id) {
-        client().delete().uri(VIDEOS_PATH + "/{id}", id).retrieve().toBodilessEntity();
+        client().delete().uri(VIDEOS_PATH + "/{id}", id).retrieve().toEntity(byte[].class);
     }
 
     private VideoResponse changeState(final String id, final String action) {
