@@ -164,6 +164,37 @@ permite a rota escolher o status antes de começar a responder.
 **O caminho sem `Range` continua montando o corpo em memória, e é escolha.** Ele serve as artes do
 catálogo — banner e miniatura —, que são pequenas, e o player sempre manda `Range`.
 
+Mas o **corpo** ser montado em memória não faz a **resposta** ser síncrona: o tipo de retorno
+declarado é `ResponseEntity<StreamingResponseBody>`, e o Spring decide o despacho assíncrono pelo tipo
+declarado. Ou seja: **toda** resposta desta rota passa pelo despacho assíncrono, com ou sem `Range`.
+
+### A intermitência do fluxo também aparece aqui, e é aqui que ela dá para medir
+
+O [README do catálogo](../videos-api/README.md#o-repasse-volta-a-bufferizar-e-isso-é-um-recuo-medido)
+registra a instabilidade que fez o repasse voltar a bufferizar, e dizia que "aquela ponta está
+estável" — a ponta deste serviço. **Em 19/10/2026 isso deixou de ser verdade por medição:** o
+`VideoE2ETest.givenAVideoWithAFile_whenUploadAnotherOfTheSameType_thenTheNewOneReplacesIt` falhou no
+CI com `ClientProtocolException` → `ParseException`, na linha do `downloadMedia`.
+
+A medição veio de onde não se esperava: numa PR que **não toca um arquivo Java** (a fila de envios do
+back-office). Três execuções sobre a mesma árvore Java — verde em main, vermelha, verde na repetição
+— que é o retrato de uma corrida, e não de uma regressão.
+
+Duas coisas que isso acrescenta a quem retomar:
+
+- **a leitura não drenada está descartada** para estes testes: o DSL do E2E lê todos os corpos até o
+  fim (`body(...)` em cada chamada), então os bytes sobrando no socket não vêm dele;
+- **a condição da hipótese que sobrou está inteira aqui**: as artes do E2E têm poucos bytes, e toda
+  resposta da rota de mídia é assíncrona pelo tipo declarado. Muitas respostas assíncronas **curtas**
+  em sequência, no mesmo pool — exatamente o que o catálogo suspeitava, e sem precisar dos dois
+  serviços para reproduzir.
+
+> **O experimento que isto habilita:** declarar o caminho **sem** `Range` como resposta síncrona. O
+> corpo dele já está inteiro em memória, então não se perde fluxo nenhum — só o despacho assíncrono
+> em respostas que não precisavam dele. Se o E2E parar de falhar, a hipótese se confirma, e a
+> exposição restante fica só no caminho do `Range`, que precisa mesmo ser em fluxo. **Um build verde
+> não prova nada**: quatro builds inteiros verdes aqui já conviveram com CI vermelho.
+
 ### O envio também, e o checksum é o nó
 
 O envio de 100 MB chegava a três cópias do arquivo inteiro em memória: `getBytes()` na rota, e as duas

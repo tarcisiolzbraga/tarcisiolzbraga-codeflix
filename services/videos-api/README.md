@@ -174,8 +174,12 @@ que faz um pedido falhar com `ParseException` de vez em quando. Quatro tentativa
 continuou vermelho neste serviço.
 
 **O que se mantém é a parte que importava mais:** as seis cópias do lado da admin-api, que é de onde
-o arquivo sai do armazenamento, deixaram de existir, e aquela ponta está estável. Dois terços do
-ganho, sem a instabilidade.
+o arquivo sai do armazenamento, deixaram de existir. Dois terços do ganho.
+
+O que estava escrito aqui era que "aquela ponta está estável", e **a medição derrubou isso**: em
+19/10/2026 o `VideoE2ETest` da admin-api falhou com a mesma `ParseException`, numa PR que não toca um
+arquivo Java. A instabilidade é das duas pontas; o recuo deste serviço continua valendo porque o
+repasse em fluxo a tornava frequente, não porque a outra ponta estivesse limpa.
 
 E o `Content-Length` ficou: a resposta declara o tamanho que o admin informou, o que é melhor para o
 player de qualquer jeito.
@@ -184,6 +188,11 @@ player de qualquer jeito.
 > conexão do cliente de teste sob carga. A hipótese que sobrou é Tomcat com `StreamingResponseBody` e
 > muitas respostas curtas em sequência. E o lugar de medir é o **build inteiro** — a classe isolada
 > passa sempre, e foi essa medição errada que custou duas das quatro tentativas.
+>
+> **E o lugar de medir é a admin-api, não aqui**: o E2E dela reproduz a condição inteira num serviço
+> só — toda resposta da rota de mídia é assíncrona pelo tipo declarado, e as artes do teste têm
+> poucos bytes. O detalhe, e o experimento que ele habilita, estão
+> [no README dela](../admin-api/README.md#a-intermitência-do-fluxo-também-aparece-aqui-e-é-aqui-que-ela-dá-para-medir).
 ### O que ainda custa
 
 Do caminho da mídia, nada: ele atravessa os dois serviços em fluxo, nos dois sentidos. O envio, que
