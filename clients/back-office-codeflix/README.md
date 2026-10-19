@@ -84,7 +84,8 @@ src/
 ├── genres/         o mesmo, para os gêneros
 ├── videos/         o maior: vínculos, três estados e cinco arquivos
 ├── shared/         o que não é de agregado nenhum
-├── App.tsx         provedores e rotas
+├── App.tsx         só a pilha de provedores
+├── AppRoutes.tsx   a tabela de rotas, separada para poder ser medida
 └── main.tsx        o ponto de entrada
 ```
 
@@ -119,6 +120,41 @@ acontecendo.
 
 O papel exigido é `CODEFLIX_ADMIN`, e não os por agregado (`CODEFLIX_CATEGORIES` e companhia): o
 painel administra os quatro.
+
+## A casca: o menu, o tema e o endereço errado
+
+O [`Layout`](src/shared/Layout.tsx) é a moldura de todas as telas: a barra do topo com quem está
+logado, o menu lateral com as quatro seções e o painel da fila no canto.
+
+**O menu é gaveta, e não aba.** São quatro seções hoje, e aba cabe — mas num painel que se usa por
+horas a gaveta fixa diz onde a pessoa está sem ela ter de ler qual aba está grifada. Em tela
+estreita ela vira gaveta temporária, com botão para abrir.
+
+São **duas** `Drawer`, e não uma com `variant` condicional: a temporária precisa de `onClose` e de
+foco preso, a permanente não pode ter nem um nem outro. Uma só, trocando de variante, carregaria o
+comportamento errado em metade dos tamanhos de tela.
+
+**O tema tem três estados**, e não dois: escuro, claro e **o do sistema**. O padrão é escuro, porque
+é um catálogo de vídeo usado por horas seguidas; o terceiro existe para quem já configurou a
+preferência no sistema — sem ele, essa pessoa teria de escolher de novo aqui, e não haveria como
+voltar atrás. O ciclo é escuro → claro → sistema, nessa ordem, porque começa onde o painel abre.
+
+O `useColorScheme` do Material guarda a escolha no `localStorage` por conta própria, então não há
+estado nosso — o que exige `cssVariables: { colorSchemeSelector: "class" }` no tema, senão o hook
+estoura. E o `localStorage` é um só para todos os testes de um arquivo: sem limpá-lo no `afterEach`,
+a escolha de um teste vira o estado inicial do próximo, e o sintoma aparece no teste seguinte, não no
+que mexeu. Foi exatamente o que aconteceu aqui.
+
+**Endereço que não existe cai numa tela que diz isso**, com o caminho que falhou e o link de volta.
+Antes caía numa tela vazia — que num painel de administração parece defeito do sistema, e não
+endereço errado.
+
+A tabela de rotas mora no [`AppRoutes`](src/AppRoutes.tsx), fora do `App`, por causa do teste: o
+primeiro que eu escrevi montava a sua **própria** rota `*` em volta da tela de "não existe", e
+continuava verde com a rota apagada do roteador. Provava que o componente desenha, não que o
+roteador o alcança. Com a tabela separada, o teste abre um endereço inventado contra a tabela de
+verdade — e a outra metade, que um endereço **existente** não cai ali, guarda o caso de uma rota `*`
+no lugar errado engolir o catálogo.
 
 ## As categorias
 
@@ -285,16 +321,50 @@ convida ao clique errado.
 Eles também salvam sozinhos, fora do botão "Salvar": cada um é uma chamada própria, e juntá-los ao
 formulário faria parecer que nada aconteceu até salvar — quando a mudança já foi gravada.
 
-### Os arquivos só entram depois de criar
+### Os arquivos são escolhidos na criação e enviados depois dela
 
-A rota de envio é `/videos/{id}/medias/{type}`, então sem o vídeo criado não há onde pôr o arquivo.
-A tela de criação **diz isso** em vez de mostrar um campo que falharia, e ao terminar vai para a
-**edição** do vídeo criado, e não para a lista: é lá que os arquivos entram, e criar um vídeo sem
-mídia é metade do trabalho.
+A rota de envio é `/videos/{id}/medias/{type}`, e o id só existe depois de o vídeo ser criado. Isso
+não impede escolher os arquivos junto com os campos: o [`MediaPicker`](src/videos/MediaPicker.tsx)
+**só escolhe**, e quem envia é a fila, logo depois da criação, com o id em mãos. Terminada a criação
+a tela vai para a **edição** do vídeo, e não para a lista — é lá que o status da codificação aparece.
+
+Antes os arquivos só entravam na edição, e a tela de criação dizia isso em vez de mostrar um campo.
+Funcionava, mas obrigava a duas passagens pela mesma tarefa.
 
 São cinco: vídeo, trailer, banner, miniatura e miniatura meia. Os dois primeiros trazem um `status`
 de codificação que os de imagem não têm — um vídeo recém-enviado fica em `PENDING` até o encoder
 responder pela fila.
+
+O que passa do teto fica de fora da fila, e o [`sendable`](src/videos/chosenMedia.ts) é quem filtra:
+a API responderia 413 a um arquivo que já se sabia grande na tela anterior. A ordem é a do
+`MEDIA_TYPES`, e não a de escolha, para o vídeo — o arquivo grande — sair primeiro.
+
+### A fila de envios
+
+Ela [vive acima do roteador](src/videos/UploadQueueProvider.tsx), e é isso que a torna fila. Cinco
+arquivos de 100 MB levam minutos, e quem administra o catálogo não fica parado olhando: vai editar
+outra coisa. Com o estado na tela, sair dela cancelaria os envios.
+
+O painel da fila fica no canto, desenhado pelo layout, então ele aparece **de qualquer tela**.
+
+**Os envios saem um por vez.** Dois uploads grandes em paralelo disputam a mesma banda de subida: o
+tempo total é o mesmo e nenhuma das duas barras informa nada. O
+[`nextToSend`](src/videos/uploadQueue.ts) é a regra inteira — nada sai enquanto houver um `sending`.
+
+**O progresso exigiu trocar o `fetch` por `XMLHttpRequest`.** O `fetch` não relata progresso de
+envio: `ReadableStream` no corpo de requisição é outra coisa, e nem é suportado de ponta a ponta. O
+`xhr.upload.onprogress` relata, e por isso o [`mediaGateway`](src/videos/mediaGateway.ts) é XHR —
+numa barra de 100 MB, a diferença é entre uma tela que parece travada e uma que informa.
+
+O XHR trouxe uma conta que o `fetch` dá de graça: falha de rede **não é status**, então os eventos
+`error` e `abort` precisam de tratamento próprio, senão a promessa nunca resolve e o item fica
+"enviando" para sempre.
+
+Dispensar um item só aparece quando ele **terminou** — concluído ou falho. Abortar no meio deixaria
+um arquivo pela metade no armazenamento, e a fila daria a entender que não deixou.
+
+Quando um arquivo chega, a fila invalida o vídeo no cache: a tela de edição, se estiver aberta,
+passa a mostrar o arquivo novo sem ninguém recarregar nada.
 
 ### O envio não passa pelo cliente comum, e o teto é conferido antes
 
@@ -358,7 +428,8 @@ kB**, porque DataGrid e formulário agora são pedaço comum em vez de estarem d
 ## As escolhas de ferramenta, e onde elas divergem do curso
 
 A referência é o [FC3-admin-videos-react](https://github.com/devfullcycle/FC3-admin-videos-react). Ela
-informa, não decide — e aqui divergiu em cinco pontos, todos por idade do que ela usa:
+informa, não decide — e aqui divergiu em sete pontos: cinco por idade do que ela usa, e dois por
+consequência de escolhas anteriores.
 
 | O que ela usa | O que está aqui | Por quê |
 |---|---|---|
@@ -367,9 +438,12 @@ informa, não decide — e aqui divergiu em cinco pontos, todos por idade do que
 | `@react-keycloak/web` 3.4 | `oidc-client-ts` + `react-oidc-context` | última publicação em **abril de 2022** |
 | Material 5 e DataGrid 5 | Material 7.3 e DataGrid 8.29 | duas e três versões maiores atrás |
 | `notistack` 3.0.2 | `Snackbar` do Material | parado desde janeiro de 2025, e empilhar avisos não é preciso aqui |
+| `createAsyncThunk` + slice para a fila de envios | um provedor de contexto acima do roteador | sem Redux aqui, a fila não precisa de store: é um estado que só tem de sobreviver à navegação |
+| `useAppTheme` próprio, com `useLocalStorage`, claro/escuro | `useColorScheme` do Material, com o estado do sistema | o Material 7 já guarda a escolha, e o terceiro estado é o que respeita a preferência de quem usa |
 
-O que **não** divergiu: `react-hook-form` com `zod` para o formulário. Os dois estão em dia (7.90 e
-4.6, de outubro de 2026), e a escolha dela continua certa.
+O que **não** divergiu: `react-hook-form` com `zod` para o formulário — os dois estão em dia (7.90 e
+4.6, de outubro de 2026), e a escolha dela continua certa — e a ideia de escolher os arquivos **na
+tela de criação**, que era a dela e foi adotada aqui.
 
 Material **7**, e não 9: o `@mui/x-data-grid` 8 não aceita Material 9 como par, e o DataGrid 9 só
 existe como *release candidate*. 7.3 com 8.29 é o par estável mais novo que existe hoje — medido, não
@@ -390,6 +464,9 @@ e um acesso a possível `null` falham a compilação.
 **Os quatro agregados por inteiro**: categorias, elenco, gêneros e vídeos — listar, criar, editar,
 ativar, desativar e remover, mais os três estados do vídeo e o envio dos cinco arquivos.
 
+Também a **fila de envios** com progresso por arquivo, a alternância de tema com o estado do
+sistema, o menu que vira gaveta em tela estreita e a tela de endereço inexistente.
+
 O que **não** existe, e é escolha: o player. Rever a mídia enviada é trabalho do portal, e o
 back-office mostra o nome do arquivo e o status da codificação, que é o que quem administra precisa
 saber. A `admin-api` tem a rota de download (com `Range`), então isto é adicionável.
@@ -406,21 +483,33 @@ ainda grita se uma dependência nova entrar.
 
 ## Os testes
 
-`npm test` roda o Vitest com jsdom. São 236, e cada guarda tem o seu: que o assinante não entra, que
+`npm test` roda o Vitest com jsdom. São 264, e cada guarda tem o seu: que o assinante não entra, que
 a consulta espera o token, que `search` vazio não vai na URL, que 4xx não é repetido, que 401 e 403
 dizem coisas diferentes, que `active` não vai no corpo da atualização, que remover pergunta antes,
 que o 409 manda desativar, que o papel do elenco é fechado nos dois valores do domínio, que a rota
 dele leva hífen, que o nome do gênero aceita uma letra, que a lista de gêneros mostra contagem e não
 ids, que tirar a última categoria manda lista vazia, que o vídeo ordena por `title`, que o filtro
 repete o parâmetro em vez de juntar com vírgula, que a sinopse é obrigatória, que o teto do arquivo é
-conferido antes de enviar, que o envio **não** define `Content-Type`, e que cada estado do vídeo vai
-na rota dele. Todos foram conferidos ao contrário — removendo o que eles guardam e vendo
-cada um falhar.
+conferido antes de enviar, que o envio **não** define `Content-Type`, que cada estado do vídeo vai na
+rota dele, que a fila manda **um por vez**, que o progresso do XHR chega a quem desenha a barra, que
+o arquivo acima do teto não entra na fila, que a fila aparece de qualquer tela, que o menu tem as
+quatro seções com link de verdade, e que um endereço inventado cai na tela de "não existe" **sem** um
+endereço de verdade cair nela. Todos foram conferidos ao contrário — removendo o que eles guardam e
+vendo cada um falhar.
 
-Um deles ficou **verde** nessa conferência, e vale registrar o que ensinou: estreitar o tipo do corpo
-da atualização (`Pick<CategoryDraft, "name" | "description">`) é documentação, não guarda — quem
-mantém o `active` fora da chamada é a tela de edição, que monta o objeto campo por campo. O teste
-passou a mirar nela.
+Dois ficaram **verdes** nessa conferência, e os dois ensinaram a mesma coisa — que o teste pode estar
+medindo o lugar errado:
+
+- estreitar o tipo do corpo da atualização (`Pick<CategoryDraft, "name" | "description">`) é
+  documentação, não guarda: quem mantém o `active` fora da chamada é a tela de edição, que monta o
+  objeto campo por campo. O teste passou a mirar nela.
+- o teste da tela de "não existe" montava a **sua própria** rota `*`, então seguia verde com a rota
+  apagada do roteador. A tabela de rotas saiu do `App` para o `AppRoutes` e o teste passou a abrir um
+  endereço inventado contra ela.
+
+A segunda metade desse teste também precisou ser remirada: ela abria `/videos/novo`, e apagar essa
+rota deixava `videos/:id` casando com o endereço (com id `"novo"`) — verde de novo. Hoje ela abre
+`/categorias`, que nenhuma outra rota cobre.
 
 Os testes de tela usam o cliente de consultas **de produção**, e não um com `retry: false`: um dublê
 ali faria os testes passarem com uma política que ninguém usa. O preço é que falha de rede levaria as
