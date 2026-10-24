@@ -3,8 +3,10 @@ package com.tarcisiolzbraga.codeflix.videos.infrastructure.configuration;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.configuration.properties.KeycloakProperties;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.security.KeycloakJwtConverter;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.graphql.execution.SecurityDataFetcherExceptionResolver;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -37,7 +39,24 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableConfigurationProperties(KeycloakProperties.class)
 public class SecurityConfig {
 
+    // O actuator, na porta de gerenciamento. Hoje esta cadeia é redundante — a regra geral abaixo
+    // já é `permitAll`, e quem autoriza de verdade é o @Secured de cada consulta, que não alcança
+    // endpoint de actuator. Ela está aqui assim mesmo, e a razão é o dia em que alguém fechar o
+    // `anyRequest()`: sem ela as sondas passariam a receber 401, o pod nasceria "não pronto" com a
+    // aplicação de pé, e nada no código ligaria uma coisa à outra. Foi o que aconteceu na
+    // admin-api, onde a regra geral já pede role.
     @Bean
+    @Order(1)
+    SecurityFilterChain actuatorFilterChain(final HttpSecurity http) throws Exception {
+        return http.securityMatcher(EndpointRequest.toAnyEndpoint())
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(rules -> rules.anyRequest().permitAll())
+                .build();
+    }
+
+    @Bean
+    @Order(2)
     SecurityFilterChain apiFilterChain(final HttpSecurity http) throws Exception {
         return http.csrf(AbstractHttpConfigurer::disable)
                 // Usa o CorsConfigurationSource que o CorsConfig publica. A verificação prévia do
