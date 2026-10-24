@@ -39,6 +39,22 @@ services:
     ports:
       - "${APP_PORT}:8080"
       - "${APP_DEBUG_PORT}:5005"
+    # A prontidão lida da porta de gerenciamento, de dentro do próprio container. Ela **não** é
+    # publicada no host de propósito: o argumento do actuator numa porta à parte é que ela não sai
+    # da rede, e publicá-la aqui desmontaria isso. Para ver de fora, `docker compose exec admin-api
+    # wget -qO- localhost:9090/actuator/health`.
+    #
+    # O wget é o do busybox, que é o que a imagem Alpine tem — não há curl. Ele sai com código de
+    # erro quando a resposta não é 2xx, que é justamente o que o healthcheck precisa.
+    #
+    # start_period generoso: o Flyway roda na subida, e falha dentro dessa janela não conta como
+    # tentativa gasta. Depois dela, 3 falhas seguidas marcam o container como unhealthy.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9090/actuator/health/readiness"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 90s
     depends_on:
       - mysql
       - rabbitmq
