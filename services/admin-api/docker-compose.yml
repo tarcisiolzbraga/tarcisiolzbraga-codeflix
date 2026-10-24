@@ -39,6 +39,12 @@ services:
     ports:
       - "${APP_PORT}:8080"
       - "${APP_DEBUG_PORT}:5005"
+    # A janela que o Docker dá entre o SIGTERM e o SIGKILL. O padrão dele é **10s**, e a espera da
+    # aplicação por requisição em voo é de 30s: com o padrão, o que a parada elegante protege o
+    # Docker corta no meio aos 10 segundos — e corta calado, porque o SIGKILL não deixa linha de
+    # log. 60s põem a decisão de volta no `timeout-per-shutdown-phase`, que ao menos registra o que
+    # abandonou. Parada saudável leva ~2s; este número só importa quando algo travou.
+    stop_grace_period: 60s
     # A prontidão lida da porta de gerenciamento, de dentro do próprio container. Ela **não** é
     # publicada no host de propósito: o argumento do actuator numa porta à parte é que ela não sai
     # da rede, e publicá-la aqui desmontaria isso. Para ver de fora, `docker compose exec admin-api
