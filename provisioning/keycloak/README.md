@@ -106,6 +106,28 @@ de desenvolvimento.
 Quem assina **não** é criado aqui: a conta nasce pelo cadastro da `subscription-api`, que a cria no
 realm e a põe no grupo `accounts`.
 
+## A tela de login tem a cara da Codeflix
+
+O realm aponta `loginTheme` para `codeflix`, e o tema está em [`themes/codeflix/`](themes/codeflix/),
+montado no container pelo compose ao lado. **Tema, e não formulário dentro do front:** um formulário
+próprio exigiria `directAccessGrantsEnabled` no client público, e aí a senha passaria pelo JavaScript
+do front, sem PKCE e sem segundo fator. Assim a página continua sendo a do Keycloak — só não parece.
+
+O `theme.properties` herda do `keycloak.v2` e **não copia um único `.ftl`**: só cor, tipografia e
+espaçamento. Copiar template é o que faz tema envelhecer — a cada versão do Keycloak a cópia
+divergiria calada.
+
+O `displayNameHtml` é o texto que o template escreve dentro do `#kc-header-wrapper`, e o CSS do tema
+o estiliza. Texto, e não `<img>`: evita um binário no repositório para uma palavra.
+
+E a tela está em **português** por `internationalizationEnabled` com `defaultLocale: pt-BR`: a
+tradução é a do próprio Keycloak (`messages_pt_BR.properties` do tema base), então não há texto nosso
+para manter em dia.
+
+> **Nada de comentário dentro do `realm.json`.** O importador do Keycloak recusa campo que não
+> conhece, inclusive uma chave `"//"`, e derruba a subida com `Unrecognized field "//"`. A explicação
+> mora aqui; o arquivo é só configuração.
+
 ## O segredo
 
 O arquivo traz `__KEYCLOAK_CLIENT_SECRET__` no lugar do segredo. O Keycloak **não** substitui variável de
