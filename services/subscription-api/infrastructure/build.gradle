@@ -16,7 +16,27 @@ tasks.named('jar') {
     enabled = false
 }
 
+// O `amqp-client` que o BOM do Boot 4.1.2 fixa é o 5.30.0, e ele carrega quatro CVEs HIGH
+// (CVE-2026-63337, -69219, -69220, -75516), corrigidos a partir do 5.33.0. Subir o Boot não resolve
+// este: ele é o único dos cinco achados do Trivy que o 4.1.2 **não** move.
+//
+// Sobrescrever propriedade do BOM é o caminho suportado pelo plugin de dependency-management, e é
+// preferível a declarar a dependência com versão: assim todo artefato do grupo continua alinhado,
+// inclusive o que entrar transitivo amanhã.
+ext['rabbit-amqp-client.version'] = '5.37.0'
+
 dependencies {
+    // O lz4-java vem do kafka-clients e **não é gerenciado pelo BOM do Boot**, então subir o Boot não
+    // o move: o 4.1.2 trouxe o 1.11.2, que carrega o CVE-2026-106451 (corrigido no 1.11.4).
+    //
+    // Constraint, e não dependência declarada: ninguém aqui usa lz4 diretamente — ele é detalhe de
+    // compressão do cliente Kafka. Declará-lo como dependência diria uma coisa falsa sobre o código;
+    // a constraint diz exatamente o que é, um piso de versão para o que vem transitivo.
+    constraints {
+        implementation('at.yawk.lz4:lz4-java:1.12.1') {
+            because 'CVE-2026-106451 no 1.11.2, que o kafka-clients traz'
+        }
+    }
     implementation project(':domain')
     implementation project(':application')
 

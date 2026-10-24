@@ -21,7 +21,10 @@ FROM alpine:3.21
 
 # Nenhuma dependência de sistema: o SMTP vem da biblioteca padrão do Go. Só os certificados, para o
 # dia em que o destino for um provedor com TLS.
-RUN apk add --no-cache ca-certificates
+# O `upgrade` antes do `add` pega as correções publicadas depois de a base ser construída. No
+# encoder isto achou o CVE-2026-84782 no libssl3/libcrypto3 3.3.7-r1, com correção no -r2 já
+# disponível no repositório do Alpine.
+RUN apk -U upgrade --no-cache && apk add --no-cache ca-certificates
 
 # Usuário sem privilégio: mandar e-mail não tem motivo para rodar como root.
 #

@@ -21,7 +21,10 @@ FROM alpine:3.21
 
 # ffmpeg é a única dependência de sistema: é ele que converte. O curso instala o Bento4 compilado
 # à mão aqui; uma linha do gerenciador de pacotes resolve o mesmo.
-RUN apk add --no-cache ffmpeg ca-certificates
+# O `upgrade` antes do `add` pega as correções publicadas depois de a base ser construída. No
+# encoder isto achou o CVE-2026-84782 no libssl3/libcrypto3 3.3.7-r1, com correção no -r2 já
+# disponível no repositório do Alpine.
+RUN apk -U upgrade --no-cache && apk add --no-cache ffmpeg ca-certificates
 
 # Usuário sem privilégio: o encoder não tem motivo para rodar como root.
 RUN addgroup -S encoder && adduser -S encoder -G encoder

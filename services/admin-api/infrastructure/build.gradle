@@ -16,6 +16,15 @@ tasks.named('jar') {
     enabled = false
 }
 
+// O `amqp-client` que o BOM do Boot 4.1.2 fixa é o 5.30.0, e ele carrega quatro CVEs HIGH
+// (CVE-2026-63337, -69219, -69220, -75516), corrigidos a partir do 5.33.0. Subir o Boot não resolve
+// este: ele é o único dos cinco achados do Trivy que o 4.1.2 **não** move.
+//
+// Sobrescrever propriedade do BOM é o caminho suportado pelo plugin de dependency-management, e é
+// preferível a declarar a dependência com versão: assim todo artefato do grupo continua alinhado,
+// inclusive o que entrar transitivo amanhã.
+ext['rabbit-amqp-client.version'] = '5.37.0'
+
 dependencies {
     implementation project(':domain')
     implementation project(':application')
