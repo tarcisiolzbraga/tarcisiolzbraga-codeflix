@@ -44,4 +44,7 @@ logging:
 # As origens do front que o browser confere. Isto **não** é segurança desta API — quem autoriza é o
 # token; ver o comentário do CorsConfig. Na máquina local, o front do próprio desenvolvedor.
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  # Duas portas, e as duas são de desenvolvimento: 3000 é o portal e **3001 é o back-office**.
+  # A 3001 faltava, e o efeito era o painel inteiro dizendo "não foi possível falar com a
+  # admin-api" com a API no ar: o preflight dele voltava 403, e o browser escondia a resposta.
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001}
