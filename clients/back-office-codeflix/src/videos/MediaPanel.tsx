@@ -19,6 +19,15 @@ import {
   type VideoDetail,
 } from "@/videos/videosGateway";
 
+// A cor de cada status da codificação. FAILED é o que motivou a tabela: antes dele existir, todo
+// status saía com a mesma aparência, e não havia por que distinguir.
+const CHIP_COLORS: Record<string, "default" | "success" | "error"> = {
+  PENDING: "default",
+  PROCESSING: "default",
+  COMPLETED: "success",
+  FAILED: "error",
+};
+
 // Os cinco arquivos de um vídeo, um cartão cada.
 //
 // **Só existe na edição**, e não na criação: a rota de envio é `/videos/{id}/medias/{type}`, então
@@ -73,8 +82,19 @@ function MediaCard({
                 {arquivo.name}
               </Typography>
               {/* O status é da codificação, e vem do encoder por fila: um vídeo recém-enviado fica
-                  em PENDING até o encoder responder. */}
-              {status !== null && <Chip size="small" variant="outlined" label={status} />}
+                  em PENDING até o encoder responder.
+
+                  **A cor não é enfeite.** Antes todo status saía igual, e FAILED tinha a mesma
+                  aparência de PROCESSING: quem olhava não distinguia "está demorando" de "falhou e
+                  não vai voltar". */}
+              {status !== null && (
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={status}
+                  color={CHIP_COLORS[status] ?? "default"}
+                />
+              )}
             </Stack>
           )}
 
