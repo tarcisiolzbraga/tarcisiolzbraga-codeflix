@@ -86,6 +86,18 @@ jobs:
           path: 'services/${{ matrix.service }}/*/build/reports/tests/**'
           retention-days: 7
 
+      # O relatório agregado dos três módulos, que o `build` gera junto do piso de cobertura. Sobe
+      # com `if: always()` como o de testes: quando o piso é violado o build falha, e é justamente
+      # aí que alguém quer ver o relatório para saber **o que** caiu — sem ele, a mensagem do gate
+      # diz o número e não diz a classe.
+      - name: Guarda o relatório de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-${{ matrix.service }}
+          path: 'services/${{ matrix.service }}/build/reports/jacoco/**'
+          retention-days: 7
+
   image:
     name: Imagem Docker (${{ matrix.service }})
     needs: build
