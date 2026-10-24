@@ -4,6 +4,8 @@ import static com.tarcisiolzbraga.codeflix.subscription.infrastructure.api.ApiRe
 import static com.tarcisiolzbraga.codeflix.subscription.infrastructure.api.ApiResponseDocs.CONFLICT_DESCRIPTION;
 import static com.tarcisiolzbraga.codeflix.subscription.infrastructure.api.ApiResponseDocs.NOT_FOUND;
 import static com.tarcisiolzbraga.codeflix.subscription.infrastructure.api.ApiResponseDocs.OK;
+import static com.tarcisiolzbraga.codeflix.subscription.infrastructure.api.ApiResponseDocs.TOO_MANY_REQUESTS;
+import static com.tarcisiolzbraga.codeflix.subscription.infrastructure.api.ApiResponseDocs.TOO_MANY_REQUESTS_DESCRIPTION;
 import static com.tarcisiolzbraga.codeflix.subscription.infrastructure.api.ApiResponseDocs.UNPROCESSABLE;
 import static com.tarcisiolzbraga.codeflix.subscription.infrastructure.api.ApiResponseDocs.UNPROCESSABLE_DESCRIPTION;
 
@@ -49,6 +51,10 @@ public interface AccountAPI {
             responseCode = UNPROCESSABLE,
             description = UNPROCESSABLE_DESCRIPTION,
             content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(
+            responseCode = TOO_MANY_REQUESTS,
+            description = TOO_MANY_REQUESTS_DESCRIPTION,
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
     SignUpResponse signUp(@RequestBody SignUpRequest request);
 
     @PostMapping("/sign-up/confirm")
@@ -71,6 +77,10 @@ public interface AccountAPI {
     @ApiResponse(
             responseCode = UNPROCESSABLE,
             description = "O link venceu, ou o token está mal formado",
+            content = @Content(schema = @Schema(implementation = ApiError.class)))
+    @ApiResponse(
+            responseCode = TOO_MANY_REQUESTS,
+            description = TOO_MANY_REQUESTS_DESCRIPTION,
             content = @Content(schema = @Schema(implementation = ApiError.class)))
     ConfirmSignUpResponse confirmSignUp(@RequestBody ConfirmSignUpRequest request);
 

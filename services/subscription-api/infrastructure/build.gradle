@@ -36,6 +36,13 @@ dependencies {
     // Saúde e métricas. O registro do Prometheus vem do BOM do Boot, por isso sem versão aqui.
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'io.micrometer:micrometer-registry-prometheus'
+    // Limite de requisição. Fora do BOM do Boot: o bucket4j-core é só o algoritmo de token bucket,
+    // sem integração de framework — o filtro e o registro de baldes são escritos aqui.
+    implementation 'com.bucket4j:bucket4j-core:8.10.1'
+    // O cache dos baldes, com teto de tamanho e expiração: sem isso o mapa de IPs cresce sem fim, e
+    // uma enxurrada de origens distintas viraria vazamento de memória em vez de defesa. Vem do BOM
+    // do Boot, por isso sem versão.
+    implementation 'com.github.ben-manes.caffeine:caffeine'
     implementation 'org.springframework.boot:spring-boot-starter-flyway'
     implementation 'org.flywaydb:flyway-mysql'
     // fora do BOM do Boot; a linha 3.x é a compatível com o Boot 4
