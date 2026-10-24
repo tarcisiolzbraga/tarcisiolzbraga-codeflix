@@ -4,9 +4,14 @@ O Codeflix inteiro num cluster local: as dez peças de apoio, os sete aplicativo
 tudo. Um comando:
 
 ```bash
-bash deploy/up.sh      # sobe do zero, semeia e imprime os endereços
-bash deploy/down.sh    # derruba o cluster (leva os dados com ele)
+bash deploy/build-images.sh   # as sete imagens, com as URLs do cluster embutidas nos fronts
+bash deploy/up.sh             # sobe do zero, semeia e imprime os endereços
+bash deploy/down.sh           # derruba o cluster (leva os dados com ele)
 ```
+
+O `build-images.sh` **não** é o mesmo que `docker compose build`, e a diferença só aparece quando
+alguém abre o front: as URLs das APIs são embutidas no JavaScript em tempo de build. Um build comum
+produz fronts apontando para `localhost:8080` — certo para o compose, errado para o cluster.
 
 Isto **não substitui** o `docker compose` da raiz, que continua sendo o caminho de quem está
 programando: ciclo mais curto, nada para construir em imagem. O cluster existe para ver o sistema

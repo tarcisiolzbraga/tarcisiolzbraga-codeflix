@@ -44,7 +44,8 @@ for imagem in "${IMAGENS[@]}"; do
   docker image inspect "$imagem" >/dev/null 2>&1 || {
     echo "a imagem '$imagem' não está no Docker do host." >&2
     case "$imagem" in
-      admin-codeflix-*) echo "  construa com: docker compose build" >&2 ;;
+      admin-codeflix-*) echo "  construa com: bash deploy/build-images.sh" >&2
+                        echo "  (e não \`docker compose build\`: os fronts embutem as URLs no build)" >&2 ;;
       *) echo "  traga com: bash deploy/cluster/export-platform-images.sh (de um cluster que já a tenha)" >&2
          echo "  ou, se a rede permitir: docker pull $imagem" >&2 ;;
     esac

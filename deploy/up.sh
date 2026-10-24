@@ -31,6 +31,9 @@ passo "2/10 resolvedor dos nós"
 bash deploy/cluster/dns-nodes.sh
 
 passo "3/10 imagens nos nós"
+# As imagens têm de existir no host, e **construídas para o cluster**: as URLs das APIs são embutidas
+# no build dos fronts. `deploy/build-images.sh` é quem passa os nomes do gateway; um
+# `docker compose build` comum produz fronts apontando para localhost.
 bash deploy/cluster/import-images.sh
 
 passo "4/10 malha e painéis"
