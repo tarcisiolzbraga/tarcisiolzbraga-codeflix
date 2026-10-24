@@ -1,0 +1,57 @@
+// O piso de cobertura, aplicado pelo módulo que **agrega** o relatório — a infrastructure de cada
+// serviço, que é quem depende dos outros dois. Não entra no codeflix.java-conventions porque aquele
+// vale para todo módulo, e verificar domain, application e infrastructure em separado mediria três
+// pedaços quando o que interessa é o serviço inteiro: um caso de uso é testado na application e
+// exercitado de novo no IT da infrastructure, e só a soma diz a verdade.
+//
+// É **piso contra regressão, e não meta**. Os três serviços estão bem acima dele hoje:
+//
+//     serviço             instrução   ramo    linha
+//     admin-api              94,9%   72,0%    95,0%
+//     videos-api             92,8%   80,1%    91,2%
+//     subscription-api       96,5%   84,9%    96,3%
+//
+// Daí os números escolhidos: 90% de instrução e 70% de ramo deixam folga para mudança honesta sem
+// deixar passar queda real. O mais apertado é o **ramo da admin-api**, a dois pontos do piso — e
+// isso é informação, não acidente: é lá que falta teste de caminho alternativo, e é o primeiro
+// lugar onde vale subir cobertura em vez de baixar o piso.
+//
+// Sem limite de LINE: ele mede quase o mesmo que INSTRUCTION e o videos-api passa a 1,2 ponto dele,
+// o que faria o gate reclamar de mudança inocente. Gate que dispara errado é gate que alguém desliga.
+plugins {
+    id 'jacoco'
+}
+
+tasks.register('testCodeCoverageVerification', JacocoCoverageVerification) {
+    group = 'verification'
+    description = 'Confere o piso de cobertura sobre o relatório agregado dos três módulos.'
+
+    // Lê os mesmos dados do relatório agregado, em vez de os redescobrir: assim o que é verificado é
+    // exatamente o que é publicado. O `map` mantém a leitura preguiçosa — a tarefa do relatório é
+    // criada pelo jacoco-report-aggregation, que pode ser aplicado depois deste plugin.
+    def report = tasks.named('testCodeCoverageReport', JacocoReport)
+    executionData.from(report.map { it.executionData })
+    classDirectories.from(report.map { it.classDirectories })
+    sourceDirectories.from(report.map { it.sourceDirectories })
+
+    violationRules {
+        rule {
+            limit {
+                counter = 'INSTRUCTION'
+                value = 'COVEREDRATIO'
+                minimum = 0.90
+            }
+            limit {
+                counter = 'BRANCH'
+                value = 'COVEREDRATIO'
+                minimum = 0.70
+            }
+        }
+    }
+}
+
+// Entra no check, que é o que o `build` chama: o piso vale em todo commit, e não numa tarefa que
+// alguém precisa lembrar de rodar.
+tasks.named('check') {
+    dependsOn tasks.named('testCodeCoverageVerification')
+}

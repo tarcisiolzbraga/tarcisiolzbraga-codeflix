@@ -3,6 +3,8 @@ plugins {
     id 'org.springframework.boot'
     id 'io.spring.dependency-management'
     id 'jacoco-report-aggregation'
+    // O piso de cobertura, no build-logic: mexer nele mexe nos três serviços.
+    id 'codeflix.coverage-verification'
 }
 
 tasks.named('bootJar') {
