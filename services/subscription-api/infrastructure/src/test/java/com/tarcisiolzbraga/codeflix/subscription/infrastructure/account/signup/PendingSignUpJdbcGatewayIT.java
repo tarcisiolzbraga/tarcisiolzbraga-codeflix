@@ -13,6 +13,8 @@ import com.tarcisiolzbraga.codeflix.subscription.domain.exceptions.ConflictExcep
 import com.tarcisiolzbraga.codeflix.subscription.domain.person.Email;
 import com.tarcisiolzbraga.codeflix.subscription.domain.utils.InstantUtils;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.IntegrationTest;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +22,10 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 
 @IntegrationTest
 class PendingSignUpJdbcGatewayIT {
+
+    // O mesmo padrão do `signup.retention`: o teste fixa a janela em vez de a ler da configuração,
+    // para medir o comportamento do DELETE e não o valor escolhido.
+    private static final Duration RETENTION = Duration.ofDays(7);
 
     @Autowired
     private PendingSignUpJdbcGateway gateway;
@@ -162,5 +168,79 @@ class PendingSignUpJdbcGatewayIT {
         final var actual = gateway.deleteUnconfirmedOf(AccountFixture.email());
 
         assertEquals(0, actual);
+    }
+
+    // --- Retenção de dado pessoal ---------------------------------------------------------------
+    //
+    // Os quatro casos são os dois lados do limiar, nas duas condições. É o que prova que a janela
+    // existe: apagar cedo demais troca o 422 de "o link venceu" por um 404, e apagar nunca é o
+    // defeito que motivou isto.
+
+    @Test
+    void givenAnUnconfirmedSignUpExpiredLongAgo_whenRemovesExpired_thenItIsGone() {
+        final var token = SignUpToken.generate();
+        gateway.save(PendingSignUpFixture.pendingSignUpWith(token));
+        expiresAt(token, InstantUtils.now().minus(Duration.ofDays(30)));
+
+        final var removed = gateway.deleteExpiredBefore(InstantUtils.now().minus(RETENTION));
+
+        assertEquals(1, removed);
+        assertTrue(gateway.pendingSignUpOfToken(token).isEmpty());
+    }
+
+    // Vencido ontem **sobrevive**, e isso é o ponto: é ele que faz a API responder 422 "o link
+    // venceu" em vez de 404, para quem clica num link de ontem.
+    @Test
+    void givenAnUnconfirmedSignUpExpiredYesterday_whenRemovesExpired_thenItSurvives() {
+        final var token = SignUpToken.generate();
+        gateway.save(PendingSignUpFixture.pendingSignUpWith(token));
+        expiresAt(token, InstantUtils.now().minus(Duration.ofDays(1)));
+
+        final var removed = gateway.deleteExpiredBefore(InstantUtils.now().minus(RETENTION));
+
+        assertEquals(0, removed);
+        assertTrue(gateway.pendingSignUpOfToken(token).isPresent());
+    }
+
+    // Confirmado há muito tempo sai: a conta já existe, e o link daquela idade não vale mais ser
+    // repetido. O que fica guardado é a conta, não esta cópia do nome e do documento.
+    @Test
+    void givenASignUpConfirmedLongAgo_whenRemovesExpired_thenItIsGone() {
+        final var token = SignUpToken.generate();
+        gateway.save(PendingSignUpFixture.pendingSignUpWith(token));
+        confirmedAt(token, InstantUtils.now().minus(Duration.ofDays(30)));
+
+        final var removed = gateway.deleteExpiredBefore(InstantUtils.now().minus(RETENTION));
+
+        assertEquals(1, removed);
+        assertTrue(gateway.pendingSignUpOfToken(token).isEmpty());
+    }
+
+    // Confirmado hoje sobrevive: é o clique repetido no mesmo link, que tem de devolver a conta em
+    // vez de erro.
+    @Test
+    void givenASignUpConfirmedToday_whenRemovesExpired_thenItSurvives() {
+        final var token = SignUpToken.generate();
+        gateway.save(PendingSignUpFixture.pendingSignUpWith(token));
+        confirmedAt(token, InstantUtils.now());
+
+        final var removed = gateway.deleteExpiredBefore(InstantUtils.now().minus(RETENTION));
+
+        assertEquals(0, removed);
+        assertTrue(gateway.pendingSignUpOfToken(token).isPresent());
+    }
+
+    // SQL direto para pôr a linha na idade que o caso pede: o tempo é a entrada do teste, e passar
+    // por um relógio de mentira aqui esconderia qual coluna o DELETE de fato olha.
+    private void expiresAt(final SignUpToken token, final Instant moment) {
+        touch("UPDATE pending_sign_up SET expires_at = :moment WHERE token_hash = :hash", token, moment);
+    }
+
+    private void confirmedAt(final SignUpToken token, final Instant moment) {
+        touch("UPDATE pending_sign_up SET confirmed_at = :moment WHERE token_hash = :hash", token, moment);
+    }
+
+    private void touch(final String sql, final SignUpToken token, final Instant moment) {
+        jdbcClient.sql(sql).param("moment", moment).param("hash", token.hashed()).update();
     }
 }

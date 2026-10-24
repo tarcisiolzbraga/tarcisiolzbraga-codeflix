@@ -12,6 +12,7 @@ import com.tarcisiolzbraga.codeflix.subscription.domain.person.Name;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.jdbc.DatabaseClient;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.jdbc.JdbcUtils;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.jdbc.RowMap;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -52,6 +53,19 @@ public class PendingSignUpJdbcGateway implements PendingSignUpGateway {
     public int deleteUnconfirmedOf(final Email anEmail) {
         final var sql = "DELETE FROM pending_sign_up WHERE email = :email AND confirmed_at IS NULL";
         return this.database.update(sql, Map.of("email", anEmail.value()));
+    }
+
+    // Um limiar só, duas condições: a linha não confirmada conta do vencimento, a confirmada conta
+    // da confirmação. Sem índice de propósito — o job roda uma vez por dia, o OR entre duas colunas
+    // não aproveitaria um índice único, e é justamente este job que mantém a tabela pequena.
+    @Override
+    public int deleteExpiredBefore(final Instant aThreshold) {
+        final var sql = """
+                DELETE FROM pending_sign_up
+                 WHERE (confirmed_at IS NULL     AND expires_at   < :threshold)
+                    OR (confirmed_at IS NOT NULL AND confirmed_at < :threshold)
+                """;
+        return this.database.update(sql, Map.of("threshold", aThreshold));
     }
 
     private void insert(final PendingSignUp aPendingSignUp) {
