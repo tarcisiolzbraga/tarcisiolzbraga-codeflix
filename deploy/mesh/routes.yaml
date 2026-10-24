@@ -1,0 +1,77 @@
+# As rotas do gateway: um nome por coisa que o browser alcança.
+#
+# `mesh` entra na lista de gateways de cada rota junto do `codeflix` porque os mesmos nomes são
+# usados **de dentro** — o portal busca os planos pelo servidor, e as imagens dos fronts têm esses
+# endereços embutidos. Sem `mesh`, a chamada de um pod ao mesmo nome sairia da malha e voltaria como
+# tráfego externo, e o Kiali a desenharia vindo da internet.
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: { name: portal, namespace: codeflix }
+spec:
+  hosts: ["codeflix.localtest.me"]
+  gateways: [codeflix, mesh]
+  http:
+    - route:
+        - destination: { host: portal.codeflix.svc.cluster.local, port: { number: 3000 } }
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: { name: back-office, namespace: codeflix }
+spec:
+  hosts: ["admin.localtest.me"]
+  gateways: [codeflix, mesh]
+  http:
+    - route:
+        - destination: { host: back-office.codeflix.svc.cluster.local, port: { number: 3001 } }
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: { name: admin-api, namespace: codeflix }
+spec:
+  hosts: ["admin-api.localtest.me"]
+  gateways: [codeflix, mesh]
+  http:
+    - route:
+        - destination: { host: admin-api.codeflix.svc.cluster.local, port: { number: 8080 } }
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: { name: catalogo, namespace: codeflix }
+spec:
+  hosts: ["catalogo.localtest.me"]
+  gateways: [codeflix, mesh]
+  http:
+    - route:
+        - destination: { host: videos-api.codeflix.svc.cluster.local, port: { number: 8082 } }
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: { name: assinatura, namespace: codeflix }
+spec:
+  hosts: ["assinatura.localtest.me"]
+  gateways: [codeflix, mesh]
+  http:
+    - route:
+        - destination: { host: subscription-api.codeflix.svc.cluster.local, port: { number: 8084 } }
+---
+# O Mailpit e o painel do RabbitMQ: não são parte do produto, mas são as duas janelas que a gente
+# abre para conferir o que aconteceu.
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: { name: mailpit, namespace: codeflix }
+spec:
+  hosts: ["mailpit.localtest.me"]
+  gateways: [codeflix]
+  http:
+    - route:
+        - destination: { host: mailpit.codeflix.svc.cluster.local, port: { number: 8025 } }
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: { name: rabbitmq, namespace: codeflix }
+spec:
+  hosts: ["rabbitmq.localtest.me"]
+  gateways: [codeflix]
+  http:
+    - route:
+        - destination: { host: rabbitmq.codeflix.svc.cluster.local, port: { number: 15672 } }

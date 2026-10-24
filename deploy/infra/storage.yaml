@@ -1,0 +1,151 @@
+# O armazenamento das mídias (Garage, compatível com S3) e o índice de leitura do catálogo
+# (Elasticsearch). Os dois falam HTTP, então as portas se chamam `http` — e aí o Istio mede rota e
+# código de resposta em vez de contar bytes.
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage
+  namespace: codeflix
+  labels: { app: garage }
+spec:
+  selector: { app: garage }
+  ports:
+    - { name: http, port: 3900, targetPort: 3900 }
+    - { name: http-admin, port: 3903, targetPort: 3903 }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: garage-dados
+  namespace: codeflix
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 8Gi }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: garage
+  namespace: codeflix
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: garage }
+  template:
+    metadata:
+      labels: { app: garage, version: v1 }
+    spec:
+      containers:
+        - name: garage
+          image: dxflrs/garage:v2.3.0
+          # `--single-node --default-bucket`: o mesmo do compose. O bucket e a chave nascem das
+          # variáveis GARAGE_DEFAULT_*, que vêm do `.env` — é o que dispensa um passo manual de
+          # `garage key create` depois de cada recriação.
+          #
+          # **O `command` é obrigatório aqui, e o compose o esconde.** A imagem não tem ENTRYPOINT:
+          # o `Cmd` dela é `["/garage","server"]`, e o compose declara `entrypoint: ["/garage"]` ao
+          # lado do `command`. Traduzir só o `command` deixa o Kubernetes tentando executar um
+          # programa chamado `server` — e o pod morre com exit 128 sem escrever uma linha de log.
+          command: ["/garage"]
+          args: ["server", "--single-node", "--default-bucket"]
+          envFrom:
+            - secretRef: { name: codeflix-env }
+          env:
+            - { name: GARAGE_DEFAULT_BUCKET, value: codeflix-medias }
+            - name: GARAGE_DEFAULT_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: STORAGE_ACCESS_KEY } }
+            - name: GARAGE_DEFAULT_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: STORAGE_SECRET_KEY } }
+            - name: GARAGE_RPC_SECRET
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: STORAGE_RPC_SECRET } }
+          ports:
+            - { name: http, containerPort: 3900 }
+            - { name: http-admin, containerPort: 3903 }
+          volumeMounts:
+            - { name: config, mountPath: /etc/garage.toml, subPath: garage.toml, readOnly: true }
+            - { name: dados, mountPath: /var/lib/garage/data }
+            - { name: meta, mountPath: /var/lib/garage/meta }
+          resources:
+            requests: { memory: 128Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+      volumes:
+        - name: config
+          configMap: { name: garage-config }
+        - name: dados
+          persistentVolumeClaim: { claimName: garage-dados }
+        - name: meta
+          persistentVolumeClaim: { claimName: garage-meta }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: garage-meta
+  namespace: codeflix
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-elasticsearch
+  namespace: codeflix
+  labels: { app: catalog-elasticsearch }
+spec:
+  selector: { app: catalog-elasticsearch }
+  ports:
+    - { name: http, port: 9200, targetPort: 9200 }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: catalog-elasticsearch-dados
+  namespace: codeflix
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 4Gi }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-elasticsearch
+  namespace: codeflix
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: catalog-elasticsearch }
+  template:
+    metadata:
+      labels: { app: catalog-elasticsearch, version: v1 }
+    spec:
+      # O Elasticsearch recusa subir se não puder escrever no volume, e o local-path do k3d entrega o
+      # diretório como root. O grupo do pod resolve sem precisar de initContainer com chown.
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: elasticsearch
+          image: docker.elastic.co/elasticsearch/elasticsearch:9.5.4
+          env:
+            - { name: discovery.type, value: single-node }
+            - { name: xpack.security.enabled, value: "false" }
+            - { name: ES_JAVA_OPTS, value: "-Xms512m -Xmx512m" }
+          ports:
+            - { name: http, containerPort: 9200 }
+          readinessProbe:
+            httpGet: { path: "/_cluster/health?wait_for_status=yellow&timeout=1s", port: 9200 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30
+          volumeMounts:
+            - { name: dados, mountPath: /usr/share/elasticsearch/data }
+          resources:
+            requests: { memory: 1Gi, cpu: 200m }
+            limits: { memory: 2Gi }
+      volumes:
+        - name: dados
+          persistentVolumeClaim: { claimName: catalog-elasticsearch-dados }

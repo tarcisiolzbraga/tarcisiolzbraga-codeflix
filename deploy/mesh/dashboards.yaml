@@ -1,0 +1,56 @@
+# Os painéis da malha, pelo gateway.
+#
+# Antes eu os alcançava por `kubectl port-forward`, e isso não se sustenta: é um processo solto que
+# morre com o terminal, com a sessão ou com um `kubectl` que termine — e aí o painel "não abre" com
+# tudo saudável dentro do cluster. Pelo gateway, eles seguem a mesma regra dos outros nomes.
+#
+# Os serviços moram em `istio-system`, então os VirtualService moram lá também e se penduram no
+# gateway do outro namespace pelo nome qualificado `codeflix/codeflix` — que é como o Istio permite
+# uma rota de um namespace usar um gateway de outro.
+#
+# Os três não servem na raiz, e isso confunde na primeira vez (medido):
+#
+#   http://kiali.localtest.me/kiali/        o `/` responde 302 para cá
+#   http://grafana.localtest.me/            este serve na raiz
+#   http://jaeger.localtest.me/jaeger/search  o addon do Istio publica o Jaeger sob /jaeger
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: kiali
+  namespace: istio-system
+spec:
+  hosts: ["kiali.localtest.me"]
+  gateways: ["codeflix/codeflix"]
+  http:
+    - route:
+        - destination:
+            host: kiali.istio-system.svc.cluster.local
+            port: { number: 20001 }
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: grafana
+  namespace: istio-system
+spec:
+  hosts: ["grafana.localtest.me"]
+  gateways: ["codeflix/codeflix"]
+  http:
+    - route:
+        - destination:
+            host: grafana.istio-system.svc.cluster.local
+            port: { number: 3000 }
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: jaeger
+  namespace: istio-system
+spec:
+  hosts: ["jaeger.localtest.me"]
+  gateways: ["codeflix/codeflix"]
+  http:
+    - route:
+        - destination:
+            host: tracing.istio-system.svc.cluster.local
+            port: { number: 80 }
