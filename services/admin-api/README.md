@@ -269,8 +269,41 @@ isso o consumidor é idempotente — resposta com checksum de outro envio é des
 mesmo conteúdo não regrava a mídia nem mexe no `updated_at`.
 
 A linha entregue fica guardada por `OUTBOX_RETENTION` (padrão 7 dias) e depois é apagada, porque a tabela é fila
-e não histórico. Linha pendente nunca é apagada. O relay pressupõe **uma instância** da aplicação: com várias, o
-passo seguinte seria travar a leitura com `SKIP LOCKED`.
+e não histórico. Linha pendente nunca é apagada.
+
+##### O relay roda em mais de uma instância
+
+Ele pressupunha **uma só**, e com duas a mesma linha era lida duas vezes e entregue em dobro. A
+exclusão agora vem do banco: cada passagem trava a linha que vai entregar com
+
+```sql
+... where sent_at is null order by created_at limit 1 for update skip locked
+```
+
+e a instância vizinha **salta** o que está travado em vez de esperar por ele. Em JPA isso é
+`@Lock(PESSIMISTIC_WRITE)` mais o hint `jakarta.persistence.lock.timeout = -2`, que é o
+`SKIP_LOCKED` do Hibernate.
+
+O hint não é enfeite, e isto foi medido com o SQL na mão: **sem ele sai `for update` sem
+`skip locked`**, e o efeito é o outro defeito — a segunda instância fica parada atrás da primeira e
+depois entrega justamente a linha que estava travada. O `OutboxRelayIT` tem um teste que falha nesse
+caso (`expected: <segunda> but was: <primeira>`), com uma transação à parte segurando a linha mais
+antiga.
+
+Três consequências que valem saber:
+
+- **o lote virou um laço de transações curtas**, uma por entrega, e não uma leitura paginada: o lock
+  vale até o fim da transação, então travar cinquenta linhas de uma vez seguraria quarenta e nove
+  durante quarenta e nove envios. O `OUTBOX_BATCH_SIZE` passou a ser o teto de entregas por
+  passagem;
+- **o envio acontece com o lock na mão.** Marcar e depois enviar soltaria o lock antes, mas uma
+  queda entre as duas coisas perderia a mensagem para sempre; enviar sob o lock troca isso por
+  entrega repetida, que o consumidor já tolera. O preço é uma linha travada durante uma chamada de
+  rede;
+- **a ordem de entrega entre instâncias não é preservada** — e não era antes tampouco: o encoder
+  consome a mesma fila com vários operários em paralelo (`ENCODER_WORKERS`, padrão 2), então
+  mensagem que saía em ordem já era processada fora de ordem. O que se perdeu é uma garantia que o
+  sistema nunca teve ponta a ponta.
 
 **Não há codificador neste repositório.** Para ver o ciclo completo, envie um arquivo pela API e publique a
 resposta à mão no painel do RabbitMQ (http://localhost:15672, com as credenciais do `.env`): na aba *Exchanges*,
