@@ -181,6 +181,16 @@ O que estava escrito aqui era que "aquela ponta está estável", e **a medição
 arquivo Java. A instabilidade é das duas pontas; o recuo deste serviço continua valendo porque o
 repasse em fluxo a tornava frequente, não porque a outra ponta estivesse limpa.
 
+**O `VideoMediaE2ETest` deste serviço é parte da mesma medição**: foi ele que ficou vermelho em
+19/10, em dois cenários, com a mesma cadeia `ClientProtocolException` → `ParseException`. Então a
+corrida atinge o repasse bufferizado também — o recuo a tornou rara, não impossível.
+
+Em 24/10/2026 a corrida ficou **provada**, e com taxa: dois workflows do mesmo SHA, rodando ao mesmo
+tempo, deram resultados opostos, e sete dos nove SHAs que falharam na janela de 18 a 24/10 também
+passaram. A conta está no
+[README da admin-api](../admin-api/README.md#a-segunda-medição-em-24102026-a-corrida-está-provada-e-tem-taxa),
+que é onde o instrumento mora.
+
 E o `Content-Length` ficou: a resposta declara o tamanho que o admin informou, o que é melhor para o
 player de qualquer jeito.
 
