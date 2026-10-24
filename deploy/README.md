@@ -92,6 +92,7 @@ Cada uma destas custou tempo e está comentada onde importa:
 | `infra/storage.yaml` | a imagem do Garage **não tem ENTRYPOINT**, e o compose o declara ao lado do `command`. Traduzir só metade dá exit 128 sem uma linha de log |
 | `apps/java.yaml` | perfil **`homolog`**, não `development`: só ele lê `KEYCLOAK_ISSUER_URI` inteiro. O `development` monta `http://host:porta/...`, e `:80` no `iss` não bate com o que o Keycloak assina |
 | `apps/java.yaml` | a `startupProbe` consulta o grupo **`readiness`**, não um grupo `startup`: o Spring só cria `liveness` e `readiness`. Medido — `/actuator/health/startup` responde 404, e uma sonda apontada para lá põe o pod em CrashLoopBackOff com a aplicação de pé |
+| `apps/java.yaml` | o Istio **reescreve** as sondas: o manifesto diz `9090`, e o `kubectl get pod` mostra `/app-health/admin-api/startupz` na **15020**, do sidecar. Não é configuração perdida — é o `rewriteAppHTTPProbers`, que faz a sonda atravessar o proxy para funcionar com mTLS. Quem for depurar conferindo o pod vai achar que o manifesto não foi aplicado |
 | `apps/java.yaml` | o catálogo pede token para chamar o admin: sem `KEYCLOAK_TOKEN_URI`, **todos** os eventos de CDC vão para a fila morta — com o conector e o Kafka saudáveis, e o catálogo respondendo vazio |
 | `cluster/dns-nodes.sh` | o resolvedor **dos nós**. Sem ele nem a imagem de sandbox chega, e todo pod fica em `Init:0/2` com um evento que fala de imagem, não de DNS |
 | `cluster/import-images.sh` | o kubelet **coleta imagem "não usada"** acima de 85% de disco, e imagem carregada à mão não tem de onde voltar. Por isso elas são fixadas (`io.cri-containerd.pinned=true`) e conferidas uma a uma |
@@ -136,6 +137,35 @@ código de resposta vindos do Envoy e nada de dentro da JVM — nem heap, nem po
 `terminationGracePeriodSeconds: 60`, igual à janela do compose e pelo mesmo motivo: a aplicação
 espera até 30s pela requisição em voo, e o padrão do Kubernetes é 30 — sem margem, quem decide é o
 relógio do kubelet, não o `timeout-per-shutdown-phase`, que ao menos registra o que abandonou.
+
+### Conferido no cluster, e não só no YAML
+
+As três aplicações subiram com as sondas novas e rolaram sem reinício:
+
+```
+admin-api-855f69b549-lfcqb          2/2  Running  0 restarts
+subscription-api-5c79b54ffb-pgd98   2/2  Running  0 restarts
+videos-api-55d9bfff86-q7drr         2/2  Running  0 restarts
+```
+
+**E a sonda foi provada por falha deliberada**, porque pod pronto não prova que a sonda mede algo —
+o Istio a reescreve, e um proxy que respondesse por conta própria daria o mesmo verde. Apontando a
+prontidão da `videos-api` para `/actuator/health/naoexiste`, o pod novo ficou **1/2 e nunca ficou
+pronto**, com o antigo seguindo em rotação. Então a cadeia kubelet → sidecar → actuator está inteira,
+e o rollout também está seguro: sonda errada não derruba quem está servindo.
+
+As métricas da aplicação chegam ao Prometheus da malha, consultado de dentro do cluster:
+
+| `application` | séries de `jvm_memory_used_bytes` |
+|---|---|
+| `admin-codeflix` | 8 |
+| `videos-api-codeflix` | 8 |
+| `subscription-codeflix` | 8 |
+
+Um detalhe que economiza tempo de quem for olhar o painel: **`http_server_requests` nasce
+preguiçosamente**, na primeira requisição à porta da aplicação, e as sondas **não** entram nele — o
+servidor de gerenciamento não é instrumentado por essa métrica. Num pod recém-subido ela
+simplesmente não existe, e isso não é defeito de configuração.
 
 ### Os dois serviços em Go seguem sem sonda
 
