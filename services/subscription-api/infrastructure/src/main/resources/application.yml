@@ -3,10 +3,24 @@
 # vem de SPRING_PROFILES_ACTIVE.
 server:
   port: 8084
+  # Parada elegante: o Tomcat para de aceitar conexão nova e espera a que está em voo terminar,
+  # em vez de a cortar no meio. **É o padrão do Boot 4** — mudou da `immediate` do Boot 3 —, e fica
+  # declarado pelo mesmo motivo do binlog-format do MySQL: para o comportamento não depender de um
+  # padrão que já mudou uma vez.
+  #
+  # O actuator entra nisto de graça: com os grupos de sonda ligados, a prontidão passa a
+  # OUT_OF_SERVICE assim que a parada começa, então o balanceador para de mandar requisição antes
+  # de a aplicação começar a se desmontar.
+  shutdown: graceful
 
 spring:
   profiles:
     default: development
+  # O teto de espera de cada fase da parada, e também o padrão do Boot, declarado pela mesma razão.
+  # 30s é o que a requisição em voo tem para terminar; passou disso, a parada segue e o que
+  # sobrou é cortado — com linha no log, que é o que diferencia isto de um SIGKILL silencioso.
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   threads:
     virtual:
       # Cada requisição roda numa virtual thread: esperar o JDBC não prende thread do SO.
