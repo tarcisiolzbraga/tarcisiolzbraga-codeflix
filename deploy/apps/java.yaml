@@ -1,0 +1,194 @@
+# As três aplicações Java.
+#
+# **`SPRING_PROFILES_ACTIVE=homolog`, e não `development`.** O motivo é o `iss` do token, outra vez:
+# o perfil de desenvolvimento monta o emissor como `http://${KEYCLOAK_HOST}:${KEYCLOAK_PORT}/realms/...`,
+# e aqui o Keycloak atende na porta 80 — `http://keycloak.localtest.me:80/realms/codeflix` **não é**
+# a string que ele assina (`http://keycloak.localtest.me/realms/codeflix`), e token com `iss`
+# diferente por dois caracteres é token recusado. O perfil `homolog` lê `KEYCLOAK_ISSUER_URI` inteiro,
+# que é o que se quer quando o endereço vem de fora.
+#
+# De quebra ele é o perfil pensado para container: log em ECS no stdout, sem arquivo.
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-api
+  namespace: codeflix
+  labels: { app: admin-api }
+spec:
+  selector: { app: admin-api }
+  ports:
+    - { name: http, port: 8080, targetPort: 8080 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-api
+  namespace: codeflix
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: admin-api }
+  template:
+    metadata:
+      labels: { app: admin-api, version: v1 }
+    spec:
+      containers:
+        - name: admin-api
+          image: admin-codeflix-admin-api:latest
+          # As imagens entram no cluster por `k3d image import`, não de um registro: `IfNotPresent`
+          # é o que impede o kubelet de tentar buscá-las no Docker Hub e falhar com ErrImagePull.
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef: { name: codeflix-env }
+          env:
+            - { name: SPRING_PROFILES_ACTIVE, value: homolog }
+            - { name: DB_HOST, value: mysql }
+            - { name: DB_PORT, value: "3306" }
+            - { name: AMQP_HOST, value: rabbitmq }
+            - { name: AMQP_PORT, value: "5672" }
+            - { name: STORAGE_HOST, value: garage }
+            # O `homolog` pede o endereço **inteiro** do armazenamento; é o `development` que o monta
+            # de host e porta. A diferença é deliberada do projeto: fora do desenvolvimento, variável
+            # faltando derruba a subida em vez de apontar para lugar nenhum.
+            - { name: STORAGE_ENDPOINT, value: "http://garage:3900" }
+            - { name: KEYCLOAK_ISSUER_URI, value: "http://keycloak.localtest.me/realms/codeflix" }
+            # As duas origens dos fronts atrás do gateway. Sem isto valeria a lista do perfil
+            # homolog, que fala de localhost e do domínio de homologação — e o browser esconderia a
+            # resposta do painel com a API no ar, que é defeito difícil de ler.
+            - { name: CORS_ALLOWED_ORIGINS, value: "http://localhost:3000,http://localhost:3001" }
+          ports:
+            - { name: http, containerPort: 8080 }
+          readinessProbe:
+            # `/actuator/health` responde 401 nesta API: a sonda usa o caminho do OpenAPI, que é
+            # público de propósito e já prova que o Spring subiu e está roteando.
+            httpGet: { path: /v3/api-docs, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30
+          resources:
+            requests: { memory: 512Mi, cpu: 200m }
+            limits: { memory: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: videos-api
+  namespace: codeflix
+  labels: { app: videos-api }
+spec:
+  selector: { app: videos-api }
+  ports:
+    - { name: http, port: 8082, targetPort: 8082 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: videos-api
+  namespace: codeflix
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: videos-api }
+  template:
+    metadata:
+      labels: { app: videos-api, version: v1 }
+    spec:
+      containers:
+        - name: videos-api
+          image: admin-codeflix-videos-api:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef: { name: codeflix-env }
+          env:
+            - { name: SPRING_PROFILES_ACTIVE, value: homolog }
+            - { name: KAFKA_BOOTSTRAP_SERVERS, value: "kafka:9092" }
+            - { name: ELASTIC_URIS, value: "http://catalog-elasticsearch:9200" }
+            # Em desenvolvimento este segredo tem um padrão com "nao-usar-fora-daqui" no nome; no
+            # `homolog` ele é obrigatório. Vem do `.env` pelo Secret, como todo segredo aqui — e
+            # precisa ser **estável**, porque é ele que assina os endereços de mídia que o player já
+            # tem em mãos.
+            - name: CATALOG_MEDIA_SIGNING_SECRET
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: CATALOG_MEDIA_SIGNING_SECRET } }
+            # **Pelo nome do Service, e não pelo gateway.** Chamada de serviço para serviço dentro da
+            # malha é o que o Kiali desenha como aresta entre os dois; passando pelo gateway, a mesma
+            # chamada apareceria como tráfego vindo de fora.
+            - { name: ADMIN_API_BASE_URL, value: "http://admin-api:8080" }
+            - { name: KEYCLOAK_ISSUER_URI, value: "http://keycloak.localtest.me/realms/codeflix" }
+            # O catálogo **pede token** para chamar a admin-api quando consome um evento de CDC, e no
+            # `homolog` o endereço do token é obrigatório. Sem ele o consumo falhava com
+            # "Not enough variable values available to expand 'KEYCLOAK_TOKEN_URI'", as retentativas
+            # se esgotavam e **todos** os eventos iam para a fila morta — com o conector e o Kafka
+            # saudáveis, e o catálogo respondendo vazio. O sintoma não aponta para a causa.
+            - { name: KEYCLOAK_TOKEN_URI, value: "http://keycloak.localtest.me/realms/codeflix/protocol/openid-connect/token" }
+            - { name: CORS_ALLOWED_ORIGINS, value: "http://localhost:3000,http://localhost:3001" }
+          ports:
+            - { name: http, containerPort: 8082 }
+          readinessProbe:
+            # **TCP, e não HTTP.** O catálogo não tem rota pública que sirva de sonda: o GraphQL
+            # exige POST com token, o `/api/v3/api-docs` responde 404 aqui (medido), e o GraphiQL
+            # responde 307 — passaria, mas depender de um redirecionamento é sonda que quebra
+            # quando alguém mexer no console. O Tomcat só abre a porta no fim da subida, então o
+            # socket aberto é o sinal honesto de "pronto para atender".
+            tcpSocket: { port: 8082 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30
+          resources:
+            requests: { memory: 512Mi, cpu: 200m }
+            limits: { memory: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: subscription-api
+  namespace: codeflix
+  labels: { app: subscription-api }
+spec:
+  selector: { app: subscription-api }
+  ports:
+    - { name: http, port: 8084, targetPort: 8084 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subscription-api
+  namespace: codeflix
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: subscription-api }
+  template:
+    metadata:
+      labels: { app: subscription-api, version: v1 }
+    spec:
+      containers:
+        - name: subscription-api
+          image: admin-codeflix-subscription-api:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef: { name: codeflix-env }
+          env:
+            - { name: SPRING_PROFILES_ACTIVE, value: homolog }
+            - { name: SUBSCRIPTION_DB_HOST, value: subscription-mysql }
+            - { name: SUBSCRIPTION_DB_PORT, value: "3306" }
+            # Esta API **também** consome Kafka (a replicação das contas), e sem este endereço ela
+            # herdava o `localhost:29092` do `.env` — os consumidores ficavam reconectando em silêncio
+            # (WARN, não ERROR), e a confirmação de cadastro respondia 500 sem dizer por quê.
+            - { name: KAFKA_BOOTSTRAP_SERVERS, value: "kafka:9092" }
+            - { name: AMQP_HOST, value: rabbitmq }
+            - { name: AMQP_PORT, value: "5672" }
+            - { name: KEYCLOAK_ISSUER_URI, value: "http://keycloak.localtest.me/realms/codeflix" }
+            # O link que vai no e-mail de confirmação: tem de abrir no browser de quem recebe, então
+            # é o nome do gateway, não o nome interno do Service.
+            - { name: SIGNUP_CONFIRMATION_URL, value: "http://localhost:3000/cadastro/confirmar" }
+            - { name: CORS_ALLOWED_ORIGINS, value: "http://localhost:3000,http://localhost:3001" }
+          ports:
+            - { name: http, containerPort: 8084 }
+          readinessProbe:
+            httpGet: { path: /plans/on-sale, port: 8084 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30
+          resources:
+            requests: { memory: 512Mi, cpu: 200m }
+            limits: { memory: 1Gi }
