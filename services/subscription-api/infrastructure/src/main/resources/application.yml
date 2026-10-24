@@ -108,6 +108,25 @@ amqp:
   # leva até lá, e é o front que chama o POST de confirmar com o token.
   confirmation-url: ${SIGNUP_CONFIRMATION_URL}
 
+# Os prazos do cadastro, e a varredura que os aplica.
+#
+# `validation-ttl` é por quanto tempo o link do e-mail vale. `retention` é por quanto tempo a linha
+# de `pending_sign_up` sobrevive **depois de deixar de servir** — e isso é retenção de dado pessoal,
+# não arrumação: aquela tabela guarda e-mail, nome completo e documento de quem pediu cadastro,
+# inclusive de quem nunca confirmou e portanto nunca virou cliente.
+#
+# Os sete dias preservam o 422 de "o link venceu" por uma semana depois do vencimento. Apagar na
+# hora faria essa resposta virar 404, e qual das duas o cliente recebe passaria a depender de o
+# limpador ter rodado.
+#
+# O cron é em UTC e de madrugada, como a varredura de cobrança: o trabalho é de banco e não precisa
+# disputar com o pico.
+signup:
+  validation-ttl: ${SIGNUP_VALIDATION_TTL:24h}
+  retention: ${SIGNUP_RETENTION:7d}
+  cleanup-job:
+    cron: ${SIGNUP_CLEANUP_JOB_CRON:0 30 3 * * *}
+
 # A assinatura: a tolerância antes do cancelamento e a varredura das vencidas.
 #
 # O cron é em UTC, o mesmo fuso do vencimento: a varredura compara datas, e rodar perto da virada do
