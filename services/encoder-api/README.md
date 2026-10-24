@@ -23,8 +23,9 @@ contrato. Dois pontos dele valem repetir:
 - **o `checksum` volta igual** em todas as respostas. É por ele que o admin descarta resposta
   atrasada: o caminho do arquivo não distingue um envio do outro, porque reenviar sobrescreve no
   mesmo lugar;
-- **`ERROR` é só registrado** pelo admin. O domínio dele ainda não tem um estado de falha para a
-  mídia, então ela fica como está.
+- **`ERROR` leva a mídia para `FAILED`** no admin, e não só para o log — era assim antes, e a mídia
+  ficava em `PROCESSING` para sempre. O arquivo enviado continua onde está; um envio novo do mesmo
+  tipo recomeça em `PENDING`. A `message` não é persistida: ela vive no log dos dois lados.
 
 ## Rodando
 
