@@ -39,4 +39,12 @@ public record AudioVideoMedia(
         return new AudioVideoMedia(
                 this.checksum, this.name, this.rawLocation, encodedLocation, MediaStatus.COMPLETED);
     }
+
+    // O `encodedLocation` é preservado em vez de limpo, e na prática ele está vazio: a falha chega
+    // antes de haver saída. Preservá-lo é o que mantém este método honesto se um dia o codificador
+    // falhar **depois** de escrever algo — aí o endereço parcial é informação, não lixo.
+    public AudioVideoMedia failed() {
+        return new AudioVideoMedia(
+                this.checksum, this.name, this.rawLocation, this.encodedLocation, MediaStatus.FAILED);
+    }
 }

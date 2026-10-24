@@ -356,6 +356,33 @@ class VideoTest {
         assertTrue(actualVideo.getDomainEvents().isEmpty());
     }
 
+    // A codificação que falhou tem de ficar registrada no agregado, e não só no log: era assim antes,
+    // e quem estava no back-office via a mídia parada em PROCESSING para sempre, sem saber se estava
+    // lenta ou morta.
+    @Test
+    void givenAVideoWithAMedia_whenCallFailed_thenMoveOnlyThatMediaAndRegisterNoEvent() {
+        final var actualVideo = newVideo();
+        actualVideo.updateVideoMedia(audioVideoMedia());
+        actualVideo.publishDomainEvents(event -> { });
+
+        actualVideo.failed(VideoMediaType.VIDEO, "abc123");
+
+        assertEquals(MediaStatus.FAILED, actualVideo.getVideo().orElseThrow().status());
+        assertTrue(actualVideo.getDomainEvents().isEmpty());
+    }
+
+    // Mesma defesa de checksum das outras transições: resposta de um envio já sobrescrito não pode
+    // marcar como falho o arquivo novo, que pode estar codificando bem.
+    @Test
+    void givenAMediaReplacedByANewUpload_whenAnOldFailureArrives_thenIgnoreIt() {
+        final var actualVideo = newVideo();
+        actualVideo.updateVideoMedia(audioVideoMedia());
+
+        actualVideo.failed(VideoMediaType.VIDEO, "outro-checksum");
+
+        assertEquals(MediaStatus.PENDING, actualVideo.getVideo().orElseThrow().status());
+    }
+
     @Test
     void givenAVideoWithATrailer_whenCallCompleted_thenKeepWhereTheEncodedFileIs() {
         final var actualVideo = newVideo();

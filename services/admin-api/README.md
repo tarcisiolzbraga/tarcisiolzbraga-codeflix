@@ -288,9 +288,18 @@ devolve o mesmo `checksum` que recebeu:
 { "status": "ERROR",      "videoId": "...", "type": "VIDEO", "checksum": "...", "message": "codec não suportado" }
 ```
 
-`PROCESSING` e `COMPLETED` movem o status da mídia, e `COMPLETED` guarda onde o arquivo codificado ficou.
-`ERROR` é apenas registrado no log: o domínio ainda não tem um estado de falha para a mídia. Mensagem ilegível,
-ou com tipo de mídia desconhecido, é registrada e descartada em vez de voltar para a fila.
+As três movem o status da mídia: `PROCESSING`, `COMPLETED` — que também guarda onde o arquivo codificado
+ficou — e `ERROR`, que a leva para `FAILED`. Mensagem ilegível, ou com tipo de mídia desconhecido, é
+registrada e descartada em vez de voltar para a fila.
+
+`FAILED` é estado **terminal desta tentativa**, e não do vídeo: o arquivo enviado continua onde está, e um
+envio novo do mesmo tipo recomeça em `PENDING`. A `message` do `ERROR` **não** é persistida — o que o painel
+precisa é saber que falhou, e a causa vive no log dos dois lados, onde há contexto. Guardá-la no agregado
+pediria coluna nova e uma decisão sobre retenção de texto vindo de fora.
+
+Antes de `FAILED` existir, o `ERROR` só virava linha de log, e a mídia ficava em `PROCESSING` **para
+sempre**: indistinguível de codificação lenta para quem estava no back-office, e o único jeito de saber era
+procurar a linha no Kibana.
 
 O `checksum` existe porque o endereço do arquivo não distingue um envio do outro: reenviar o mesmo tipo
 sobrescreve o arquivo no mesmo lugar. Se o usuário trocar o arquivo enquanto a codificação do anterior ainda
