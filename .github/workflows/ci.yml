@@ -123,15 +123,38 @@ jobs:
 
       # Constrói sem publicar: não exige credencial nenhuma, e passa a verificar os Dockerfiles, que
       # hoje não são exercitados por nada. A publicação entra quando houver registro definido.
+      # `load: true` porque com buildx e `push: false` a imagem fica no cache do builder e não no
+      # daemon — e sem ela no daemon não há o que varrer no passo seguinte.
       - name: Constrói a imagem
         uses: docker/build-push-action@v6
         with:
           context: services/${{ matrix.service }}
           push: false
+          load: true
           tags: ${{ matrix.service }}:${{ github.sha }}
 
+      # A varredura do que a imagem **de fato contém**: os pacotes do sistema da base e as
+      # bibliotecas dentro do jar. É pergunta diferente da que o Dependabot responde, e isso foi
+      # medido — o `npm audit` do portal dizia zero enquanto a imagem dele tinha cinco CVEs HIGH,
+      # porque eram dependências do próprio npm na imagem base.
+      #
+      # `ignore-unfixed: true` porque CVE sem correção publicada não é acionável: barrar por ela
+      # pararia o trabalho sem dar o que fazer. `exit-code: 1` em HIGH e CRITICAL, e isso só pode
+      # ser estrito porque as sete imagens estão em **zero** — foi a PR que zerou que tornou este
+      # portão possível.
+      - name: Varredura de vulnerabilidade da imagem
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          image-ref: ${{ matrix.service }}:${{ github.sha }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: table
+
   # Os serviços em Go têm job próprio, e não entram nas matrizes dos de cima: a cadeia é outra —
-  # Go, com o seu cache e o seu jeito de rodar teste. Não dependem do job unit porque não
+  # Go, com o seu cache e o seu jeito de rodar teste. Desde que a imagem do mail-api ficou meses
+  # quebrada sem ninguém notar, ele também **constrói e varre a imagem**, como os outros dois jobs. Não dependem do job unit porque não
   # compartilham nada com os serviços Java; o que os liga é o contrato das filas, e esse quem
   # exercita é o teste de cada lado.
   #
@@ -158,6 +181,30 @@ jobs:
       # O mesmo alvo que se usa na mão antes de commitar: vet e depois os testes com -race.
       - name: Verificação
         run: make check
+
+      # **Isto fechou um buraco de meses.** O CI tinha job de imagem só para as três aplicações
+      # Java, e por isso a imagem do mail-api ficou sem construir sem ninguém saber: o `alpine`
+      # passou a trazer um usuário `mail` de fábrica, o `addgroup -S mail` começou a falhar com
+      # "group 'mail' in use", e o defeito só aparecia no `docker compose up --build` de quem
+      # tentasse subir o projeto do zero — derrubando a subida inteira, porque build de um serviço
+      # que falha aborta o resto.
+      - name: Constrói a imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: services/${{ matrix.service }}
+          push: false
+          load: true
+          tags: ${{ matrix.service }}:${{ github.sha }}
+
+      - name: Varredura de vulnerabilidade da imagem
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          image-ref: ${{ matrix.service }}:${{ github.sha }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: table
 
   # Os clientes têm job próprio pelo mesmo motivo dos serviços em Go: a cadeia de ferramentas é
   # outra. `npm run check` é a porta de entrada de cada commit do portal — lint, tipos, testes e
@@ -206,4 +253,24 @@ jobs:
         with:
           context: clients/${{ matrix.client }}
           push: false
+          load: true
           tags: ${{ matrix.client }}:${{ github.sha }}
+
+      # A varredura do que a imagem **de fato contém**: os pacotes do sistema da base e as
+      # bibliotecas dentro do jar. É pergunta diferente da que o Dependabot responde, e isso foi
+      # medido — o `npm audit` do portal dizia zero enquanto a imagem dele tinha cinco CVEs HIGH,
+      # porque eram dependências do próprio npm na imagem base.
+      #
+      # `ignore-unfixed: true` porque CVE sem correção publicada não é acionável: barrar por ela
+      # pararia o trabalho sem dar o que fazer. `exit-code: 1` em HIGH e CRITICAL, e isso só pode
+      # ser estrito porque as sete imagens estão em **zero** — foi a PR que zerou que tornou este
+      # portão possível.
+      - name: Varredura de vulnerabilidade da imagem
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          image-ref: ${{ matrix.client }}:${{ github.sha }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: table
