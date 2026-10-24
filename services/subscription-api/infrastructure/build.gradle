@@ -31,6 +31,9 @@ dependencies {
     // consumidor. Mesma escolha da videos-api, que também consome CDC.
     implementation 'org.springframework.boot:spring-boot-starter-kafka'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    // Saúde e métricas. O registro do Prometheus vem do BOM do Boot, por isso sem versão aqui.
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
     implementation 'org.springframework.boot:spring-boot-starter-flyway'
     implementation 'org.flywaydb:flyway-mysql'
     // fora do BOM do Boot; a linha 3.x é a compatível com o Boot 4

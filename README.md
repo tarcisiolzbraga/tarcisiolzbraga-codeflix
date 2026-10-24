@@ -180,6 +180,91 @@ O CORS e o Keycloak decidem coisas diferentes, e as duas listas precisam estar c
 Esquecer a segunda dá erro na tela de login do Keycloak; esquecer a primeira dá uma chamada que
 chegou, respondeu, e o front não pode ler.
 
+## Saúde e métricas
+
+Os três serviços Java expõem o actuator, e **numa porta diferente da aplicação**:
+
+| Serviço | Aplicação | Gerenciamento |
+|---|---|---|
+| `admin-api` | 8080 | 9090 |
+| `videos-api` | 8082 | 9091 |
+| `subscription-api` | 8084 | 9092 |
+
+A porta de gerenciamento **não é publicada** pelo compose nem roteada pelo gateway. Essa é a
+decisão, e não um detalhe de arrumação: quem protege `/actuator` é a topologia, não uma regra de
+caminho. Regra de caminho alguém escreve errado um dia, e ninguém percebe até o `/actuator/env`
+estar na internet com as variáveis de ambiente dentro. Por isso, além da porta, a lista do que se
+expõe é fechada em `health`, `info` e `prometheus`.
+
+Para ver de fora, de dentro do container:
+
+```bash
+docker compose exec admin-api wget -qO- localhost:9090/actuator/health
+```
+
+### O que as sondas medem, e o que elas deliberadamente não medem
+
+`/actuator/health/liveness` e `/actuator/health/readiness` são os dois caminhos que um orquestrador
+consulta. Banco, broker e Elasticsearch aparecem no `/actuator/health` geral e **ficam fora do grupo
+`readiness`** — é o padrão do Spring, e aqui é escolha consciente nas duas pontas:
+
+- **Na prontidão**, porque banco fora do ar tiraria todas as réplicas de rotação ao mesmo tempo, e
+  isso troca uma degradação por uma queda total. Quem espera conexão já falha rápido pelo
+  `connection-timeout` do Hikari.
+- **Na vivacidade**, por um motivo mais forte: reiniciar a aplicação não traz o banco de volta, só
+  acrescenta uma subida a frio no pior momento possível.
+
+### A cadeia de segurança do actuator não é formalidade
+
+O filtro de segurança da aplicação **atravessa** o contexto filho do servidor de gerenciamento. Sem
+uma cadeia própria liberando os endpoints, a regra geral da `admin-api` pedia role de administrador
+às sondas — e o kubelet não carrega token. O resultado seria um pod eternamente "não pronto" com a
+aplicação perfeitamente de pé. Foi medido: as sondas respondiam 401, e cada serviço tem teste
+fixando os quatro fatos, inclusive o de que a porta da aplicação **não** serve `/actuator` nem para
+quem apresenta credencial que abre tudo.
+
+### A parada, e a janela que o Docker dava
+
+`server.shutdown: graceful` **já é o padrão do Spring Boot 4** — mudou da `immediate` do Boot 3. Ele
+está declarado nos três `application.yml` assim mesmo, junto do
+`spring.lifecycle.timeout-per-shutdown-phase: 30s`, pela mesma razão do `binlog-format` do MySQL:
+para o comportamento não depender de um padrão que já mudou uma vez.
+
+O que **não** estava certo era a janela do lado de fora. O Docker dá 10 segundos entre o `SIGTERM` e
+o `SIGKILL`, e a aplicação espera até 30 pela requisição em voo:
+
+```
+Docker:  SIGTERM ──────────10s─────────→ SIGKILL
+Spring:  SIGTERM ──────────────────30s──────────→ desiste e registra
+                            ↑
+                   aqui o Docker matava
+```
+
+Com o padrão, o que a parada elegante protege era cortado no meio aos 10 segundos — e cortado
+**calado**, porque o `SIGKILL` não deixa linha de log. Os três serviços agora declaram
+`stop_grace_period: 60s`, que põe a decisão de volta no `timeout-per-shutdown-phase`: ele ao menos
+registra o que abandonou.
+
+Parada saudável leva pouco mais de um segundo. Medido no `adm_videos_app`: 1406ms, nesta ordem —
+o consumidor do Rabbit drena os workers, os **dois** servidores Tomcat (o da aplicação e o do
+actuator) fecham com "Graceful shutdown complete", e só então a JPA e o Hikari. Este número só
+importa quando algo travou.
+
+A prontidão entra nisto de graça: com os grupos de sonda ligados, ela passa a `OUT_OF_SERVICE`
+assim que a parada começa, então o balanceador para de mandar requisição antes de a aplicação
+começar a se desmontar.
+
+Os dois serviços em Go já tratavam `SIGTERM` com `signal.NotifyContext` e esperavam os operários no
+`WaitGroup`. Eles ficam com o `stop_grace_period` padrão de propósito: o `exec.CommandContext` mata
+o ffmpeg no cancelamento em vez de esperar a conversão terminar, então janela maior não compraria
+nada — a mensagem volta para a fila e outro operário a pega.
+
+### Os dois serviços em Go ficam de fora
+
+`encoder-api` e `mail-api` não expõem HTTP — consomem fila. Não há porta onde pôr uma sonda, e o
+que o compose sabe deles é o processo estar de pé. Medi-los pede outro instrumento (profundidade de
+fila, idade da mensagem mais velha), e isso não está feito.
+
 ## Integração contínua
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) é um workflow só, com os dois serviços Java

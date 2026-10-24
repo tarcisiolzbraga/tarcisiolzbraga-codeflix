@@ -32,6 +32,9 @@ dependencies {
     // autoconfiguração do Kafka mora em módulo próprio, e sem ela o @KafkaListener nunca sobe
     // o container de escuta nem existe KafkaTemplate algum — falha silenciosa, sem erro.
     implementation 'org.springframework.boot:spring-boot-starter-kafka'
+    // Saúde e métricas. O registro do Prometheus vem do BOM do Boot, por isso sem versão aqui.
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-graphql-test'
