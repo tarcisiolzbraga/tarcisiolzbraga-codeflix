@@ -180,6 +180,54 @@ O CORS e o Keycloak decidem coisas diferentes, e as duas listas precisam estar c
 Esquecer a segunda dá erro na tela de login do Keycloak; esquecer a primeira dá uma chamada que
 chegou, respondeu, e o front não pode ler.
 
+## O teto de requisição
+
+A `subscription-api` limita requisição por origem, em três degraus — um por preço do que a rota
+custa:
+
+| Degrau | Rotas | Teto |
+|---|---|---|
+| `sign-up` | `POST /accounts/sign-up` | 10 por 10 min |
+| `confirm` | `POST /accounts/sign-up/confirm` | 20 por 10 min |
+| `general` | todo o resto | 120 por min |
+
+Só este serviço, e isso é escolha. A `admin-api` é inteira autenticada por papel — quem chama é
+operador, não anônimo. E a `videos-api` serve mídia: um `<video src>` abre muitas requisições de
+faixa por segundo, e limitar por origem ali recusaria reprodução legítima.
+
+### Por que degraus separados
+
+As duas rotas do cadastro são as únicas abertas, e não poderiam ser outra coisa: quem se cadastra
+ainda não tem usuário no Keycloak para pedir token. Mas elas custam coisas diferentes — pedir o
+cadastro cria usuário no provedor e põe e-mail na fila; confirmar só confere um token. Com balde
+único, quem se cadastra e clica no link gasta do mesmo saldo, e quanto cabe passa a depender da
+mistura.
+
+### De onde vêm os números
+
+Não de gosto. O primeiro teto foi 5, e a [coleção do Postman](services/subscription-api/.postman/)
+— que é a regressão manual desta API e tem de rodar inteira e repetidas vezes — faz **4** chamadas a
+`sign-up` e **2** a `confirm`: ela tomava 429 em si mesma, na sexta requisição. Os números atuais a
+deixam rodar duas vezes seguidas e ainda limitam abuso a 60 cadastros por hora e por origem. Há
+teste fixando essa conta, para ninguém apertar o teto e quebrar a regressão manual sem perceber.
+
+### Os dois limites, ditos em vez de escondidos
+
+- **O contador é por instância.** Com duas réplicas, o teto efetivo dobra, porque cada uma tem os
+  seus baldes. Contador compartilhado pediria Redis, que este projeto não tem; o bucket4j o suporta,
+  e a troca seria da implementação do registro, não do filtro. Para o que isto protege — cadastro em
+  massa e adivinhação de token —, dobrar 10 em 10 minutos ainda é um teto.
+- **A origem vem do `X-Forwarded-For` atrás do gateway**, e quem controla esse cabeçalho escolhe a
+  própria chave e escapa do balde. Quem o sanitiza é o gateway, e é nele que a defesa de borda mora;
+  este filtro é a de base. Sem o `forward-headers-strategy` dos perfis `homolog` e `production`, o
+  `getRemoteAddr()` devolveria o IP do gateway e o limite viraria **global** — defeito que não
+  aparece em teste nenhum, porque no development não há proxy.
+
+O limite fica **ligado em todos os perfis**, inclusive o development, pela mesma razão da segurança
+deste serviço: desligado no perfil em que se desenvolve, ele nunca é exercitado onde se trabalha.
+As jornadas de teste declaram um teto alto em vez de o desligar, e quem o exercita é um teste
+próprio, com tetos apertados.
+
 ## Saúde e métricas
 
 Os três serviços Java expõem o actuator, e **numa porta diferente da aplicação**:
