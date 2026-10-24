@@ -313,6 +313,66 @@ nada — a mensagem volta para a fila e outro operário a pega.
 que o compose sabe deles é o processo estar de pé. Medi-los pede outro instrumento (profundidade de
 fila, idade da mensagem mais velha), e isso não está feito.
 
+## Dependências e vulnerabilidades
+
+Duas coisas diferentes, com ferramentas diferentes, porque respondem perguntas diferentes:
+
+| | Pergunta | Onde |
+|---|---|---|
+| **Dependabot** | há versão mais nova? | [`.github/dependabot.yml`](.github/dependabot.yml), semanal |
+| **Trivy** | o que eu publico tem CVE conhecido? | job de imagem do CI, em todo push |
+
+O Dependabot cobre os cinco ecossistemas — Gradle, Go, npm, as imagens base dos sete `Dockerfile` e
+as actions do próprio CI — com patch e minor agrupados num PR por ecossistema. Agrupar não é
+estética: sem isso, dezenove diretórios dariam dezenas de PRs por semana, e PR que ninguém lê é
+pior que nenhuma. Major vem sozinho, porque é o que precisa de leitura.
+
+O Trivy varre a imagem construída, e **barra o push** em HIGH ou CRITICAL com correção publicada
+(`ignore-unfixed`, porque CVE sem correção não é acionável: barrar por ela pararia o trabalho sem
+dar o que fazer).
+
+### Por que as duas, e não uma
+
+Porque uma não vê o que a outra vê. Medido neste projeto: o `npm audit` do portal dizia **zero**
+enquanto a imagem dele tinha **cinco CVEs HIGH**.
+
+```
+npm audit  ->  olha o package-lock.json        ->  0
+trivy      ->  olha o que está DENTRO da imagem ->  5 HIGH
+```
+
+Os cinco não eram deste projeto: `undici`, `brace-expansion` e `http-cache-semantics`, todos em
+`/usr/local/lib/node_modules/npm/node_modules/` — dependências do **próprio npm** na imagem base.
+Confiar só no gerenciador de pacote é não ver o que se publica.
+
+### A medição que motivou tudo isto
+
+Antes de configurar qualquer coisa, medi o que ela acharia. As sete imagens somavam **104**
+vulnerabilidades HIGH/CRITICAL:
+
+| Imagem | Antes | Depois |
+|---|---|---|
+| `admin-api` | 18 | 0 |
+| `videos-api` | 15 | 0 |
+| `subscription-api` | 19 | 0 |
+| `encoder-api` | 1 | 0 |
+| `mail-api` | 0 | 0 |
+| `portal` | 5 | 0 |
+| `back-office` | 46 | 0 |
+
+Dezessete sumiram com uma linha (Spring Boot 4.1.1 → 4.1.2) e quarenta e sete eram base
+desatualizada, resolvidas por um `apk -U upgrade` que pega o que o repositório do Alpine já tinha
+publicado. O portão estrito do CI só é possível porque o número é zero: foi o conserto que o
+habilitou, não o contrário.
+
+### O CI constrói as sete imagens, e isso é novo
+
+Antes havia job de imagem só para as três aplicações Java. A consequência apareceu: a imagem do
+`mail-api` ficou **meses sem construir** sem ninguém saber — o `alpine` passou a trazer um usuário
+`mail` de fábrica, o `addgroup -S mail` começou a falhar, e o defeito só aparecia para quem tentasse
+subir o projeto do zero, derrubando a subida inteira. Agora os três jobs que produzem imagem
+constroem e varrem: os Java, os dois em Go e os dois fronts.
+
 ## Integração contínua
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) é um workflow só, com os dois serviços Java
