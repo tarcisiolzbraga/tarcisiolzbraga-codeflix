@@ -223,6 +223,42 @@ aplicação perfeitamente de pé. Foi medido: as sondas respondiam 401, e cada s
 fixando os quatro fatos, inclusive o de que a porta da aplicação **não** serve `/actuator` nem para
 quem apresenta credencial que abre tudo.
 
+### A parada, e a janela que o Docker dava
+
+`server.shutdown: graceful` **já é o padrão do Spring Boot 4** — mudou da `immediate` do Boot 3. Ele
+está declarado nos três `application.yml` assim mesmo, junto do
+`spring.lifecycle.timeout-per-shutdown-phase: 30s`, pela mesma razão do `binlog-format` do MySQL:
+para o comportamento não depender de um padrão que já mudou uma vez.
+
+O que **não** estava certo era a janela do lado de fora. O Docker dá 10 segundos entre o `SIGTERM` e
+o `SIGKILL`, e a aplicação espera até 30 pela requisição em voo:
+
+```
+Docker:  SIGTERM ──────────10s─────────→ SIGKILL
+Spring:  SIGTERM ──────────────────30s──────────→ desiste e registra
+                            ↑
+                   aqui o Docker matava
+```
+
+Com o padrão, o que a parada elegante protege era cortado no meio aos 10 segundos — e cortado
+**calado**, porque o `SIGKILL` não deixa linha de log. Os três serviços agora declaram
+`stop_grace_period: 60s`, que põe a decisão de volta no `timeout-per-shutdown-phase`: ele ao menos
+registra o que abandonou.
+
+Parada saudável leva pouco mais de um segundo. Medido no `adm_videos_app`: 1406ms, nesta ordem —
+o consumidor do Rabbit drena os workers, os **dois** servidores Tomcat (o da aplicação e o do
+actuator) fecham com "Graceful shutdown complete", e só então a JPA e o Hikari. Este número só
+importa quando algo travou.
+
+A prontidão entra nisto de graça: com os grupos de sonda ligados, ela passa a `OUT_OF_SERVICE`
+assim que a parada começa, então o balanceador para de mandar requisição antes de a aplicação
+começar a se desmontar.
+
+Os dois serviços em Go já tratavam `SIGTERM` com `signal.NotifyContext` e esperavam os operários no
+`WaitGroup`. Eles ficam com o `stop_grace_period` padrão de propósito: o `exec.CommandContext` mata
+o ffmpeg no cancelamento em vez de esperar a conversão terminar, então janela maior não compraria
+nada — a mensagem volta para a fila e outro operário a pega.
+
 ### Os dois serviços em Go ficam de fora
 
 `encoder-api` e `mail-api` não expõem HTTP — consomem fila. Não há porta onde pôr uma sonda, e o
