@@ -157,6 +157,10 @@ public class Video extends AggregateRoot<VideoID> {
         applyToAudioVideo(type, checksum, media -> media.completed(encodedLocation));
     }
 
+    public void failed(final VideoMediaType type, final String checksum) {
+        applyToAudioVideo(type, checksum, AudioVideoMedia::failed);
+    }
+
     private void applyToAudioVideo(
             final VideoMediaType type, final String checksum, final UnaryOperator<AudioVideoMedia> change) {
         switch (type) {
