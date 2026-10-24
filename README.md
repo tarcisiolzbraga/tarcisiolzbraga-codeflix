@@ -180,6 +180,55 @@ O CORS e o Keycloak decidem coisas diferentes, e as duas listas precisam estar c
 Esquecer a segunda dá erro na tela de login do Keycloak; esquecer a primeira dá uma chamada que
 chegou, respondeu, e o front não pode ler.
 
+## Saúde e métricas
+
+Os três serviços Java expõem o actuator, e **numa porta diferente da aplicação**:
+
+| Serviço | Aplicação | Gerenciamento |
+|---|---|---|
+| `admin-api` | 8080 | 9090 |
+| `videos-api` | 8082 | 9091 |
+| `subscription-api` | 8084 | 9092 |
+
+A porta de gerenciamento **não é publicada** pelo compose nem roteada pelo gateway. Essa é a
+decisão, e não um detalhe de arrumação: quem protege `/actuator` é a topologia, não uma regra de
+caminho. Regra de caminho alguém escreve errado um dia, e ninguém percebe até o `/actuator/env`
+estar na internet com as variáveis de ambiente dentro. Por isso, além da porta, a lista do que se
+expõe é fechada em `health`, `info` e `prometheus`.
+
+Para ver de fora, de dentro do container:
+
+```bash
+docker compose exec admin-api wget -qO- localhost:9090/actuator/health
+```
+
+### O que as sondas medem, e o que elas deliberadamente não medem
+
+`/actuator/health/liveness` e `/actuator/health/readiness` são os dois caminhos que um orquestrador
+consulta. Banco, broker e Elasticsearch aparecem no `/actuator/health` geral e **ficam fora do grupo
+`readiness`** — é o padrão do Spring, e aqui é escolha consciente nas duas pontas:
+
+- **Na prontidão**, porque banco fora do ar tiraria todas as réplicas de rotação ao mesmo tempo, e
+  isso troca uma degradação por uma queda total. Quem espera conexão já falha rápido pelo
+  `connection-timeout` do Hikari.
+- **Na vivacidade**, por um motivo mais forte: reiniciar a aplicação não traz o banco de volta, só
+  acrescenta uma subida a frio no pior momento possível.
+
+### A cadeia de segurança do actuator não é formalidade
+
+O filtro de segurança da aplicação **atravessa** o contexto filho do servidor de gerenciamento. Sem
+uma cadeia própria liberando os endpoints, a regra geral da `admin-api` pedia role de administrador
+às sondas — e o kubelet não carrega token. O resultado seria um pod eternamente "não pronto" com a
+aplicação perfeitamente de pé. Foi medido: as sondas respondiam 401, e cada serviço tem teste
+fixando os quatro fatos, inclusive o de que a porta da aplicação **não** serve `/actuator` nem para
+quem apresenta credencial que abre tudo.
+
+### Os dois serviços em Go ficam de fora
+
+`encoder-api` e `mail-api` não expõem HTTP — consomem fila. Não há porta onde pôr uma sonda, e o
+que o compose sabe deles é o processo estar de pé. Medi-los pede outro instrumento (profundidade de
+fila, idade da mensagem mais velha), e isso não está feito.
+
 ## Integração contínua
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) é um workflow só, com os dois serviços Java

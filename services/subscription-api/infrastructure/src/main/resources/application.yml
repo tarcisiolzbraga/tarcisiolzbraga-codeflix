@@ -126,6 +126,38 @@ kafka:
       # Keycloak fora do ar. O que passar disso vai para a fila morta, que só registra em log.
       max-attempts: 7
 
+# Saúde e métricas, **numa porta à parte da aplicação**, pelo mesmo motivo dos outros dois serviços:
+# o gateway publica só a porta da aplicação, então /actuator não tem por onde ser alcançado de fora.
+# A proteção é a topologia, e não uma regra de caminho que alguém escreve errado um dia.
+#
+# A 9092 aqui, fechando a sequência: 9090 na admin-api, 9091 no catálogo. Portas distintas porque no
+# desenvolvimento os três rodam no mesmo host pelo bootRun, e a faixa é a 9090 porque a 8090 é do
+# gateway do Istio, publicada no host pelo deploy/cluster/create-cluster.sh.
+management:
+  server:
+    port: ${SUBSCRIPTION_MANAGEMENT_PORT:9092}
+  endpoints:
+    web:
+      exposure:
+        # O que se expõe é escolha, e não o padrão do Boot. Aqui `env` e `configprops` ficariam de
+        # fora mesmo que a porta fosse pública: é neste serviço que mora o segredo do client que
+        # administra o realm inteiro.
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    # Banco e broker no /actuator/health, fora do grupo readiness — a mesma conta dos outros dois.
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    tags:
+      application: subscription-codeflix
+
 # Identifica a aplicação no log estruturado, que é como o Kibana a separa das outras.
 logging:
   structured:
