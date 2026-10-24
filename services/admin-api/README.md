@@ -189,11 +189,52 @@ Duas coisas que isso acrescenta a quem retomar:
   em sequência, no mesmo pool — exatamente o que o catálogo suspeitava, e sem precisar dos dois
   serviços para reproduzir.
 
+#### A segunda medição, em 24/10/2026: a corrida está provada, e tem taxa
+
+Nada no caminho de mídia em Java mudou entre 19/10 e 24/10. Mesmo assim a falha voltou, do **outro**
+lado: o `VideoE2ETest.givenAVideoWithAFile_whenUploadAnotherOfTheSameType_thenTheNewOneReplacesIt`
+deste serviço, com a mesma cadeia `ResourceAccessException` → `ClientProtocolException` →
+`ParseException`, numa PR que mexe **só** em `deploy/` e num `AGENTS.md` — nenhum arquivo Java,
+desta vez sem ressalva.
+
+**O que fecha o diagnóstico é o par de execuções.** O GitHub dispara dois workflows por push, um pelo
+evento `push` e outro pelo `pull_request`, e os dois rodam o **mesmo SHA** ao mesmo tempo:
+
+```
+sha 028a2cc6, 24/10 00:41    push         -> failure
+sha 028a2cc6, 24/10 00:41    pull_request -> success
+```
+
+Código idêntico, minuto idêntico, imagem de runner idêntica, resultados opostos. Isso não é
+regressão nem diferença de ambiente: é corrida, e não há mais o que discutir sobre isso.
+
+E não é um acaso isolado. Na janela de 18/10 a 24/10:
+
+| | |
+|---|---|
+| execuções concluídas do `ci.yml` | 66 (55 verdes, 11 vermelhas) |
+| SHAs distintos testados | 39 |
+| SHAs com ao menos uma execução vermelha | 9 |
+| **SHAs em que as duas execuções simultâneas divergiram** | **7** |
+
+Sete dos nove SHAs que falharam **também passaram**, no mesmo instante e no mesmo código. A taxa de
+commit afetado é de cerca de **1 em 4**, e todas as 11 falhas da janela são esta mesma cadeia de
+exceções — não houve, no período, uma única falha de CI que fosse outra coisa.
+
+Duas consequências práticas:
+
+- **a hipótese do despacho assíncrono curto segue de pé, e o experimento abaixo segue sem ser
+  feito.** Esta medição não o substitui: ela mede a frequência, não a causa;
+- **o par de execuções é o instrumento**, e é de graça. Para avaliar qualquer tentativa de conserto,
+  o sinal não é "o CI ficou verde" — é a divergência entre os dois runs do mesmo SHA desaparecer ao
+  longo de dezenas de commits.
+
 > **O experimento que isto habilita:** declarar o caminho **sem** `Range` como resposta síncrona. O
 > corpo dele já está inteiro em memória, então não se perde fluxo nenhum — só o despacho assíncrono
 > em respostas que não precisavam dele. Se o E2E parar de falhar, a hipótese se confirma, e a
 > exposição restante fica só no caminho do `Range`, que precisa mesmo ser em fluxo. **Um build verde
-> não prova nada**: quatro builds inteiros verdes aqui já conviveram com CI vermelho.
+> não prova nada**: quatro builds inteiros verdes aqui já conviveram com CI vermelho — e a medição de
+> 24/10 põe número nisso, com sete SHAs passando e falhando ao mesmo tempo.
 
 ### O envio também, e o checksum é o nó
 
