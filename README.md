@@ -270,6 +270,27 @@ fila, idade da mensagem mais velha), e isso não está feito.
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) é um workflow só, com os dois serviços Java
 numa matriz: testes sem container, build completo com Testcontainers, e a imagem Docker de cada um.
 
+O `build` de cada serviço confere um **piso de cobertura** antes de passar: 90% de instrução e 70%
+de ramo, sobre o relatório agregado dos três módulos. O piso vive no
+[`build-logic`](build-logic/src/main/groovy/), então mexer nele mexe nos três serviços de uma vez.
+
+É piso contra regressão, e não meta. Os números de hoje:
+
+| Serviço | Instrução | Ramo | Linha |
+|---|---|---|---|
+| `admin-api` | 94,9% | **72,0%** | 95,0% |
+| `videos-api` | 92,8% | 80,1% | 91,2% |
+| `subscription-api` | 96,5% | 84,9% | 96,3% |
+
+O ramo da `admin-api` é o mais apertado, a dois pontos do piso, e isso é informação: é lá que falta
+teste de caminho alternativo, e é o primeiro lugar onde vale subir cobertura em vez de baixar o
+piso. A cobertura da `videos-api` **não era medida por ninguém** até agora — faltava a agregação
+naquele serviço, e só naquele, então `testCodeCoverageReport` nem existia lá.
+
+O relatório sobe como artefato do CI com `if: always()`, pelo mesmo motivo do de testes: quando o
+piso é violado o build falha, e é aí que alguém quer o relatório — a mensagem do gate diz o número,
+não diz a classe.
+
 **Não há filtro por caminho, de propósito.** Filtrar teste pelo que mudou daria push verde com
 contrato quebrado: mexer só na `admin-api` quebra a `videos-api`, que replica o dado dela. O filtro
 entra no dia em que houver deploy — e aí no deploy, não nos testes.
