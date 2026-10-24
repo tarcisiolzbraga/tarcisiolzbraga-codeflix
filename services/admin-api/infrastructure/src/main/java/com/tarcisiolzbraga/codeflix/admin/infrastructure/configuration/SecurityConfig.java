@@ -3,8 +3,10 @@ package com.tarcisiolzbraga.codeflix.admin.infrastructure.configuration;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.security.KeycloakJwtConverter;
 import jakarta.servlet.DispatcherType;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer;
@@ -34,7 +36,27 @@ public class SecurityConfig {
     private static final String[] DOCS_PATHS = {"/v3/api-docs/**", "/v3/api-docs", "/swagger-ui/**",
             "/swagger-ui.html"};
 
+    // O actuator mora numa porta própria, e essa porta **não** escapa da segurança: o filtro desta
+    // aplicação atravessa o contexto filho do servidor de gerenciamento, e sem esta cadeia a regra
+    // geral lá embaixo pedia role de administrador às sondas. O kubelet não carrega token, então o
+    // pod nascia eternamente "não pronto" com a aplicação perfeitamente de pé — conferido: as
+    // sondas respondiam 401 antes desta cadeia existir, e há teste fixando isso.
+    //
+    // Liberar aqui não abre nada para fora porque quem decide é a topologia: a porta de
+    // gerenciamento não é publicada pelo compose nem roteada pelo gateway, e o que se expõe nela
+    // está limitado a health, info e prometheus pelo application.yml.
     @Bean
+    @Order(1)
+    SecurityFilterChain actuatorFilterChain(final HttpSecurity http) throws Exception {
+        return http.securityMatcher(EndpointRequest.toAnyEndpoint())
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(rules -> rules.anyRequest().permitAll())
+                .build();
+    }
+
+    @Bean
+    @Order(2)
     SecurityFilterChain apiFilterChain(final HttpSecurity http) throws Exception {
         return http.csrf(AbstractHttpConfigurer::disable)
                 // Usa o CorsConfigurationSource que o CorsConfig publica. A verificação prévia do

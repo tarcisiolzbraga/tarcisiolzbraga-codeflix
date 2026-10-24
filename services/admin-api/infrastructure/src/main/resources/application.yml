@@ -110,6 +110,55 @@ amqp:
 keycloak:
   issuer-uri: ${KEYCLOAK_ISSUER_URI}
 
+# Saúde e métricas, **numa porta à parte da aplicação**, e essa é a decisão que importa aqui.
+#
+# Quem publica a porta 8080 é o gateway; a 8090 não sai do cluster. Então /actuator não tem por onde
+# ser alcançado de fora, e a proteção é a topologia — não uma regra de caminho, que alguém escreve
+# errado um dia e ninguém percebe até o /actuator/env estar na internet. Quem fala com esta porta é
+# o orquestrador, nas sondas, e o coletor de métricas; os dois de dentro.
+#
+# Uma porta por serviço (9090 aqui, 9091 no catálogo, 9092 na assinatura) porque no desenvolvimento
+# os três rodam no mesmo host pelo bootRun, e porta repetida só apareceria como falha na subida do
+# segundo.
+#
+# A faixa 9090 e não uma vizinha das portas da aplicação: 8081 e 8083 são do Keycloak e do Kafka
+# Connect, e a **8090 é do gateway do Istio** — o deploy/cluster/create-cluster.sh a publica no
+# host, e com o cluster de pé um bootRun aqui morreria com "address already in use".
+management:
+  server:
+    port: ${ADMIN_MANAGEMENT_PORT:9090}
+  endpoints:
+    web:
+      exposure:
+        # O que se expõe é escolha, e não o padrão do Boot: saúde para as sondas e prometheus para o
+        # coletor. /actuator/env e /actuator/configprops ficam de fora mesmo numa porta interna —
+        # eles imprimem as variáveis de ambiente, e é lá que estão as senhas.
+        include: health,info,prometheus
+  endpoint:
+    health:
+      # Liga os grupos `liveness` e `readiness`, que são os que as sondas consultam. Sem isto os
+      # dois caminhos respondem 404 e a sonda passa a medir "o Tomcat respondeu", não "a aplicação
+      # está pronta".
+      probes:
+        enabled: true
+      # Numa porta que não sai do cluster, o detalhe é o que torna a resposta útil para quem está
+      # investigando: qual indicador caiu, e não só que algo caiu.
+      show-details: always
+  health:
+    # O banco e o broker entram no /actuator/health, e **não** no grupo readiness — que é o padrão
+    # do Spring, e aqui é escolha consciente. Banco fora do ar tiraria todas as réplicas de rotação
+    # ao mesmo tempo, trocando uma degradação por uma queda total, e a fila de quem espera conexão
+    # já falha rápido pelo connection-timeout do Hikari. Na liveness o argumento é mais forte
+    # ainda: reiniciar a aplicação não traz o banco de volta, só adiciona uma subida a frio.
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    tags:
+      # Separa as séries por aplicação no coletor, como o nome do serviço separa as linhas no Kibana.
+      application: admin-codeflix
+
 # Identifica a aplicação no log estruturado, que é como o Kibana a separa das outras.
 logging:
   structured:
