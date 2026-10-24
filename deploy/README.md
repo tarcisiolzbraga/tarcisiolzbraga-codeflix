@@ -91,10 +91,57 @@ Cada uma destas custou tempo e está comentada onde importa:
 | `infra/messaging.yaml` | a JVM do Kafka Connect precisa de **heap declarado**; o padrão ignora o limite do container e o pod é morto por OOM sem erro de aplicação |
 | `infra/storage.yaml` | a imagem do Garage **não tem ENTRYPOINT**, e o compose o declara ao lado do `command`. Traduzir só metade dá exit 128 sem uma linha de log |
 | `apps/java.yaml` | perfil **`homolog`**, não `development`: só ele lê `KEYCLOAK_ISSUER_URI` inteiro. O `development` monta `http://host:porta/...`, e `:80` no `iss` não bate com o que o Keycloak assina |
+| `apps/java.yaml` | a `startupProbe` consulta o grupo **`readiness`**, não um grupo `startup`: o Spring só cria `liveness` e `readiness`. Medido — `/actuator/health/startup` responde 404, e uma sonda apontada para lá põe o pod em CrashLoopBackOff com a aplicação de pé |
 | `apps/java.yaml` | o catálogo pede token para chamar o admin: sem `KEYCLOAK_TOKEN_URI`, **todos** os eventos de CDC vão para a fila morta — com o conector e o Kafka saudáveis, e o catálogo respondendo vazio |
 | `cluster/dns-nodes.sh` | o resolvedor **dos nós**. Sem ele nem a imagem de sandbox chega, e todo pod fica em `Init:0/2` com um evento que fala de imagem, não de DNS |
 | `cluster/import-images.sh` | o kubelet **coleta imagem "não usada"** acima de 85% de disco, e imagem carregada à mão não tem de onde voltar. Por isso elas são fixadas (`io.cri-containerd.pinned=true`) e conferidas uma a uma |
 | `infra/register-cdc.sh` | o Kafka nasce vazio: sem registrar o conector, o catálogo fica vazio **para sempre**, com tudo saudável |
+
+## As sondas, e as três gambiarras que elas substituíram
+
+Até a `admin-api` ganhar actuator, cada serviço media prontidão de um jeito diferente — e cada jeito
+era errado de um jeito próprio:
+
+| Serviço | O que a sonda usava | Por que não servia |
+|---|---|---|
+| `admin-api` | `GET /v3/api-docs` | o springdoc está **desligado no perfil `production`**, então a sonda que funciona em homologação some em produção |
+| `videos-api` | `tcpSocket` na 8082 | prova que o Tomcat abriu a porta, não que a aplicação atende |
+| `subscription-api` | `GET /plans/on-sale` | rota de **negócio** como sonda: consulta banco a cada 10s e amarra a saúde do pod ao catálogo de planos |
+
+Hoje as três consultam o actuator, na porta de gerenciamento (9090, 9091 e 9092). Essa porta entra
+no pod para o kubelet e o Prometheus a alcançarem, e **não** entra no Service nem no gateway: a
+proteção dela é a topologia.
+
+### Três sondas, com papéis diferentes
+
+- **`startupProbe`** tolera a subida lenta — 30 tentativas de 10s. Enquanto ela não passa, as outras
+  duas nem correm.
+- **`readinessProbe`** tira de rotação sem matar, apertada (3 falhas), porque a subida já foi coberta
+  pela de cima. É ela que o Spring põe em `OUT_OF_SERVICE` quando a parada começa.
+- **`livenessProbe`** mata e reinicia, e consulta o grupo `liveness`, que de propósito **não** inclui
+  banco nem broker: reiniciar não traz nenhum dos dois de volta.
+
+Isso substitui o `initialDelaySeconds: 30` com `failureThreshold: 30` que a prontidão carregava.
+Aquele arranjo dava 30 tentativas **para sempre**, e não só na subida: uma aplicação travada levava
+5 minutos para sair de rotação.
+
+### As métricas da aplicação chegam ao Grafana
+
+Os pods declaram `prometheus.io/scrape`, `prometheus.io/port` e `prometheus.io/path`, e o sidecar
+**junta** as métricas da aplicação com as dele num endereço só. Sem isso, o painel teria latência e
+código de resposta vindos do Envoy e nada de dentro da JVM — nem heap, nem pool do Hikari.
+
+### A parada
+
+`terminationGracePeriodSeconds: 60`, igual à janela do compose e pelo mesmo motivo: a aplicação
+espera até 30s pela requisição em voo, e o padrão do Kubernetes é 30 — sem margem, quem decide é o
+relógio do kubelet, não o `timeout-per-shutdown-phase`, que ao menos registra o que abandonou.
+
+### Os dois serviços em Go seguem sem sonda
+
+Não é esquecimento: eles não expõem HTTP, consomem fila. Não há porta onde pôr sonda, e o que o
+cluster sabe deles é o processo estar de pé. Medi-los pede outro instrumento — profundidade de fila,
+idade da mensagem mais velha —, e isso não está feito.
 
 ## O que ainda depende de rede
 
@@ -130,10 +177,14 @@ Nada é instalado por `sudo`; tudo em `~/.local/bin`:
   serviços não propagam `traceparent`/`b3` — sem isso cada salto vira um rastro solto em vez de uma
   árvore. É também o instrumento que pode explicar a intermitência do fluxo de mídia que o README da
   admin-api registra sem causa.
-- **Nenhum HPA.** O terreno está pronto (metrics-server responde, todos os Deployments têm
-  `requests.cpu`), mas três dos sete aplicativos têm impedimento antes: o relay da outbox da
-  admin-api **pressupõe uma instância**, os tópicos de CDC têm uma partição só (réplica extra do
-  catálogo fica ociosa no consumo), e o encoder pede escala **por profundidade de fila**, não por CPU.
+- **Nenhum HPA.** O terreno ficou mais pronto — metrics-server responde, todos os Deployments têm
+  `requests.cpu`, e agora as três aplicações Java têm prontidão de verdade, que é o que faz réplica
+  nova entrar em rotação na hora certa. Mas três dos sete aplicativos seguem com impedimento antes
+  disso: o relay da outbox da admin-api **pressupõe uma instância** (sem `SKIP LOCKED`, duas
+  entregariam em dobro), os tópicos de CDC têm uma partição só (réplica extra do catálogo fica
+  ociosa no consumo), e o encoder pede escala **por profundidade de fila**, não por CPU.
+- **O limitador de requisição da `subscription-api` conta por instância.** Com réplica, o teto
+  efetivo multiplica. Contador compartilhado pediria Redis; está dito no README da raiz.
 - **Carregamento de imagem por tarball** é o ponto frágil: três cópias de 429 MB por recriação. O
   certo é um registro local do k3d, que exige recriar o cluster — por isso está documentado e não
   feito.

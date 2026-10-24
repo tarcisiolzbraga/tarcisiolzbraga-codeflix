@@ -31,7 +31,20 @@ spec:
   template:
     metadata:
       labels: { app: admin-api, version: v1 }
+      # O Prometheus da malha descobre o que raspar por estas anotações, e o sidecar **junta** as
+      # métricas da aplicação com as dele num endereço só. Sem elas, o painel teria latência e
+      # código de resposta vindos do Envoy e nada de dentro da JVM — nem heap, nem pool do Hikari,
+      # nem profundidade de fila.
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: /actuator/prometheus
     spec:
+      # A janela entre o SIGTERM e o SIGKILL, igual à do compose e pelo mesmo motivo: a aplicação
+      # espera até 30s pela requisição em voo, e o padrão do Kubernetes é 30 — sem margem, quem
+      # decide é o relógio do kubelet e não o `timeout-per-shutdown-phase`, que ao menos registra o
+      # que abandonou.
+      terminationGracePeriodSeconds: 60
       containers:
         - name: admin-api
           image: admin-codeflix-admin-api:latest
@@ -58,13 +71,38 @@ spec:
             - { name: CORS_ALLOWED_ORIGINS, value: "http://localhost:3000,http://localhost:3001" }
           ports:
             - { name: http, containerPort: 8080 }
-          readinessProbe:
-            # `/actuator/health` responde 401 nesta API: a sonda usa o caminho do OpenAPI, que é
-            # público de propósito e já prova que o Spring subiu e está roteando.
-            httpGet: { path: /v3/api-docs, port: 8080 }
-            initialDelaySeconds: 30
+            # A porta do actuator. Entra aqui para o kubelet e o Prometheus a alcançarem; ela **não**
+            # está no Service nem no gateway, então segue sem rota de fora — a proteção dela é a
+            # topologia, como no compose.
+            - { name: http-management, containerPort: 9090 }
+          # Três sondas, e a divisão de trabalho entre elas é o ponto.
+          #
+          # A `startupProbe` é quem tolera a subida lenta: enquanto ela não passa, as outras duas nem
+          # correm. Isso substitui o `initialDelaySeconds: 30` com `failureThreshold: 30` que a
+          # prontidão carregava — aquele arranjo dava 30 tentativas **para sempre**, e não só na
+          # subida, então uma aplicação travada levava 5 minutos para sair de rotação.
+          #
+          # Ela consulta o grupo `readiness`, e não um grupo `startup`: o Spring cria só `liveness` e
+          # `readiness` com o `probes.enabled`. Conferido no container — `/actuator/health/startup`
+          # responde **404**, e uma startupProbe apontada para lá nunca passaria: o pod entraria em
+          # CrashLoopBackOff com a aplicação de pé.
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 9090 }
             periodSeconds: 10
             failureThreshold: 30
+          # Prontidão: tira de rotação sem matar. Fica apertada porque a startupProbe já cobriu a
+          # subida, e porque é ela que o Spring põe em OUT_OF_SERVICE quando a parada começa.
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 9090 }
+            periodSeconds: 10
+            failureThreshold: 3
+          # Vivacidade: mata e reinicia. Consulta o grupo `liveness`, que de propósito **não** inclui
+          # banco nem broker — reiniciar não traz nenhum dos dois de volta, só acrescenta uma subida
+          # a frio no pior momento. Ela responde a uma pergunta só: esta JVM ainda está sã?
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 9090 }
+            periodSeconds: 10
+            failureThreshold: 3
           resources:
             requests: { memory: 512Mi, cpu: 200m }
             limits: { memory: 1Gi }
@@ -92,7 +130,20 @@ spec:
   template:
     metadata:
       labels: { app: videos-api, version: v1 }
+      # O Prometheus da malha descobre o que raspar por estas anotações, e o sidecar **junta** as
+      # métricas da aplicação com as dele num endereço só. Sem elas, o painel teria latência e
+      # código de resposta vindos do Envoy e nada de dentro da JVM — nem heap, nem pool do Hikari,
+      # nem profundidade de fila.
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        prometheus.io/path: /actuator/prometheus
     spec:
+      # A janela entre o SIGTERM e o SIGKILL, igual à do compose e pelo mesmo motivo: a aplicação
+      # espera até 30s pela requisição em voo, e o padrão do Kubernetes é 30 — sem margem, quem
+      # decide é o relógio do kubelet e não o `timeout-per-shutdown-phase`, que ao menos registra o
+      # que abandonou.
+      terminationGracePeriodSeconds: 60
       containers:
         - name: videos-api
           image: admin-codeflix-videos-api:latest
@@ -123,16 +174,38 @@ spec:
             - { name: CORS_ALLOWED_ORIGINS, value: "http://localhost:3000,http://localhost:3001" }
           ports:
             - { name: http, containerPort: 8082 }
-          readinessProbe:
-            # **TCP, e não HTTP.** O catálogo não tem rota pública que sirva de sonda: o GraphQL
-            # exige POST com token, o `/api/v3/api-docs` responde 404 aqui (medido), e o GraphiQL
-            # responde 307 — passaria, mas depender de um redirecionamento é sonda que quebra
-            # quando alguém mexer no console. O Tomcat só abre a porta no fim da subida, então o
-            # socket aberto é o sinal honesto de "pronto para atender".
-            tcpSocket: { port: 8082 }
-            initialDelaySeconds: 30
+            # A porta do actuator. Entra aqui para o kubelet e o Prometheus a alcançarem; ela **não**
+            # está no Service nem no gateway, então segue sem rota de fora — a proteção dela é a
+            # topologia, como no compose.
+            - { name: http-management, containerPort: 9091 }
+          # Três sondas, e a divisão de trabalho entre elas é o ponto.
+          #
+          # A `startupProbe` é quem tolera a subida lenta: enquanto ela não passa, as outras duas nem
+          # correm. Isso substitui o `initialDelaySeconds: 30` com `failureThreshold: 30` que a
+          # prontidão carregava — aquele arranjo dava 30 tentativas **para sempre**, e não só na
+          # subida, então uma aplicação travada levava 5 minutos para sair de rotação.
+          #
+          # Ela consulta o grupo `readiness`, e não um grupo `startup`: o Spring cria só `liveness` e
+          # `readiness` com o `probes.enabled`. Conferido no container — `/actuator/health/startup`
+          # responde **404**, e uma startupProbe apontada para lá nunca passaria: o pod entraria em
+          # CrashLoopBackOff com a aplicação de pé.
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 9091 }
             periodSeconds: 10
             failureThreshold: 30
+          # Prontidão: tira de rotação sem matar. Fica apertada porque a startupProbe já cobriu a
+          # subida, e porque é ela que o Spring põe em OUT_OF_SERVICE quando a parada começa.
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 9091 }
+            periodSeconds: 10
+            failureThreshold: 3
+          # Vivacidade: mata e reinicia. Consulta o grupo `liveness`, que de propósito **não** inclui
+          # banco nem broker — reiniciar não traz nenhum dos dois de volta, só acrescenta uma subida
+          # a frio no pior momento. Ela responde a uma pergunta só: esta JVM ainda está sã?
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 9091 }
+            periodSeconds: 10
+            failureThreshold: 3
           resources:
             requests: { memory: 512Mi, cpu: 200m }
             limits: { memory: 1Gi }
@@ -160,7 +233,20 @@ spec:
   template:
     metadata:
       labels: { app: subscription-api, version: v1 }
+      # O Prometheus da malha descobre o que raspar por estas anotações, e o sidecar **junta** as
+      # métricas da aplicação com as dele num endereço só. Sem elas, o painel teria latência e
+      # código de resposta vindos do Envoy e nada de dentro da JVM — nem heap, nem pool do Hikari,
+      # nem profundidade de fila.
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9092"
+        prometheus.io/path: /actuator/prometheus
     spec:
+      # A janela entre o SIGTERM e o SIGKILL, igual à do compose e pelo mesmo motivo: a aplicação
+      # espera até 30s pela requisição em voo, e o padrão do Kubernetes é 30 — sem margem, quem
+      # decide é o relógio do kubelet e não o `timeout-per-shutdown-phase`, que ao menos registra o
+      # que abandonou.
+      terminationGracePeriodSeconds: 60
       containers:
         - name: subscription-api
           image: admin-codeflix-subscription-api:latest
@@ -184,11 +270,38 @@ spec:
             - { name: CORS_ALLOWED_ORIGINS, value: "http://localhost:3000,http://localhost:3001" }
           ports:
             - { name: http, containerPort: 8084 }
-          readinessProbe:
-            httpGet: { path: /plans/on-sale, port: 8084 }
-            initialDelaySeconds: 30
+            # A porta do actuator. Entra aqui para o kubelet e o Prometheus a alcançarem; ela **não**
+            # está no Service nem no gateway, então segue sem rota de fora — a proteção dela é a
+            # topologia, como no compose.
+            - { name: http-management, containerPort: 9092 }
+          # Três sondas, e a divisão de trabalho entre elas é o ponto.
+          #
+          # A `startupProbe` é quem tolera a subida lenta: enquanto ela não passa, as outras duas nem
+          # correm. Isso substitui o `initialDelaySeconds: 30` com `failureThreshold: 30` que a
+          # prontidão carregava — aquele arranjo dava 30 tentativas **para sempre**, e não só na
+          # subida, então uma aplicação travada levava 5 minutos para sair de rotação.
+          #
+          # Ela consulta o grupo `readiness`, e não um grupo `startup`: o Spring cria só `liveness` e
+          # `readiness` com o `probes.enabled`. Conferido no container — `/actuator/health/startup`
+          # responde **404**, e uma startupProbe apontada para lá nunca passaria: o pod entraria em
+          # CrashLoopBackOff com a aplicação de pé.
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 9092 }
             periodSeconds: 10
             failureThreshold: 30
+          # Prontidão: tira de rotação sem matar. Fica apertada porque a startupProbe já cobriu a
+          # subida, e porque é ela que o Spring põe em OUT_OF_SERVICE quando a parada começa.
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 9092 }
+            periodSeconds: 10
+            failureThreshold: 3
+          # Vivacidade: mata e reinicia. Consulta o grupo `liveness`, que de propósito **não** inclui
+          # banco nem broker — reiniciar não traz nenhum dos dois de volta, só acrescenta uma subida
+          # a frio no pior momento. Ela responde a uma pergunta só: esta JVM ainda está sã?
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 9092 }
+            periodSeconds: 10
+            failureThreshold: 3
           resources:
             requests: { memory: 512Mi, cpu: 200m }
             limits: { memory: 1Gi }
