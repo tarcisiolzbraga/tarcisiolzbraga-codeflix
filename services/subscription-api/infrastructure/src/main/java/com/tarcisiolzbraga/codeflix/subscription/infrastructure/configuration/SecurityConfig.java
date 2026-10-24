@@ -57,7 +57,16 @@ public class SecurityConfig {
     // pedir token, e quem clica no link de validação também não — é justamente a confirmação que
     // marca o e-mail como conferido. Listadas uma a uma em vez de /accounts/sign-up/**: com o
     // curinga, qualquer rota futura embaixo desse caminho nasceria aberta sem ninguém decidir.
-    private static final String[] SIGN_UP_PATHS = {"/accounts/sign-up", "/accounts/sign-up/confirm"};
+    //
+    // Pública porque o limitador de requisição lê **esta** lista, e não uma cópia dela: é o mesmo
+    // princípio do "duas listas, não uma" do README — rota nova aberta aqui nasce limitada lá
+    // sozinha, em vez de nascer aberta e sem teto porque alguém esqueceu o segundo lugar.
+    // Separadas por nome porque o limitador cobra preços diferentes pelas duas: pedir o cadastro
+    // cria usuário no provedor e manda e-mail, confirmar só confere um token.
+    public static final String SIGN_UP_PATH = "/accounts/sign-up";
+    public static final String SIGN_UP_CONFIRM_PATH = "/accounts/sign-up/confirm";
+
+    public static final String[] SIGN_UP_PATHS = {SIGN_UP_PATH, SIGN_UP_CONFIRM_PATH};
 
     // O catálogo de planos à venda, aberto: preço é informação pública, e é o que uma tela de
     // escolha mostra antes de alguém se cadastrar.

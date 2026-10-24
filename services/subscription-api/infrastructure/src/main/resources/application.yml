@@ -172,6 +172,35 @@ management:
     tags:
       application: subscription-codeflix
 
+# O teto de requisição por origem, em três degraus — um por preço. Ligado em **todos** os perfis,
+# inclusive o development, pela mesma razão da segurança: desligado no perfil em que se desenvolve, o
+# limite nunca é exercitado onde se trabalha, e a primeira vez que roda de verdade é em outro
+# ambiente.
+#
+# `sign-up` é o mais apertado: cada chamada cria usuário no Keycloak e põe e-mail na fila. `confirm`
+# é mais folgado porque só confere um token. `general` põe teto em tudo o mais sem estorvar quem está
+# atrás de um NAT compartilhado, onde muita gente divide uma origem.
+#
+# **10 e 20 saíram de uma conta.** A coleção do Postman é a regressão manual desta API e tem de rodar
+# inteira e repetidas vezes: são 4 chamadas a `sign-up` e 2 a `confirm`. Com teto de 5 ela tomava 429
+# na própria suíte de regressão. Estes números a deixam rodar duas vezes seguidas e ainda limitam
+# abuso a 60 cadastros por hora e por origem.
+#
+# O contador é **por instância**: com duas réplicas o teto efetivo dobra. Contador compartilhado
+# pediria Redis, que este projeto não tem, e para o que este limite protege dobrar 5 em 10 minutos
+# ainda é um teto. Está declarado aqui e no filtro em vez de escondido.
+rate-limit:
+  enabled: ${RATE_LIMIT_ENABLED:true}
+  sign-up:
+    capacity: ${RATE_LIMIT_SIGN_UP_CAPACITY:10}
+    period: ${RATE_LIMIT_SIGN_UP_PERIOD:10m}
+  confirm:
+    capacity: ${RATE_LIMIT_CONFIRM_CAPACITY:20}
+    period: ${RATE_LIMIT_CONFIRM_PERIOD:10m}
+  general:
+    capacity: ${RATE_LIMIT_GENERAL_CAPACITY:120}
+    period: ${RATE_LIMIT_GENERAL_PERIOD:1m}
+
 # Identifica a aplicação no log estruturado, que é como o Kibana a separa das outras.
 logging:
   structured:
