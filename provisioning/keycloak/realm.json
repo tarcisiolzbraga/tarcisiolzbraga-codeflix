@@ -1,6 +1,13 @@
 {
   "realm": "codeflix",
   "displayName": "Codeflix",
+
+  "loginTheme": "codeflix",
+  "displayNameHtml": "Codeflix",
+  "internationalizationEnabled": true,
+  "supportedLocales": ["pt-BR"],
+  "defaultLocale": "pt-BR",
+
   "enabled": true,
   "sslRequired": "none",
 
