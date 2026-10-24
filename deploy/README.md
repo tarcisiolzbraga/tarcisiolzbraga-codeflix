@@ -207,12 +207,13 @@ Nada é instalado por `sudo`; tudo em `~/.local/bin`:
   serviços não propagam `traceparent`/`b3` — sem isso cada salto vira um rastro solto em vez de uma
   árvore. É também o instrumento que pode explicar a intermitência do fluxo de mídia que o README da
   admin-api registra sem causa.
-- **Nenhum HPA.** O terreno ficou mais pronto — metrics-server responde, todos os Deployments têm
-  `requests.cpu`, e agora as três aplicações Java têm prontidão de verdade, que é o que faz réplica
-  nova entrar em rotação na hora certa. Mas três dos sete aplicativos seguem com impedimento antes
-  disso: o relay da outbox da admin-api **pressupõe uma instância** (sem `SKIP LOCKED`, duas
-  entregariam em dobro), os tópicos de CDC têm uma partição só (réplica extra do catálogo fica
-  ociosa no consumo), e o encoder pede escala **por profundidade de fila**, não por CPU.
+- **Nenhum HPA**, mas o caminho encurtou. O terreno estava pronto (metrics-server responde, todos os
+  Deployments têm `requests.cpu`) e as três aplicações Java ganharam prontidão de verdade, que é o
+  que faz réplica nova entrar em rotação na hora certa. O impedimento da `admin-api` **saiu**: o
+  relay da outbox trava a linha com `SKIP LOCKED` e roda em mais de uma instância.
+  Sobram dois: os tópicos de CDC têm uma partição só (réplica extra do catálogo fica ociosa no
+  consumo), e o encoder pede escala **por profundidade de fila**, não por CPU. Ou seja, a `admin-api`
+  e a `subscription-api` já podem escalar; o catálogo e o encoder não.
 - **O limitador de requisição da `subscription-api` conta por instância.** Com réplica, o teto
   efetivo multiplica. Contador compartilhado pediria Redis; está dito no README da raiz.
 - **Carregamento de imagem por tarball** é o ponto frágil: três cópias de 429 MB por recriação. O
