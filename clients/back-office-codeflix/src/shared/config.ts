@@ -33,6 +33,10 @@ export const KEYCLOAK_CLIENT_ID = required(
   import.meta.env.VITE_KEYCLOAK_CLIENT_ID,
 );
 
+// O portal, para onde quem não administra é levado. O back-office não serve o catálogo, e manter
+// alguém numa tela de "sem permissão" é deixá-lo parado num lugar que ele não pediu para abrir.
+export const PORTAL_URL = apiUrl("VITE_PORTAL_URL", import.meta.env.VITE_PORTAL_URL);
+
 // O papel que o back-office exige. A admin-api aceita papéis por agregado também
 // (CODEFLIX_CATEGORIES e companhia), mas o back-office administra os quatro, então quem entra aqui
 // precisa do papel que abre todos.

@@ -24,6 +24,7 @@ services:
         MEDIA_MAX_FILE_SIZE: ${MEDIA_MAX_FILE_SIZE:-100MB}
         PUBLIC_ADMIN_API_URL: ${PUBLIC_ADMIN_API_URL:-}
         PUBLIC_KEYCLOAK_ISSUER: ${PUBLIC_KEYCLOAK_ISSUER:-}
+        PUBLIC_PORTAL_URL: ${PUBLIC_PORTAL_URL:-}
     container_name: codeflix_back_office
     ports:
       # 3001 dentro e fora: a 3000 é do portal, e a 3001 é a que o `redirectUris` do realm libera.
