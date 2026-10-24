@@ -17,6 +17,17 @@ tasks.named('jar') {
 }
 
 dependencies {
+    // O lz4-java vem do kafka-clients e **não é gerenciado pelo BOM do Boot**, então subir o Boot não
+    // o move: o 4.1.2 trouxe o 1.11.2, que carrega o CVE-2026-106451 (corrigido no 1.11.4).
+    //
+    // Constraint, e não dependência declarada: ninguém aqui usa lz4 diretamente — ele é detalhe de
+    // compressão do cliente Kafka. Declará-lo como dependência diria uma coisa falsa sobre o código;
+    // a constraint diz exatamente o que é, um piso de versão para o que vem transitivo.
+    constraints {
+        implementation('at.yawk.lz4:lz4-java:1.12.1') {
+            because 'CVE-2026-106451 no 1.11.2, que o kafka-clients traz'
+        }
+    }
     implementation project(':domain')
     implementation project(':application')
 
