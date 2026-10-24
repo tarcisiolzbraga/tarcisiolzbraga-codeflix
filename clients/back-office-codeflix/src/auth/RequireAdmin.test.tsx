@@ -14,8 +14,15 @@ vi.mock("react-oidc-context", () => ({
 
 const { RequireAdmin } = await import("@/auth/RequireAdmin");
 
+// O token de acesso como o Keycloak o emite — é de lá que os papéis são lidos, e não do `profile`.
 function usuarioCom(roles: string[]): User {
-  return { profile: { realm_access: { roles } } } as unknown as User;
+  const base64url = (texto: string) =>
+    btoa(String.fromCharCode(...new TextEncoder().encode(texto)))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+  const carga = base64url(JSON.stringify({ realm_access: { roles } }));
+  return { access_token: `${base64url('{"alg":"RS256"}')}.${carga}.assinatura` } as unknown as User;
 }
 
 const DENTRO = "painel do catálogo";
