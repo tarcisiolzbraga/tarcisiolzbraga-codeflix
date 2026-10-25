@@ -14,6 +14,8 @@ Os serviços de back-end do Codeflix, num repositório só. Cada serviço tem o 
 | [`clients/back-office-codeflix/`](clients/back-office-codeflix/) | não é serviço: o front de quem administra o catálogo. | 3001 |
 | [`build-logic/`](build-logic/) | não é serviço: a configuração de build que os serviços Java dividem. | — |
 | [`provisioning/`](provisioning/) | não é serviço: os containers de apoio, um compose por parte. | — |
+| [`deploy/`](deploy/) | não é serviço: o cluster em Kubernetes com Istio, do zero em um comando. | — |
+| [`perf/`](perf/) | não é serviço: o teste de carga do catálogo, e o que ele mediu. | — |
 
 A leitura de cada um está no README da própria pasta. Comece pelo
 [`services/admin-api/README.md`](services/admin-api/README.md) se quer entender de onde o dado vem, ou pelo
@@ -367,6 +369,28 @@ nada — a mensagem volta para a fila e outro operário a pega.
 `encoder-api` e `mail-api` não expõem HTTP — consomem fila. Não há porta onde pôr uma sonda, e o
 que o compose sabe deles é o processo estar de pé. Medi-los pede outro instrumento (profundidade de
 fila, idade da mensagem mais velha), e isso não está feito.
+
+## Quanto ele aguenta
+
+Até medir, ninguém sabia. A leitura paginada do catálogo, com as relações resolvidas, satura assim:
+
+| VUs | req/s | mediana | p99 | erro |
+|---:|---:|---:|---:|---:|
+| 10 | 701 | 12,1ms | 20,9ms | 0% |
+| 20 | **769** | 23,2ms | 37,0ms | 0% |
+| 40 | 723 | 52,0ms | 75,4ms | 0% |
+| 80 | 578 | 129,8ms | 242,9ms | 0% |
+
+**O joelho está entre 10 e 20 VUs**, e passado o pico de ~770 req/s a vazão **cai** enquanto a
+latência cresce. Zero erro em todos os níveis: o serviço degrada, não quebra.
+
+E o custo tem nome: **resolver `categories`, `genres` e `castMembers` custa 2,4× da vazão** — a mesma
+consulta sem elas chega a 1.870 req/s. Não é N+1 (o `@BatchMapping` já existe): são três idas extras
+ao Elasticsearch por página, e o caminho é cache curto ou desnormalizar o nome no documento.
+
+Os números vêm de uma máquina onde o gerador de carga divide CPU com o cluster que ele mede, então
+não são capacidade de produção — o que vale é a comparação. O método, as ressalvas e o que **não** foi
+medido estão em [`perf/README.md`](perf/).
 
 ## Backup, e o que deliberadamente não se copia
 
