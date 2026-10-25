@@ -45,3 +45,6 @@ out/
 
 ### Go (encoder-api) ###
 coverage.out
+
+# Os backups locais do provisioning/backup/backup.sh: dado, não código.
+backups/

@@ -368,6 +368,23 @@ nada — a mensagem volta para a fila e outro operário a pega.
 que o compose sabe deles é o processo estar de pé. Medi-los pede outro instrumento (profundidade de
 fila, idade da mensagem mais velha), e isso não está feito.
 
+## Backup, e o que deliberadamente não se copia
+
+```bash
+bash provisioning/backup/backup.sh                 # copia para backups/<data>/
+bash provisioning/backup/restore.sh backups/<data> # devolve (pede confirmação)
+```
+
+Dos **onze** volumes do compose, só **quatro** guardam coisa que não volta de lugar nenhum: o MySQL
+do catálogo, o da assinatura, o Postgres do Keycloak e os objetos do Garage. Os outros sete ficam de
+fora de propósito — o índice do catálogo é réplica que o Debezium refaz, o Kafka é transporte, o
+Postgres do encoder é histórico de tentativas, e o Elasticsearch de log tem retenção própria.
+Copiá-los daria sensação de proteção e aumentaria o que há para restaurar errado.
+
+A classificação volume por volume, o motivo de cada exclusão e os dois limites do que existe hoje
+(destino local, sem agendamento) estão em
+[`provisioning/backup/README.md`](provisioning/backup/).
+
 ## Dependências e vulnerabilidades
 
 Duas coisas diferentes, com ferramentas diferentes, porque respondem perguntas diferentes:
