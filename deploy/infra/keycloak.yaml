@@ -42,6 +42,26 @@ spec:
         # O Kiali agrupa e versiona por estes dois rótulos; sem eles o grafo mostra "unknown".
         version: v1
     spec:
+      # **Espera o banco aceitar conexão.** O compose tem `depends_on: service_healthy` para isso; o
+      # Kubernetes não tem equivalente, e sem esta espera o Keycloak subia antes do Postgres, morria
+      # com `SQLState: 08001` ("the connection attempt failed") e era reiniciado — medido: um
+      # restart em toda subida a frio do cluster. Funcionava por acidente do kubelet, e o preço era
+      # meio minuto de Keycloak fora do ar logo quando os sete aplicativos o procuram.
+      #
+      # A imagem é a mesma do banco, pelo `pg_isready` que ela já traz: nada novo para baixar.
+      initContainers:
+        - name: espera-o-banco
+          image: postgres:18-alpine
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              until pg_isready -h keycloak-postgres -U keycloak -d keycloak; do
+                echo "o banco ainda não aceita conexão; esperando"
+                sleep 2
+              done
+          resources:
+            requests: { memory: 32Mi, cpu: 10m }
+            limits: { memory: 128Mi }
       containers:
         - name: keycloak
           image: quay.io/keycloak/keycloak:26.8.0
@@ -55,7 +75,12 @@ spec:
               comSegredo="${template//__KEYCLOAK_CLIENT_SECRET__/$KEYCLOAK_CLIENT_SECRET}"
               printf '%s' "${comSegredo//__OPERATOR_TEST_PASSWORD__/$OPERATOR_TEST_PASSWORD}" \
                 > /opt/keycloak/data/import/realm.json
-              exec /opt/keycloak/bin/kc.sh start-dev --import-realm --http-port=8081
+              # `start`, e não `start-dev`: o de desenvolvimento guarda tudo num H2 dentro do
+              # container, e aqui isso era perda de dado a cada reinício de pod — pior que no
+              # compose, porque pod reinicia muito mais que container. Sem `--optimized`, porque o
+              # vendor de banco é opção de tempo de build e esta imagem não foi aumentada para
+              # postgres; o próprio `start` reaumenta na subida.
+              exec /opt/keycloak/bin/kc.sh start --import-realm --http-port=8081
           envFrom:
             - secretRef:
                 name: codeflix-env
@@ -78,6 +103,19 @@ spec:
               value: xforwarded
             - name: KC_HTTP_ENABLED
               value: "true"
+            # O banco. Mesma razão do compose: o H2 do `start-dev` vivia na camada do container, e
+            # reinício de pod levava consigo todo assinante criado em execução — enquanto a linha
+            # dele em `account`, que está em PVC, sobrevivia. O banco e o provedor de identidade se
+            # separavam, e a pessoa não conseguia mais entrar.
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: jdbc:postgresql://keycloak-postgres:5432/keycloak
+            - name: KC_DB_USERNAME
+              value: keycloak
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: codeflix-env, key: KEYCLOAK_DB_PASSWORD }
           ports:
             - name: http
               containerPort: 8081
@@ -111,6 +149,79 @@ spec:
                 path: login/theme.properties
               - key: codeflix.css
                 path: login/resources/css/codeflix.css
+---
+# O banco do Keycloak, aqui e não no databases.yaml pela mesma razão que no compose ele mora na
+# pasta do Keycloak: é estado dele, não um banco compartilhado.
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-postgres
+  namespace: codeflix
+  labels: { app: keycloak-postgres }
+spec:
+  selector: { app: keycloak-postgres }
+  ports:
+    # `tcp-postgres`: toda porta não-HTTP se chama tcp-* nesta malha. Sem o nome certo o sidecar
+    # fareja protocolo, e o Postgres — que fala primeiro do lado do servidor — morre no tempo limite.
+    - { name: tcp-postgres, port: 5432, targetPort: 5432 }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: keycloak-postgres-dados
+  namespace: codeflix
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak-postgres
+  namespace: codeflix
+spec:
+  replicas: 1
+  # Recreate, e não RollingUpdate: dois Postgres no mesmo volume ao mesmo tempo corrompem o banco.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: { app: keycloak-postgres }
+  template:
+    metadata:
+      labels: { app: keycloak-postgres, version: v1 }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:18-alpine
+          env:
+            - { name: POSTGRES_DB, value: keycloak }
+            - { name: POSTGRES_USER, value: keycloak }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: codeflix-env, key: KEYCLOAK_DB_PASSWORD }
+          ports:
+            - { name: tcp-postgres, containerPort: 5432 }
+          # **Sem `PGDATA` e montando `/var/lib/postgresql`**, diferente do encoder-postgres, que é
+          # 17 e usa o caminho antigo. O 18 põe o PGDATA numa subpasta por versão e espera o mount no
+          # diretório de cima; com o caminho antigo a imagem **recusa subir**, dizendo que o mount
+          # está "unused". Medido no compose antes de chegar aqui.
+          volumeMounts:
+            - name: dados
+              mountPath: /var/lib/postgresql
+          readinessProbe:
+            exec:
+              command: [pg_isready, -U, keycloak, -d, keycloak]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests: { memory: 128Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+      volumes:
+        - name: dados
+          persistentVolumeClaim:
+            claimName: keycloak-postgres-dados
 ---
 apiVersion: networking.istio.io/v1
 kind: VirtualService

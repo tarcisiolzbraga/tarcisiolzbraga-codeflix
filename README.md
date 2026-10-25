@@ -180,6 +180,61 @@ O CORS e o Keycloak decidem coisas diferentes, e as duas listas precisam estar c
 Esquecer a segunda dá erro na tela de login do Keycloak; esquecer a primeira dá uma chamada que
 chegou, respondeu, e o front não pode ler.
 
+## O Keycloak tem banco, e por que isso foi conserto e não zelo
+
+Ele rodava `kc.sh start-dev`, cujo banco é um **H2 dentro da camada do container**, sem volume
+nenhum. Medido: o arquivo ficava em `/opt/keycloak/data/h2/keycloakdb.mv.db`, e o único mount do
+container era o `realm.json`, somente-leitura.
+
+A consequência não era "faltar backup". Era **perda de dado a cada recriação**: quem se cadastrou
+pelo fluxo de sign-up desaparecia, enquanto a linha dele em `account` — que está em volume —
+sobrevivia. O banco e o provedor de identidade se separavam: a pessoa não conseguia mais entrar, e
+o nome e o documento dela continuavam guardados. No cluster era pior, porque pod reinicia muito
+mais que container, e lá era um `Deployment` sem PVC.
+
+Agora há um Postgres próprio, com volume no compose e PVC no cluster, e o Keycloak roda `start` em
+vez de `start-dev` — `Profile prod activated` no log.
+
+Conferido nos dois ambientes, criando um usuário pela API administrativa e derrubando o que o
+servia:
+
+| | o que foi derrubado | o usuário |
+|---|---|---|
+| compose | `up -d --force-recreate keycloak` | sobreviveu |
+| cluster | `kubectl delete pod -l app=keycloak` | sobreviveu |
+
+E o H2 deixou de existir: `ls /opt/keycloak/data/h2/` responde "No such file or directory".
+
+### O preço: o `realm.json` deixa de ser reimportado sozinho
+
+Esta é a troca, e ela é real. O import usa a estratégia que o próprio log declara:
+
+```
+KC-SERVICES0030: Full model import requested. Strategy: IGNORE_EXISTING
+```
+
+Antes, cada recriação começava com banco vazio, então **toda** edição do
+[`realm.json`](provisioning/keycloak/) era aplicada na subida seguinte. Agora o realm persiste, e um
+realm que já existe é ignorado no import: papel novo, client novo ou mudança de `redirectUris`
+**não aplicam** até o banco ser zerado.
+
+```bash
+docker compose down -v        # zera o volume; o realm.json volta a valer na próxima subida
+```
+
+No cluster, o equivalente é apagar o PVC `keycloak-postgres-dados`.
+
+Não há como ter as duas coisas com import por arquivo: a estratégia que sobrescreve apaga e recria
+o realm, e isso levaria os usuários junto. O caminho que resolve de verdade é o realm aplicado pela
+API administrativa (um `keycloak-config-cli` ou equivalente) em vez de importado de arquivo — e isso
+está em aberto.
+
+### Os testes continuam em `start-dev`, de propósito
+
+O `KeycloakContainerConfiguration` dos três serviços Java sobe o próprio container com
+`start-dev --import-realm`, lendo o mesmo `realm.json`. Ali o efêmero é o que se quer: cada execução
+começa limpa, e o import tem de valer sempre.
+
 ## O teto de requisição
 
 A `subscription-api` limita requisição por origem, em três degraus — um por preço do que a rota
