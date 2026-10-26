@@ -35,17 +35,17 @@ jobs:
       run:
         working-directory: services/${{ matrix.service }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Confere que o jar do wrapper é um artefato oficial do Gradle, e não algo trocado no caminho.
-      - uses: gradle/actions/wrapper-validation@v4
+      - uses: gradle/actions/wrapper-validation@v6
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: 'temurin'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       # unitTests é definida por exclusão de tags, então dispensa Docker e responde em segundos.
       - name: Testes unitários
@@ -63,14 +63,14 @@ jobs:
       run:
         working-directory: services/${{ matrix.service }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: 'temurin'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       # O build roda os três módulos do serviço, incluindo integração e E2E, que sobem a
       # infraestrutura em Testcontainers. O runner tem Docker; o custo é o download das imagens.
@@ -80,7 +80,7 @@ jobs:
 
       - name: Guarda o relatório dos testes
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: relatorios-de-teste-${{ matrix.service }}
           path: 'services/${{ matrix.service }}/*/build/reports/tests/**'
@@ -92,7 +92,7 @@ jobs:
       # diz o número e não diz a classe.
       - name: Guarda o relatório de cobertura
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cobertura-${{ matrix.service }}
           path: 'services/${{ matrix.service }}/build/reports/jacoco/**'
@@ -107,14 +107,14 @@ jobs:
       matrix:
         service: [admin-api, videos-api, subscription-api]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: 'temurin'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       # O Dockerfile de cada serviço empacota o jar já construído, por isso o bootJar antes.
       - name: Gera o jar
@@ -126,7 +126,7 @@ jobs:
       # `load: true` porque com buildx e `push: false` a imagem fica no cache do builder e não no
       # daemon — e sem ela no daemon não há o que varrer no passo seguinte.
       - name: Constrói a imagem
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: services/${{ matrix.service }}
           push: false
@@ -171,9 +171,9 @@ jobs:
       run:
         working-directory: services/${{ matrix.service }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: services/${{ matrix.service }}/go.mod
           cache-dependency-path: services/${{ matrix.service }}/go.sum
@@ -189,7 +189,7 @@ jobs:
       # tentasse subir o projeto do zero — derrubando a subida inteira, porque build de um serviço
       # que falha aborta o resto.
       - name: Constrói a imagem
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: services/${{ matrix.service }}
           push: false
@@ -223,9 +223,9 @@ jobs:
       run:
         working-directory: clients/${{ matrix.client }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: clients/${{ matrix.client }}/.nvmrc
           cache: npm
@@ -249,7 +249,7 @@ jobs:
       # quem os escreveu. Sem `build-args`: a imagem do CI é a de desenvolvimento, e o que está sob
       # teste é o Dockerfile, não a URL.
       - name: Constrói a imagem
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: clients/${{ matrix.client }}
           push: false
