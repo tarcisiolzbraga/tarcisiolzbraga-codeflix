@@ -7,6 +7,7 @@ import org.springframework.boot.security.autoconfigure.actuate.web.servlet.Endpo
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer;
@@ -17,6 +18,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.header.HeaderWriterFilter;
 
 // Cada agregado tem a sua role, e a de administrador abre tudo. A documentação da API fica aberta:
 // ela não expõe dado nenhum, e em produção o springdoc já está desligado.
@@ -65,9 +67,42 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(SecurityConfig::routeRules)
+                .headers(headers -> headers.withObjectPostProcessor(headersBeforeTheChain()))
                 .oauth2ResourceServer(oauth ->
                         oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(new KeycloakJwtConverter())))
                 .build();
+    }
+
+    // **Os cabeçalhos de segurança passam a ser escritos antes da cadeia, e não depois.**
+    //
+    // O padrão do `HeaderWriterFilter` é escrever **depois** que a cadeia volta. Com despacho
+    // assíncrono — e a rota de mídia é assíncrona, porque devolve `StreamingResponseBody` — "depois
+    // da cadeia" não é "depois da resposta": a cadeia volta assim que o assíncrono começa, enquanto
+    // o corpo ainda está sendo escrito. O Tomcat recicla o `Response` ao terminar, o filtro vai ler
+    // um cabeçalho que já não existe, e estoura:
+    //
+    //     NullPointerException: Cannot invoke "MimeHeaderField.getName()"
+    //       because "this.headers[i]" is null
+    //       at MimeHeaders.getValue -> Response.getHeader
+    //       -> CacheControlHeadersWriter.hasHeader -> HeaderWriterFilter.doHeadersAfter
+    //
+    // A resposta sai pela metade, a conexão fica inconsistente, e **o pedido seguinte** daquela
+    // conexão do pool lê os bytes errados — que é a `ParseException` e a `InvalidMimeTypeException`
+    // que o CI mostrava há dez dias, sem causa. Medido pelo `stressTests`: 11 falhas em 144.000
+    // pedidos na rota de mídia, contra **zero** numa rota síncrona sob a mesma carga.
+    //
+    // O preço: escrever antes significa que um handler que ponha o mesmo cabeçalho depois o
+    // sobrescreve, em vez de o `hasHeader` do writer o respeitar. Para os cabeçalhos em uso aqui —
+    // os padrões do Spring Security — nenhuma rota os define, então a troca é de ordem e não de
+    // conteúdo. Há teste fixando que eles continuam saindo.
+    private static ObjectPostProcessor<HeaderWriterFilter> headersBeforeTheChain() {
+        return new ObjectPostProcessor<>() {
+            @Override
+            public HeaderWriterFilter postProcess(final HeaderWriterFilter filter) {
+                filter.setShouldWriteHeadersEagerly(true);
+                return filter;
+            }
+        };
     }
 
     private static void routeRules(
