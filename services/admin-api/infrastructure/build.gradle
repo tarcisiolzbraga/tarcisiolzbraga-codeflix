@@ -47,6 +47,11 @@ dependencies {
     implementation 'software.amazon.awssdk:s3'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
+    // O Apache HttpClient 5 já vinha transitivo **em runtime**, e é ele que o RestClient usa nos
+    // E2E — a `ParseException` da intermitência de mídia é do parser dele. Aqui ele passa a ser
+    // declarado porque o teste de estresse monta o pool de conexões à mão: é o pool compartilhado
+    // que reproduz a corrida, e sem acesso de compilação não há como montá-lo. Versão do BOM do Boot.
+    testImplementation 'org.apache.httpcomponents.client5:httpclient5'
     testImplementation testFixtures(project(':domain'))
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'

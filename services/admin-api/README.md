@@ -229,6 +229,35 @@ Duas consequências práticas:
   o sinal não é "o CI ficou verde" — é a divergência entre os dois runs do mesmo SHA desaparecer ao
   longo de dezenas de commits.
 
+#### O instrumento: `./gradlew stressTests`
+
+Faltava reproduzir sob demanda, e é o que esta task faz. Ela concentra a condição que as duas
+medições anteriores identificaram — pool de conexões compartilhado, respostas **curtas** em
+sequência, várias threads:
+
+```
+32 threads, pool compartilhado, 19.200 pedidos
+execução 1: 3 falhas (0,02%)   {ParseException=3}
+execução 2: 2 falhas (0,01%)   {ParseException=2}
+execução 3: 1 falha  (0,01%)   {ParseException=1}
+```
+
+É a **mesma exceção** que derruba o CI. "1 commit em 4" virou "1 a 3 em 19.200 pedidos, em toda
+execução" — e com isso qualquer tentativa de conserto passa a ser avaliável, o que nunca foi o caso.
+
+Três coisas sobre ele que importam para quem o usar:
+
+- **a condição vem da lição registrada acima**: a classe isolada rodou 8 vezes verde, e só o build
+  inteiro falhava, porque lá o Tomcat e o pool são compartilhados. O teste não repete um cenário,
+  concentra a condição;
+- **o cliente é o mesmo da falha** — Apache HttpClient 5, cujo parser é quem reclama. Um gerador de
+  carga em Go toleraria ou relataria diferente, e o sintoma se perderia;
+- **o volume importa**: com 8 threads e 1.200 pedidos dá verde. A taxa é baixa o bastante para isso
+  ser informação sobre quanto o CI precisa para sortear.
+
+Ele fica **fora do `build`** de propósito: quem mede uma corrida falha quando a corrida acontece, e
+pôr isso no caminho de todo commit transformaria o build num sorteio.
+
 > **O experimento que isto habilita:** declarar o caminho **sem** `Range` como resposta síncrona. O
 > corpo dele já está inteiro em memória, então não se perde fluxo nenhum — só o despacho assíncrono
 > em respostas que não precisavam dele. Se o E2E parar de falhar, a hipótese se confirma, e a
