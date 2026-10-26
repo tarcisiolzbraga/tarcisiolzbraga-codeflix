@@ -258,7 +258,50 @@ Três coisas sobre ele que importam para quem o usar:
 Ele fica **fora do `build`** de propósito: quem mede uma corrida falha quando a corrida acontece, e
 pôr isso no caminho de todo commit transformaria o build num sorteio.
 
-> **O experimento que isto habilita:** declarar o caminho **sem** `Range` como resposta síncrona. O
+#### A causa, encontrada em 26/10/2026
+
+Não era artefato do cliente de teste. É do **servidor**, e a pilha a nomeia:
+
+```
+NullPointerException: Cannot invoke "MimeHeaderField.getName()"
+  because "this.headers[i]" is null
+  at MimeHeaders.getValue -> Response.getHeader
+  -> CacheControlHeadersWriter.hasHeader -> HeaderWriterFilter.doHeadersAfter
+```
+
+O `HeaderWriterFilter` do Spring Security escreve os cabeçalhos **depois** que a cadeia de filtros
+volta. Com despacho assíncrono, "depois da cadeia" **não é** "depois da resposta": a cadeia volta
+assim que o assíncrono começa, com o corpo ainda sendo escrito. O Tomcat recicla o `Response` ao
+terminar, e o filtro vai ler um cabeçalho que já não existe.
+
+A resposta sai pela metade, a conexão fica inconsistente, e **o pedido seguinte** daquela conexão do
+pool lê os bytes errados. Isso explica tudo o que estava anotado acima:
+
+- **por que só a rota de mídia**: é a única assíncrona, por devolver `StreamingResponseBody`;
+- **por que a assinatura mudava** — `NoHttpResponseException`, `ParseException`,
+  `InvalidMimeTypeException`: são parsers diferentes reclamando do mesmo desalinhamento, e foi essa
+  troca de sintoma que fez o diagnóstico anterior desconfiar do conserto;
+- **por que era intermitente**: é corrida entre o fim do assíncrono e a reciclagem.
+
+O conserto é `setShouldWriteHeadersEagerly(true)` no filtro — escrever antes da cadeia, onde não há
+resposta reciclada para tocar. A DSL não expõe a opção, daí o `withObjectPostProcessor` no
+`SecurityConfig`.
+
+Medido com o `stressTests`, três pares de 48.000 pedidos:
+
+| | antes | depois |
+|---|---:|---:|
+| rota de mídia | **11 falhas** | **0** |
+| rota síncrona (controle) | 0 | 0 |
+
+O controle é o que separa as conclusões possíveis: limpo nas duas vezes, sob a mesma carga e na
+mesma máquina, aponta o assíncrono e não a combinação cliente/pool/Tomcat em geral.
+
+O preço está no `SecurityHeadersIT`: escrever antes faz um handler que ponha o mesmo cabeçalho
+sobrescrevê-lo, em vez de o `hasHeader` do writer o respeitar. Nenhuma rota daqui os define, então a
+troca é de ordem e não de conteúdo — e o teste fixa que os seis continuam saindo.
+
+> **O experimento que isto torna desnecessário:** declarar o caminho **sem** `Range` como resposta síncrona. O
 > corpo dele já está inteiro em memória, então não se perde fluxo nenhum — só o despacho assíncrono
 > em respostas que não precisavam dele. Se o E2E parar de falhar, a hipótese se confirma, e a
 > exposição restante fica só no caminho do `Range`, que precisa mesmo ser em fluxo. **Um build verde
