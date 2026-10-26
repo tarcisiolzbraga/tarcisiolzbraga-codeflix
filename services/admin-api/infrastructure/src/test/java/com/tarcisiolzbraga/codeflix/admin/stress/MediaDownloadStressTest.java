@@ -84,12 +84,13 @@ class MediaDownloadStressTest implements VideoE2EDsl, CategoryE2EDsl {
         final var falhas = new ConcurrentHashMap<String, AtomicLong>();
         final var feitas = new AtomicLong();
 
-        martelar(id, falhas, feitas);
+        martelar(falhas, feitas, () -> baixarMidia(id));
 
         assertEquals(Map.of(), resumo(falhas), relatorio(falhas, feitas.get()));
     }
 
-    private void martelar(final String id, final Map<String, AtomicLong> falhas, final AtomicLong feitas)
+    private void martelar(
+            final Map<String, AtomicLong> falhas, final AtomicLong feitas, final Runnable pedido)
             throws InterruptedException {
         final var largada = new CountDownLatch(1);
         try (var piscina = Executors.newFixedThreadPool(THREADS)) {
@@ -97,7 +98,7 @@ class MediaDownloadStressTest implements VideoE2EDsl, CategoryE2EDsl {
                 piscina.submit(() -> {
                     esperar(largada);
                     for (var i = 0; i < POR_THREAD; i++) {
-                        baixarUmaVez(id, falhas, feitas);
+                        umaVez(pedido, falhas, feitas);
                     }
                 });
             }
@@ -111,19 +112,25 @@ class MediaDownloadStressTest implements VideoE2EDsl, CategoryE2EDsl {
 
     // Conta a exceção pela classe, e não pela mensagem: a mensagem traz offsets e bytes que mudam a
     // cada falha, e agrupá-las por ela daria uma linha por ocorrência em vez de um padrão.
-    private void baixarUmaVez(final String id, final Map<String, AtomicLong> falhas, final AtomicLong feitas) {
+    private void umaVez(final Runnable pedido, final Map<String, AtomicLong> falhas, final AtomicLong feitas) {
         try {
-            final var corpo = this.comPool.get()
-                    .uri("/videos/{id}/medias/{type}", id, "BANNER")
-                    .retrieve()
-                    .body(byte[].class);
-            if (corpo == null || corpo.length != CONTEUDO.getBytes().length) {
-                contar(falhas, "corpo com tamanho inesperado");
-            }
+            pedido.run();
         } catch (final RuntimeException falha) {
             contar(falhas, nomeDaCausaRaiz(falha));
         } finally {
             feitas.incrementAndGet();
+        }
+    }
+
+    // O tamanho é conferido junto: resposta truncada que não estoura exceção também é corrupção, e
+    // sem esta conta ela passaria por sucesso.
+    private void baixarMidia(final String id) {
+        final var corpo = this.comPool.get()
+                .uri("/videos/{id}/medias/{type}", id, "BANNER")
+                .retrieve()
+                .body(byte[].class);
+        if (corpo == null || corpo.length != CONTEUDO.getBytes().length) {
+            throw new IllegalStateException("corpo com tamanho inesperado: " + (corpo == null ? -1 : corpo.length));
         }
     }
 
@@ -171,5 +178,31 @@ class MediaDownloadStressTest implements VideoE2EDsl, CategoryE2EDsl {
         } catch (final InterruptedException interrompida) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    // **O controle do experimento.** A rota de mídia responde por `StreamingResponseBody`, então o
+    // Spring a despacha de forma assíncrona; a hipótese que o README carrega desde 19/10 é que são
+    // "muitas respostas assíncronas curtas em sequência, no mesmo pool".
+    //
+    // Este teste martela uma rota **síncrona** — o `GET /videos/{id}`, JSON comum — com o mesmo pool,
+    // as mesmas threads e o mesmo volume. É o que separa duas conclusões muito diferentes:
+    //
+    // - controle limpo  -> o despacho assíncrono está implicado, e o experimento de declarar o
+    //                      caminho sem `Range` como síncrono vale o preço que tem;
+    // - controle falha  -> a hipótese está errada, e o problema é da combinação cliente/pool/Tomcat
+    //                      em geral, não do assíncrono. Dez dias de suspeita cairiam aqui.
+    @Test
+    void givenTheSameLoadOnASynchronousRoute_whenItSharesPoolAndThreads_thenCompareWithTheMediaRoute()
+            throws InterruptedException {
+        final var id = givenAVideo("Duna", givenACategory("Filmes", null));
+        final var falhas = new ConcurrentHashMap<String, AtomicLong>();
+        final var feitas = new AtomicLong();
+
+        martelar(falhas, feitas, () -> this.comPool.get()
+                .uri("/videos/{id}", id)
+                .retrieve()
+                .body(byte[].class));
+
+        assertEquals(Map.of(), resumo(falhas), relatorio(falhas, feitas.get()));
     }
 }
