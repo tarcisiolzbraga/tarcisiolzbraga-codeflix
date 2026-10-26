@@ -4,7 +4,7 @@
 # substitui no código em tempo de build, pelo `define` do `vite.config.ts` — passar a URL no `run`
 # não mudaria nada, porque o valor já está no JavaScript que o browser baixa. Uma imagem construída
 # para homologação não serve para produção.
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 # npm ci, e não npm install: respeita o lock e falha se ele estiver fora de sincronia.
@@ -25,7 +25,7 @@ ARG MEDIA_MAX_FILE_SIZE
 
 RUN npm run build
 
-FROM nginx:1.29-alpine AS runner
+FROM nginx:1.31-alpine AS runner
 
 # Pega as correções de segurança publicadas depois de a base ser construída. Aqui isso não é
 # detalhe: o Trivy achou 46 CVEs HIGH/CRITICAL nos pacotes de sistema desta base — curl, pcre2,

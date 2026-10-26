@@ -8,13 +8,13 @@
 # escolha de estilo: `NEXT_PUBLIC_*` é embutido no pacote em tempo de build. Uma imagem construída
 # para homologação não serve para produção, e passar a URL no `run` não mudaria nada — o valor já
 # está no JavaScript que o browser baixa.
-FROM node:24-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 # npm ci, e não npm install: respeita o lock e falha se ele estiver fora de sincronia.
 RUN npm ci
 
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -39,7 +39,7 @@ ARG FRONT_KEYCLOAK_CLIENT_ID
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-FROM node:24-alpine AS runner
+FROM node:26-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
