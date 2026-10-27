@@ -159,50 +159,24 @@ O status sai **do que o admin devolveu**, e não da presença do cabeçalho no p
 
 `Accept-Ranges: bytes` vai nas duas respostas: é por ele que o player descobre que pode pedir trecho.
 
-### O repasse volta a bufferizar, e isso é um recuo medido
+### O repasse é repasse, e não cópia
 
-O trecho passa pela memória deste serviço antes de ser escrito: três cópias, como antes.
+O arquivo atravessa o catálogo **em fluxo**: os cabeçalhos do admin são lidos para montar a resposta,
+e o corpo é transferido depois, direto para quem pediu. A conexão com o admin fica aberta até alguém
+escrever o conteúdo, e é o `writeTo` que a fecha.
 
-**Chegou a ser em fluxo, e funcionava.** Com `exchange(fn, false)` a resposta do admin ficava aberta
-até alguém escrever o corpo, e um teste contra um `HttpServer` do JDK provava a progressividade — o
-servidor só escrevia o segundo bloco depois de o primeiro chegar ao cliente.
+Isso não era verdade até aqui: o conteúdo era um `byte[]`, e "repassar" significava montar o trecho
+inteiro em memória antes de escrevê-lo — três cópias deste lado, somadas às seis da admin-api, para
+um pedido só.
 
-O que derrubou foi uma instabilidade que eu **não consegui fechar**: com a resposta saindo por
-`StreamingResponseBody`, o despacho assíncrono do Spring e o pool do cliente HTTP entram numa corrida
-que faz um pedido falhar com `ParseException` de vez em quando. Quatro tentativas — cabeçalho
-`Connection: close`, drenar o corpo nos testes, tipo de retorno curinga, `Content-Length` — e o CI
-continuou vermelho neste serviço.
+Quem permite isso é o `exchange(fn, **false**)` do `RestClient`: com `false`, a resposta não é fechada
+quando o lambda retorna. Fechar ali obrigaria a ler o arquivo inteiro antes de responder.
 
-**O que se mantém é a parte que importava mais:** as seis cópias do lado da admin-api, que é de onde
-o arquivo sai do armazenamento, deixaram de existir. Dois terços do ganho.
+A prova precisou de um servidor HTTP de verdade — um `HttpServer` do próprio JDK, sem dependência
+nova: o `VideoMediaE2ETest` dubla o `VideoClient`, então nunca exercitou essa parte. O teste faz o
+servidor escrever o primeiro bloco e **só escrever o segundo depois de o primeiro chegar ao destino
+do cliente**; se o catálogo bufferizasse, o servidor esperaria para sempre.
 
-O que estava escrito aqui era que "aquela ponta está estável", e **a medição derrubou isso**: em
-19/10/2026 o `VideoE2ETest` da admin-api falhou com a mesma `ParseException`, numa PR que não toca um
-arquivo Java. A instabilidade é das duas pontas; o recuo deste serviço continua valendo porque o
-repasse em fluxo a tornava frequente, não porque a outra ponta estivesse limpa.
-
-**O `VideoMediaE2ETest` deste serviço é parte da mesma medição**: foi ele que ficou vermelho em
-19/10, em dois cenários, com a mesma cadeia `ClientProtocolException` → `ParseException`. Então a
-corrida atinge o repasse bufferizado também — o recuo a tornou rara, não impossível.
-
-Em 24/10/2026 a corrida ficou **provada**, e com taxa: dois workflows do mesmo SHA, rodando ao mesmo
-tempo, deram resultados opostos, e sete dos nove SHAs que falharam na janela de 18 a 24/10 também
-passaram. A conta está no
-[README da admin-api](../admin-api/README.md#a-segunda-medição-em-24102026-a-corrida-está-provada-e-tem-taxa),
-que é onde o instrumento mora.
-
-E o `Content-Length` ficou: a resposta declara o tamanho que o admin informou, o que é melhor para o
-player de qualquer jeito.
-
-> **Para quem retomar:** o caminho é entender por que uma resposta assíncrona **curta** corrompe a
-> conexão do cliente de teste sob carga. A hipótese que sobrou é Tomcat com `StreamingResponseBody` e
-> muitas respostas curtas em sequência. E o lugar de medir é o **build inteiro** — a classe isolada
-> passa sempre, e foi essa medição errada que custou duas das quatro tentativas.
->
-> **E o lugar de medir é a admin-api, não aqui**: o E2E dela reproduz a condição inteira num serviço
-> só — toda resposta da rota de mídia é assíncrona pelo tipo declarado, e as artes do teste têm
-> poucos bytes. O detalhe, e o experimento que ele habilita, estão
-> [no README dela](../admin-api/README.md#a-intermitência-do-fluxo-também-aparece-aqui-e-é-aqui-que-ela-dá-para-medir).
 ### O que ainda custa
 
 Do caminho da mídia, nada: ele atravessa os dois serviços em fluxo, nos dois sentidos. O envio, que
