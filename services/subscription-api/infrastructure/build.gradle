@@ -36,6 +36,9 @@ dependencies {
         implementation('at.yawk.lz4:lz4-java:1.12.1') {
             because 'CVE-2026-106451 no 1.11.2, que o kafka-clients traz'
         }
+        implementation('org.xerial.snappy:snappy-java:1.1.10.12') {
+            because 'CVE-2026-108106 e CVE-2026-93451 no 1.1.10.7, que o kafka-clients traz'
+        }
     }
     implementation project(':domain')
     implementation project(':application')
