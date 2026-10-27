@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.graphql.execution.SecurityDataFetcherExceptionResolver;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -18,6 +19,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.header.HeaderWriterFilter;
 
 // O Spring Security está aqui por dois motivos agora: o oauth2-client, que pede token para falar com
 // a API do admin, e o resource server, que valida o token de quem fala com esta API.
@@ -59,6 +61,17 @@ public class SecurityConfig {
     @Order(2)
     SecurityFilterChain apiFilterChain(final HttpSecurity http) throws Exception {
         return http.csrf(AbstractHttpConfigurer::disable)
+                // **Cabeçalhos escritos na entrada, e não na saída da cadeia.** Esta rota serve mídia
+                // por `StreamingResponseBody`, então o Spring despacha a resposta de forma
+                // assíncrona: a thread da requisição sai da cadeia de filtros **antes** de a resposta
+                // terminar. No padrão, o `HeaderWriterFilter` escreve os cabeçalhos na volta, e aí o
+                // `CacheControlHeadersWriter` vai ler os cabeçalhos de uma resposta que o Tomcat já
+                // reciclou — ou de outra requisição.
+                //
+                // É o mesmo conserto que a admin-api recebeu, e pelo mesmo mecanismo medido lá. Aqui
+                // ele não é precaução: sem ele, o teste de estresse do repasse mede 1 falha em 96.000
+                // pedidos, com o arco síncrono limpo no mesmo ambiente.
+                .headers(headers -> headers.withObjectPostProcessor(headersBeforeTheChain()))
                 // Usa o CorsConfigurationSource que o CorsConfig publica. A verificação prévia do
                 // browser é respondida pelo filtro de CORS, antes da autorização — por isso ela não
                 // precisa de regra liberando OPTIONS, e há teste provando que não precisa.
@@ -68,6 +81,18 @@ public class SecurityConfig {
                 .oauth2ResourceServer(oauth ->
                         oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(new KeycloakJwtConverter())))
                 .build();
+    }
+
+    // `setShouldWriteHeadersEagerly` não tem ajuste declarativo no DSL, então o jeito de alcançá-lo
+    // é pós-processar o filtro que o `headers()` constrói.
+    private static ObjectPostProcessor<HeaderWriterFilter> headersBeforeTheChain() {
+        return new ObjectPostProcessor<>() {
+            @Override
+            public HeaderWriterFilter postProcess(final HeaderWriterFilter filter) {
+                filter.setShouldWriteHeadersEagerly(true);
+                return filter;
+            }
+        };
     }
 
     // Construído do jwk-set-uri, e não do issuer-uri: o segundo faria o Spring buscar os metadados
