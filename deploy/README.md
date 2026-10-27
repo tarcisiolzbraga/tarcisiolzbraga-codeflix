@@ -192,6 +192,7 @@ A ordem importa, e cada passo tem um porquê:
 | `kubectl delete pods --field-selector status.phase=Failed` nos **dois** namespaces | pod despejado não volta sozinho, e o `istio-system` também é despejado — 24 dos 46 eram dele |
 | `bash deploy/cluster/import-images.sh` | **o kubelet coleta as imagens carregadas à mão, e o rótulo `pinned` não resiste à pressão.** Ele não as removeu de um nó só: faltavam 2 num, 6 noutro e 6 no terceiro |
 | `kubectl rollout restart` em cada aplicação | **esta é a que custa achar.** O `istiod` reinicia no despejo, e os sidecars precisam de certificado novo; sem o reinício o gateway segue dando 503 com o pod servindo normalmente por dentro. Reiniciar **só** o `istio-ingressgateway` não resolve |
+| `bash deploy/infra/register-cdc.sh` | **esta eu descobri que faltava dias depois.** O Kafka Connect voltou de pé e com os tópicos, e `GET /connectors` devolvia `[]`: os conectores não estavam registrados. Nada acusa — o catálogo simplesmente para de receber mudança nova, e o que já estava indexado continua respondendo. Confira o estado, não o pod |
 
 Dois detalhes que economizam tempo:
 
@@ -205,6 +206,62 @@ Dois detalhes que economizam tempo:
 O caminho que evita tudo isso é o que o README já aponta como o certo: um **registro local do k3d**,
 em vez de carregar imagem por tarball. Com registro, a coleta do kubelet é inofensiva — a imagem tem
 de onde voltar.
+
+## O mTLS é obrigatório, com duas exceções medidas
+
+Sem `PeerAuthentication` a malha fica `PERMISSIVE`: cifra quando os dois lados falam Istio, e aceita
+texto puro quando não. Na prática, qualquer coisa que alcance o IP de um pod fala com ele sem
+credencial. Medido de dentro do cluster, de um lugar fora da malha:
+
+| | `GET http://10.42.0.28:8082/api/graphql` |
+|---|---|
+| sem STRICT | **405** — a aplicação respondeu (a rota pede POST) |
+| com STRICT | **conexão recusada** |
+
+`STRICT` não é só cifra, é **autenticação**: o sidecar passa a exigir certificado emitido pelo
+istiod. É isso que torna a identidade do chamador verificável, e é sobre ela que a
+`AuthorizationPolicy` decide. Uma sem a outra não fecha nada — política sem mTLS confia num
+cabeçalho, e mTLS sem política só diz que o chamador é alguém da malha.
+
+### O que foi medido antes e depois
+
+| | permissivo | STRICT |
+|---|---|---|
+| rotas pelo gateway (catálogo, mídia, assinatura, Keycloak, Mailpit, RabbitMQ) | ok | **ok** |
+| pods prontos | 18 | **18** |
+| alvos de métrica saudáveis | 18 | **18** |
+| CDC de ponta a ponta (categoria nova aparecendo no catálogo) | ok | **ok** |
+| fronts por NodePort | ok | **caiu** |
+
+Três coisas não quebraram, e nenhuma delas por sorte:
+
+- as **sondas** do kubelet chegam de fora da malha, mas o Istio as reescreve na injeção — o pod em
+  execução aponta para `:15020/app-health/<container>/readyz`, a porta do pilot-agent, fora do mTLS.
+  Sem essa reescrita o STRICT marcaria todo pod como não pronto;
+- o **Prometheus** não tem sidecar (nada em `istio-system` tem) e raspa de fora da malha. O
+  `enablePrometheusMerge` reescreve a anotação do pod para `:15020/stats/prometheus`, também fora do
+  mTLS, e o sidecar mescla ali as métricas da aplicação com as do Envoy — conferido, as
+  `jvm_memory_used_bytes` continuam presentes;
+- o **CDC** atravessa MySQL, Debezium, Kafka e a API do admin, tudo sidecar a sidecar: mTLS entre
+  eles é exatamente o caso que o STRICT quer.
+
+### E a que quebrou
+
+Os dois fronts, pelo NodePort, passaram de 200 para conexão recusada no instante em que o STRICT
+entrou. Tráfego de NodePort entra pelo nó e chega ao pod em texto puro, de fora da malha.
+
+A exceção é **por porta**, não por workload: o `portLevelMtls` libera só a porta que o NodePort
+alcança — 3000 no portal, 3001 no back-office. Todo o resto do tráfego desses pods, inclusive o que
+eles mandam para as APIs, continua sob STRICT. Conferido depois da exceção:
+
+```
+texto puro -> catálogo          recusado
+texto puro -> admin             recusado
+texto puro -> portal (exceção)  200
+```
+
+Isto sai quando os fronts deixarem de depender de NodePort, o que depende de servi-los por https no
+gateway — e aí o contexto seguro vem do próprio esquema, que é a razão de o NodePort existir.
 
 ## O que ainda depende de rede
 
@@ -368,10 +425,11 @@ kubectl -n istio-system patch telemetry rastreamento --type=merge \
 
 ## O que falta
 
-- **mTLS está `PERMISSIVE`**: a malha cifra quando os dois lados falam Istio, mas aceita texto puro.
-  `STRICT` é um `PeerAuthentication` pequeno e é o maior ganho isolado.
-- **Nenhuma `AuthorizationPolicy`**: qualquer pod pode chamar qualquer pod — hoje o portal pode abrir
-  conexão no MySQL do admin.
+- **Nenhuma `AuthorizationPolicy`**: o mTLS obrigatório já entrou, então a identidade de cada
+  chamador é verificável — mas ninguém decide nada com ela. Qualquer pod da malha pode chamar
+  qualquer pod: hoje o portal pode abrir conexão no MySQL do admin, e o que o impede é só não haver
+  motivo. É o que falta para a malha fechar de verdade, e agora há rastreamento para dizer em qual
+  salto o tráfego parou se uma política apertar demais.
 - **O rastreamento das filas.** O das requisições HTTP está fechado: os spans chegam e as
   requisições atravessam os serviços num trace só, medido acima. O que continua solto é o que passa
   por Kafka e RabbitMQ — o encoder e os listeners de CDC. Ligá-los é propagar o rastro **pela
