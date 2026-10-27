@@ -272,16 +272,89 @@ porque a aplicação não repassou o que recebeu — e começa um rastro novo. N
 propaga: os três Java não têm `micrometer-tracing`, e nos dois Go o OpenTelemetry aparece só como
 dependência transitiva.
 
-O que isso permite e o que não permite, dito antes de alguém se decepcionar:
+### E o conserto: o rastro passou a atravessar
 
-- **permite** topologia, latência por salto e taxa de erro por serviço — o que o Kiali desenha e o
-  que responde "qual serviço está lento";
-- **não permite** seguir uma requisição ponta a ponta. "O pedido do cliente X demorou 2 s, em qual
-  salto?" não tem resposta aqui, porque os saltos não se ligam.
+O repasse entrou nos serviços que podem fazê-lo, e o resultado é a mesma consulta GraphQL, no mesmo
+cluster, antes e depois:
 
-O conserto é pequeno em tamanho e grande em alcance: repassar `traceparent` e `x-b3-*` de entrada
-para saída em cada cliente HTTP dos cinco serviços. É mudança de código de aplicação, não de malha,
-e por isso não entrou junto.
+| | traces | formas | ligando as duas pontas |
+|---|---:|---|---:|
+| antes | 30 | 2 (gateway+catálogo, catálogo+índice) | **0** |
+| depois | 9 | 1 (gateway+catálogo+índice, 7 spans) | **8 de 9** |
+
+Os 30 fragmentos viraram 8 árvores completas — o número de traces **caiu** porque cada um agora
+cobre a requisição inteira, em vez de um salto. Uma delas, por dentro:
+
+```
+istio-ingressgateway   videos-api...:8082/*
+istio-ingressgateway   router outbound|8082||videos-api...
+videos-api             videos-api...:8082/*
+videos-api             catalog-elasticsearch...:9200/*
+catalog-elasticsearch  catalog-elasticsearch...:9200/*
+videos-api             catalog-elasticsearch...:9200/*
+catalog-elasticsearch  catalog-elasticsearch...:9200/*
+```
+
+E os outros dois caminhos, medidos do mesmo jeito:
+
+| caminho | spans |
+|---|---|
+| `gateway -> catálogo -> admin -> armazenamento` (mídia) | **7**, todos em 200 |
+| `gateway -> assinatura -> Keycloak` (cadastro) | **9**, com as três chamadas ao Keycloak na mesma árvore |
+
+Quatro serviços numa árvore só, no primeiro — que é o caminho onde "quem demorou" nunca tinha
+resposta.
+
+O 9º trace é a busca de chaves no Keycloak, que acontece **fora** de qualquer requisição — não há
+rastro para continuar ali, e ele ficar solto é o comportamento certo.
+
+### Três coisas que só a medição no cluster mostrou
+
+**A thread importa, e o teste de unidade não a revela.** O repasse lê a requisição de entrada do
+`RequestContextHolder`, que é um ThreadLocal. Com ele ligado e os testes verdes, medido no cluster:
+
+- a rota de mídia **juntava** o rastro — o controller chama o admin na thread da requisição;
+- a consulta GraphQL **continuava partida** — o graphql-java executa os data fetchers em outra
+  thread, onde o ThreadLocal está vazio.
+
+O que fechou isso foi registrar o `RequestAttributesThreadLocalAccessor` no `ContextRegistry`: o
+Spring GraphQL carrega ThreadLocal para a thread de execução, mas só os que estiverem registrados. O
+acessador já vem no spring-web; o registro não vem, porque não há arquivo de serviço.
+
+**No cliente do Elasticsearch, o gancho óbvio é o errado.** Ele é assíncrono, e o interceptor de
+*requisição* do Apache HttpClient roda na thread de I/O do reator — longe do ThreadLocal. Medido:
+
+```
+exec-interceptor     -> thread do chamador      contexto: visível
+request-interceptor  -> httpclient-dispatch-1   contexto: null
+```
+
+O gancho de `exec` roda antes de a requisição ir para o reator, e é o que funciona.
+
+**No armazenamento, o rastro não pode ser assinado — e eu assinei.** O SDK da AWS assina a requisição
+com SigV4, e o gancho óbvio (`ExecutionInterceptor.modifyHttpRequest`) roda **antes** disso, então o
+cabeçalho entrava em `SignedHeaders`. O Garage passou a recusar **todo** pedido de mídia com `403
+Invalid signature`, porque o sidecar **reescreve** `traceparent` em trânsito — ele cria um span novo
+para o salto e troca o valor. Assinatura sobre cabeçalho que a malha reescreve nunca corresponde.
+
+O rastro passou para a camada do cliente HTTP, que o SDK chama depois de assinar. Isto quebrou o
+cluster por alguns minutos e o teste não pegou: ele afirmava que a requisição continuava assinada, o
+que era verdade e não provava nada, porque dublê não confere assinatura.
+
+### Onde o repasse não existe, e por que não é escolha
+
+| serviço | entrada | saída | repassa? |
+|---|---|---|---|
+| `videos-api` | HTTP | HTTP (admin, índice) | **sim** |
+| `admin-api` | HTTP | HTTP (armazenamento) | **sim** |
+| `subscription-api` | HTTP | HTTP (Keycloak) | **sim** |
+| `encoder-api` | AMQP | HTTP (armazenamento) | não há o que repassar |
+| `mail-api` | AMQP | SMTP | não há o que repassar |
+
+Os dois Go ficam de fora por **mecanismo**, não por decisão: o encoder é acionado por mensagem de
+fila, não por requisição HTTP, então não existe rastro de entrada para continuar; e o mail sai por
+SMTP, que o Istio nem rastreia. Ligá-los exigiria propagar o rastro **pela mensagem** — outro
+problema, com outra solução.
 
 **Amostragem a 100%, e o preço.** Num cluster de desenvolvimento o valor é abrir a requisição que
 acabou de falhar; com o padrão de 1% ela praticamente nunca está lá. O addon do Jaeger guarda os
@@ -299,10 +372,11 @@ kubectl -n istio-system patch telemetry rastreamento --type=merge \
   `STRICT` é um `PeerAuthentication` pequeno e é o maior ganho isolado.
 - **Nenhuma `AuthorizationPolicy`**: qualquer pod pode chamar qualquer pod — hoje o portal pode abrir
   conexão no MySQL do admin.
-- **O rastreamento liga, mas fragmenta na fronteira da aplicação.** O recurso `Telemetry` entrou e o
-  Jaeger saiu do vazio; o que falta é os serviços propagarem `traceparent`/`b3`. Está medido logo
-  acima, com os números — e é o próximo passo se o rastreamento for para ser usado em diagnóstico, e
-  não só em desenho de topologia.
+- **O rastreamento das filas.** O das requisições HTTP está fechado: os spans chegam e as
+  requisições atravessam os serviços num trace só, medido acima. O que continua solto é o que passa
+  por Kafka e RabbitMQ — o encoder e os listeners de CDC. Ligá-los é propagar o rastro **pela
+  mensagem**, que é outro problema: o Istio não rastreia AMQP nem o protocolo do Kafka, então o
+  contexto teria de ir num cabeçalho da própria mensagem e ser lido pelo consumidor.
 - **Nenhum HPA**, mas o caminho encurtou. O terreno estava pronto (metrics-server responde, todos os
   Deployments têm `requests.cpu`) e as três aplicações Java ganharam prontidão de verdade, que é o
   que faz réplica nova entrar em rotação na hora certa. O impedimento da `admin-api` **saiu**: o

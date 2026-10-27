@@ -494,6 +494,22 @@ respondem `404` para ele. A jornada automatizada precisa de token de pessoa de v
 client só para isso **dentro do container de teste**; ele não existe em
 `../../provisioning/keycloak/realm.json`.
 
+## O rastro segue para o Keycloak
+
+As chamadas ao provedor de identidade — criar conta, confirmar, trocar senha — levam o rastro da
+requisição que as originou (`infrastructure/tracing`). Sem isso, "o cadastro do cliente X demorou"
+não dizia se o tempo era desta API ou do Keycloak, que é exatamente a pergunta de quem recebe a
+reclamação.
+
+É um gancho só, diferente do catálogo: todas as saídas HTTP daqui vão ao Keycloak e passam pelo mesmo
+`RestClient`. O banco e o armazenamento deste serviço não falam HTTP.
+
+Fora de requisição — o job da outbox, os listeners de evento — não há rastro para continuar, e o
+repasse não faz nada. Há teste fixando que isso não quebra, porque um erro ali derrubaria a entrega
+de eventos, que é pior que rastro fragmentado.
+
+Os números e as armadilhas estão no `deploy/README.md`.
+
 ## Os eventos, e como eles saem daqui
 
 Cada transição da assinatura registra um evento de domínio, e é por eles que o **acesso ao catálogo**
