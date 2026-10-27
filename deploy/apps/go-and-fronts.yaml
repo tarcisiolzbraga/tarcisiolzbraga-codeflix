@@ -16,6 +16,11 @@ spec:
     metadata:
       labels: { app: encoder-api, version: v1 }
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: encoder-api
       containers:
         - name: encoder
           image: admin-codeflix-encoder-api:latest
@@ -62,6 +67,11 @@ spec:
     metadata:
       labels: { app: mail-api, version: v1 }
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: mail-api
       containers:
         - name: mail
           image: admin-codeflix-mail-api:latest
@@ -106,6 +116,11 @@ spec:
     metadata:
       labels: { app: portal, version: v1 }
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: portal
       containers:
         - name: portal
           image: admin-codeflix-portal-codeflix:latest
@@ -155,6 +170,11 @@ spec:
     metadata:
       labels: { app: back-office, version: v1 }
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: back-office
       containers:
         - name: back-office
           image: admin-codeflix-back-office-codeflix:latest

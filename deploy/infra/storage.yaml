@@ -37,6 +37,11 @@ spec:
     metadata:
       labels: { app: garage, version: v1 }
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: garage
       containers:
         - name: garage
           image: dxflrs/garage:v2.3.0
@@ -123,6 +128,11 @@ spec:
     metadata:
       labels: { app: catalog-elasticsearch, version: v1 }
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: catalog-elasticsearch
       # O Elasticsearch recusa subir se não puder escrever no volume, e o local-path do k3d entrega o
       # diretório como root. O grupo do pod resolve sem precisar de initContainer com chown.
       securityContext:

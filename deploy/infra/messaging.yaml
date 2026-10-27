@@ -29,6 +29,11 @@ spec:
     metadata:
       labels: { app: rabbitmq, version: v1 }
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: rabbitmq
       containers:
         - name: rabbitmq
           image: rabbitmq:4.2-management
@@ -88,6 +93,11 @@ spec:
     metadata:
       labels: { app: kafka, version: v1 }
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: kafka
       containers:
         - name: kafka
           image: apache/kafka:4.3.1
@@ -152,6 +162,11 @@ spec:
     metadata:
       labels: { app: kafka-connect, version: v1 }
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: kafka-connect
       containers:
         - name: connect
           image: quay.io/debezium/connect:3.6.3.Final
@@ -205,6 +220,11 @@ spec:
     metadata:
       labels: { app: mailpit, version: v1 }
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: mailpit
       containers:
         - name: mailpit
           image: axllent/mailpit:v1.21

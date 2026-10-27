@@ -43,6 +43,11 @@ spec:
     metadata:
       labels: { app: mysql, version: v1 }
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: mysql
       containers:
         - name: mysql
           image: mysql:8.4
@@ -115,6 +120,11 @@ spec:
     metadata:
       labels: { app: subscription-mysql, version: v1 }
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: subscription-mysql
       containers:
         - name: mysql
           image: mysql:8.4
@@ -172,6 +182,11 @@ spec:
     metadata:
       labels: { app: encoder-postgres, version: v1 }
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: encoder-postgres
       containers:
         - name: postgres
           image: postgres:17-alpine

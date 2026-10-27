@@ -42,6 +42,11 @@ spec:
         # O Kiali agrupa e versiona por estes dois rótulos; sem eles o grafo mostra "unknown".
         version: v1
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: keycloak
       # **Espera o banco aceitar conexão.** O compose tem `depends_on: service_healthy` para isso; o
       # Kubernetes não tem equivalente, e sem esta espera o Keycloak subia antes do Postgres, morria
       # com `SQLState: 08001` ("the connection attempt failed") e era reiniciado — medido: um
@@ -192,6 +197,11 @@ spec:
     metadata:
       labels: { app: keycloak-postgres, version: v1 }
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: keycloak-postgres
       containers:
         - name: postgres
           image: postgres:18-alpine
