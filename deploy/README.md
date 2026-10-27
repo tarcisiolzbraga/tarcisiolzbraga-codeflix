@@ -230,16 +230,79 @@ Nada é instalado por `sudo`; tudo em `~/.local/bin`:
 | helm | 4.3.1 |
 | istioctl | 1.31.3 |
 
+## O rastreamento: o que ligou, e onde ele ainda quebra
+
+O Jaeger subia com o perfil `demo` e o meshconfig já declarava o provedor apontando para
+`jaeger-collector:4317`. **Faltava o que liga uma coisa à outra:** sem um recurso `Telemetry` nenhum
+sidecar manda span, e `defaultProviders` do meshconfig lista só métricas. Um Jaeger de pé,
+alcançável pelo gateway, e vazio — que é pior que não ter, porque parece instalado.
+
+`deploy/mesh/telemetry.yaml` resolve isso. Medido num Jaeger recém-reiniciado, o mesmo tráfego nos
+dois estados:
+
+| | serviços conhecidos pelo Jaeger |
+|---|---|
+| sem o `Telemetry`, 40 requisições pela malha | **0** |
+| com o `Telemetry` | **5**, incluindo `catalog-elasticsearch` e `keycloak` |
+
+**Para repetir esta medição, reinicie o pod do Jaeger primeiro.** O addon guarda os traces em
+memória, então apagar o `Telemetry` não apaga o que já entrou — e a medição do "antes" sai
+contaminada com o "depois" de minutos antes. Foi o que aconteceu na primeira tentativa aqui, e o que
+a desmascarou foi conferir a idade do pod:
+
+```bash
+kubectl -n istio-system rollout restart deploy/jaeger
+kubectl -n istio-system get pods -l app=jaeger   # o nome TEM de mudar
+```
+
+**E aí aparece o limite, que é bom conhecer antes de confiar na ferramenta.** Nos 30 traces que uma
+consulta GraphQL do catálogo gerou, há exatamente **duas** formas, e nenhuma delas liga as duas
+pontas:
+
+| forma | ocorrências | spans | serviços |
+|---|---:|---|---|
+| `29486cbf...` | 14x | 3 | gateway -> gateway (egress) -> **videos-api** |
+| `34e5a6ad...` | 16x | 2 | **videos-api** -> catalog-elasticsearch |
+
+**Nenhum trace contém o gateway e o Elasticsearch juntos.** A chamada ao índice que atendeu uma
+requisição está sempre num rastro à parte — não às vezes, sempre.
+
+A causa é conhecida e não é do Istio: o sidecar de saída vê um pedido **sem** cabeçalho de rastro —
+porque a aplicação não repassou o que recebeu — e começa um rastro novo. Nenhum dos cinco serviços
+propaga: os três Java não têm `micrometer-tracing`, e nos dois Go o OpenTelemetry aparece só como
+dependência transitiva.
+
+O que isso permite e o que não permite, dito antes de alguém se decepcionar:
+
+- **permite** topologia, latência por salto e taxa de erro por serviço — o que o Kiali desenha e o
+  que responde "qual serviço está lento";
+- **não permite** seguir uma requisição ponta a ponta. "O pedido do cliente X demorou 2 s, em qual
+  salto?" não tem resposta aqui, porque os saltos não se ligam.
+
+O conserto é pequeno em tamanho e grande em alcance: repassar `traceparent` e `x-b3-*` de entrada
+para saída em cada cliente HTTP dos cinco serviços. É mudança de código de aplicação, não de malha,
+e por isso não entrou junto.
+
+**Amostragem a 100%, e o preço.** Num cluster de desenvolvimento o valor é abrir a requisição que
+acabou de falhar; com o padrão de 1% ela praticamente nunca está lá. O addon do Jaeger guarda os
+traces **em memória**, então um teste de carga a centenas de requisições por segundo o enche e começa
+a descartar. Antes de rodar `perf/`, baixe a amostragem:
+
+```bash
+kubectl -n istio-system patch telemetry rastreamento --type=merge \
+  -p '{"spec":{"tracing":[{"providers":[{"name":"jaeger"}],"randomSamplingPercentage":1}]}}'
+```
+
 ## O que falta
 
 - **mTLS está `PERMISSIVE`**: a malha cifra quando os dois lados falam Istio, mas aceita texto puro.
   `STRICT` é um `PeerAuthentication` pequeno e é o maior ganho isolado.
 - **Nenhuma `AuthorizationPolicy`**: qualquer pod pode chamar qualquer pod — hoje o portal pode abrir
   conexão no MySQL do admin.
-- **O rastreamento está instalado e vazio.** Falta o recurso `Telemetry` ligando o provedor, e os
-  serviços não propagam `traceparent`/`b3` — sem isso cada salto vira um rastro solto em vez de uma
-  árvore. É também o instrumento que pode explicar a intermitência do fluxo de mídia que o README da
-  admin-api registra sem causa.
+- **O rastreamento liga, mas fragmenta na fronteira da aplicação.** O recurso `Telemetry` entrou e o
+  Jaeger saiu do vazio; o que falta é os serviços propagarem `traceparent`/`b3`. Está medido logo
+  acima, com os números — e é o próximo passo se o rastreamento for para ser usado em diagnóstico, e
+  não só em desenho de topologia.
 - **Nenhum HPA**, mas o caminho encurtou. O terreno estava pronto (metrics-server responde, todos os
   Deployments têm `requests.cpu`) e as três aplicações Java ganharam prontidão de verdade, que é o
   que faz réplica nova entrar em rotação na hora certa. O impedimento da `admin-api` **saiu**: o

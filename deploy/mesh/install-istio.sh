@@ -23,5 +23,9 @@ for addon in prometheus kiali jaeger grafana; do
   kubectl apply -f "${PACOTE}/samples/addons/${addon}.yaml"
 done
 
+# O recurso que faz os sidecars **mandarem** span. Depois dos addons de propósito: ele aponta para o
+# `jaeger-collector`, e a CRD `Telemetry` vem com a malha. Sem ele o Jaeger sobe vazio e fica vazio.
+kubectl apply -f "$(dirname "${BASH_SOURCE[0]}")/telemetry.yaml"
+
 kubectl -n istio-system wait --for=condition=Available deployment --all --timeout=300s
 kubectl -n istio-system get deploy
