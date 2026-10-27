@@ -85,6 +85,57 @@ Então o caminho **não** é batch, que já existe. É um destes dois:
 - **desnormalizar o nome** no documento do vídeo. O índice já guarda os ids; guardar os nomes
   elimina as três buscas, ao preço de reindexar quando um nome muda.
 
+### O GC era 7% do tempo, e virou 1,4%
+
+A primeira medição deixou uma pista: muita pausa de GC. Investigada, a causa não era a aplicação —
+era a JVM não saber o tamanho do container:
+
+```
+MaxHeapSize      = 268435456  (256 MB de 1 GiB)   {ergonomic}
+MaxRAMPercentage = 25.0                           {default}
+UseSerialGC      = true                           {ergonomic}
+pools: "Eden Space" / "Survivor Space" / "Tenured Gen"
+processo: java -jar /opt/app/application.jar      (nenhuma flag)
+```
+
+Duas coisas de uma vez: **768 MB do limite não eram usados pelo heap**, e o coletor era
+**stop-the-world de uma thread**. A escolha do serial é por **memória**, não por CPU — abaixo de
+1792 MB disponíveis a JVM classifica o container como "client class", e a máquina tem 16 CPUs
+visíveis sem limite de cgroup. Por isso `-XX:+UseG1GC` precisa ser explícito: subir só o percentual
+deixaria o coletor como estava.
+
+Com `-XX:MaxRAMPercentage=70 -XX:+UseG1GC` nos três serviços Java, medido no catálogo com 10 VUs e
+50 s, duas execuções consecutivas na mesma máquina:
+
+| | antes | depois |
+|---|---:|---:|
+| pausas de GC | 1.209 | **490** |
+| tempo total em GC | 3.651 ms | **698 ms** |
+| pausa média | 3,0 ms | **1,4 ms** |
+| **% do tempo em pausa** | **7,3%** | **1,4%** |
+| média no servidor | 11,9 ms | **9,7 ms** |
+| requisições em 50 s | 30.637 | **37.461** |
+
+E o efeito na curva de saturação, nos mesmos degraus de antes:
+
+| VUs | antes | depois |
+|---|---:|---:|
+| 10 | 701 req/s | **790** |
+| 20 | 769 req/s | **869** |
+| 40 | 723 req/s | **899** |
+
+**O colapso depois do joelho desapareceu.** Antes a vazão *caía* ao passar de 20 VUs — 769 para 723
+— enquanto a latência crescia; agora ela continua subindo. O joelho segue entre 10 e 20 VUs, mas o
+que vem depois dele deixou de ser perda. O p99 a 40 VUs caiu de 75,4 para 62,3 ms.
+
+Duas ressalvas honestas:
+
+- **70%, e não 75 ou 80**: sobram ~300 MB para metaspace, cache de código, pilhas e buffers diretos.
+  Errar para cima troca pausa de GC por `OOMKill`, que é pior;
+- **a medição é do catálogo**, e as flags foram para os três serviços Java pelo mesmo diagnóstico —
+  os três rodavam `java -jar` sem flag, com o mesmo limite de 1 GiB. A `admin-api` e a
+  `subscription-api` não foram medidas sob carga.
+
 ### O que o serviço sentiu
 
 Da rampa de 80 VUs, pelo `/actuator/prometheus` antes e depois:
