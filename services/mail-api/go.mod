@@ -2,4 +2,4 @@ module github.com/tarcisiolzbraga/codeflix/mail
 
 go 1.27.1
 
-require github.com/rabbitmq/amqp091-go v1.15.0
+require github.com/rabbitmq/amqp091-go v1.16.0
