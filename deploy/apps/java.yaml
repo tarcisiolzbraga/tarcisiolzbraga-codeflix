@@ -69,6 +69,27 @@ spec:
             # homolog, que fala de localhost e do domínio de homologação — e o browser esconderia a
             # resposta do painel com a API no ar, que é defeito difícil de ler.
             - { name: CORS_ALLOWED_ORIGINS, value: "http://localhost:3000,http://localhost:3001" }
+            # **A JVM só usa 25% do limite como heap, e escolhe o coletor serial.** Medido no
+            # container, antes desta linha existir:
+            #
+            #     MaxHeapSize      = 268435456  (256 MB de 1 GiB)   {ergonomic}
+            #     MaxRAMPercentage = 25.0                           {default}
+            #     UseSerialGC      = true                           {ergonomic}
+            #     pools: "Eden Space" / "Survivor Space" / "Tenured Gen"
+            #
+            # Duas consequências: 768 MB do limite não são usados pelo heap, e o coletor é
+            # stop-the-world de **uma thread**. No teste de carga do catálogo isso dava 1.209 pausas
+            # somando 3,6 s em 50 s de medição — cerca de 7% do tempo parado.
+            #
+            # `UseG1GC` precisa ser **explícito**: a escolha do serial é por memória, não por CPU —
+            # abaixo de 1792 MB de memória disponível a JVM classifica o container como "client
+            # class", e 70% de 1 GiB continua abaixo disso. Subir só o percentual deixaria o
+            # coletor como está.
+            #
+            # 70%, e não 75 ou 80: sobram ~300 MB para metaspace, cache de código, pilhas e buffers
+            # diretos. Errar para cima aqui troca pausa de GC por OOMKill, que é pior.
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=70 -XX:+UseG1GC"
           ports:
             - { name: http, containerPort: 8080 }
             # A porta do actuator. Entra aqui para o kubelet e o Prometheus a alcançarem; ela **não**
@@ -172,6 +193,27 @@ spec:
             # saudáveis, e o catálogo respondendo vazio. O sintoma não aponta para a causa.
             - { name: KEYCLOAK_TOKEN_URI, value: "http://keycloak.localtest.me/realms/codeflix/protocol/openid-connect/token" }
             - { name: CORS_ALLOWED_ORIGINS, value: "http://localhost:3000,http://localhost:3001" }
+            # **A JVM só usa 25% do limite como heap, e escolhe o coletor serial.** Medido no
+            # container, antes desta linha existir:
+            #
+            #     MaxHeapSize      = 268435456  (256 MB de 1 GiB)   {ergonomic}
+            #     MaxRAMPercentage = 25.0                           {default}
+            #     UseSerialGC      = true                           {ergonomic}
+            #     pools: "Eden Space" / "Survivor Space" / "Tenured Gen"
+            #
+            # Duas consequências: 768 MB do limite não são usados pelo heap, e o coletor é
+            # stop-the-world de **uma thread**. No teste de carga do catálogo isso dava 1.209 pausas
+            # somando 3,6 s em 50 s de medição — cerca de 7% do tempo parado.
+            #
+            # `UseG1GC` precisa ser **explícito**: a escolha do serial é por memória, não por CPU —
+            # abaixo de 1792 MB de memória disponível a JVM classifica o container como "client
+            # class", e 70% de 1 GiB continua abaixo disso. Subir só o percentual deixaria o
+            # coletor como está.
+            #
+            # 70%, e não 75 ou 80: sobram ~300 MB para metaspace, cache de código, pilhas e buffers
+            # diretos. Errar para cima aqui troca pausa de GC por OOMKill, que é pior.
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=70 -XX:+UseG1GC"
           ports:
             - { name: http, containerPort: 8082 }
             # A porta do actuator. Entra aqui para o kubelet e o Prometheus a alcançarem; ela **não**
@@ -268,6 +310,27 @@ spec:
             # é o nome do gateway, não o nome interno do Service.
             - { name: SIGNUP_CONFIRMATION_URL, value: "http://localhost:3000/cadastro/confirmar" }
             - { name: CORS_ALLOWED_ORIGINS, value: "http://localhost:3000,http://localhost:3001" }
+            # **A JVM só usa 25% do limite como heap, e escolhe o coletor serial.** Medido no
+            # container, antes desta linha existir:
+            #
+            #     MaxHeapSize      = 268435456  (256 MB de 1 GiB)   {ergonomic}
+            #     MaxRAMPercentage = 25.0                           {default}
+            #     UseSerialGC      = true                           {ergonomic}
+            #     pools: "Eden Space" / "Survivor Space" / "Tenured Gen"
+            #
+            # Duas consequências: 768 MB do limite não são usados pelo heap, e o coletor é
+            # stop-the-world de **uma thread**. No teste de carga do catálogo isso dava 1.209 pausas
+            # somando 3,6 s em 50 s de medição — cerca de 7% do tempo parado.
+            #
+            # `UseG1GC` precisa ser **explícito**: a escolha do serial é por memória, não por CPU —
+            # abaixo de 1792 MB de memória disponível a JVM classifica o container como "client
+            # class", e 70% de 1 GiB continua abaixo disso. Subir só o percentual deixaria o
+            # coletor como está.
+            #
+            # 70%, e não 75 ou 80: sobram ~300 MB para metaspace, cache de código, pilhas e buffers
+            # diretos. Errar para cima aqui troca pausa de GC por OOMKill, que é pior.
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=70 -XX:+UseG1GC"
           ports:
             - { name: http, containerPort: 8084 }
             # A porta do actuator. Entra aqui para o kubelet e o Prometheus a alcançarem; ela **não**
