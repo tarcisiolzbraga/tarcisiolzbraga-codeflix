@@ -427,6 +427,23 @@ O Trivy varre a imagem construída, e **barra o push** em HIGH ou CRITICAL com c
 (`ignore-unfixed`, porque CVE sem correção não é acionável: barrar por ela pararia o trabalho sem
 dar o que fazer).
 
+### A única exceção, e o que ela exige para existir
+
+O [`.trivyignore`](.trivyignore) tem **uma** linha, e o arquivo é a exceção **registrada** — não um
+silenciador. Cada linha tem de dizer o que foi medido, por que não há conserto, e o que a faria sair.
+
+A que está lá é o `CVE-2026-102554` do guava, e vale como exemplo do padrão: o guava não é
+dependência deste projeto, vem **shadado dentro** do `graphql-java`. Baixei os jares das três versões
+publicadas mais recentes e as três embutem o mesmo guava vulnerável, então **não há versão para onde
+subir** — e uma restrição de dependência não ajudaria, porque traria um jar ao lado sem remover os
+bytes shadados. Além disso a CVE exige desserialização de fluxo Java não confiável, que este projeto
+não faz em lugar nenhum.
+
+A diferença entre registrar e silenciar aparece na medida: as outras duas CVEs que apareceram junto
+— as do `snappy-java` — **tinham** correção publicada, e foram corrigidas por restrição de versão.
+Varrida sem o `.trivyignore`, a imagem do catálogo acusa exatamente **1** achado, e a da assinatura
+**nenhum**. A exceção cobre só o que não tem conserto.
+
 ### Por que as duas, e não uma
 
 Porque uma não vê o que a outra vê. Medido neste projeto: o `npm audit` do portal dizia **zero**
