@@ -539,6 +539,33 @@ docker compose --profile observability up -d
 O Elasticsearch pede meio giga de heap, por isso não sobe junto. Uma rede à parte não é necessária: a rede padrão
 do projeto já liga todos pelo nome do serviço.
 
+### O rastro segue para o armazenamento
+
+A chamada ao Garage leva o rastro da requisição que a pediu (`infrastructure/tracing`). Sem isso, o
+sidecar de saída via um pedido sem cabeçalho de rastro e começava um rastro novo — e "o download de
+400 MB levou 30 s" não dizia se o tempo era desta API ou do armazenamento, que é a pergunta de cada
+investigação de mídia deste repositório.
+
+**O rastro entra na camada do cliente HTTP, depois de o SDK assinar, e essa ordem é a única que
+funciona.** A primeira versão usava um `ExecutionInterceptor` com `modifyHttpRequest`, que roda
+**antes** da assinatura. O cabeçalho entrava no SigV4:
+
+```
+SignedHeaders=amz-sdk-invocation-id;amz-sdk-request;host;traceparent;x-amz-content-sha256;...
+```
+
+E o Garage recusava com `403 Invalid signature` em **todo** pedido de mídia. A razão é que o sidecar
+do Istio **reescreve** `traceparent` em trânsito: ele cria um span novo para o salto e troca o valor.
+Assinatura sobre cabeçalho que a malha reescreve nunca corresponde do outro lado.
+
+O teste que havia antes afirmava que a requisição continuava assinada — e continuava, porque dublê
+não confere assinatura. A afirmação era verdadeira e inútil, e quem a desmentiu foi o cluster. O
+teste de agora fixa que `traceparent` **não** está em `SignedHeaders`.
+
+O `S3Client` é síncrono e os dois ramos da rota de mídia chamam o armazenamento na thread da
+requisição, então o `RequestContextHolder` está visível ali — o `writeTo` do fluxo só consome um
+corpo já aberto. No catálogo isso não bastou, e o porquê está no `deploy/README.md`.
+
 ### O caminho do log
 
 O Filebeat tem duas entradas, porque a aplicação pode rodar de dois jeitos. Em container — a forma de homolog e

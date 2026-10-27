@@ -45,6 +45,10 @@ dependencies {
     // Fora do BOM do Boot: o arquivo de mídia vai para um armazenamento que fala S3.
     implementation platform('software.amazon.awssdk:bom:2.55.7')
     implementation 'software.amazon.awssdk:s3'
+    // Declarado, e não herdado: ele já vinha no classpath de execução — é o cliente HTTP síncrono
+    // que o `S3Client` resolve sozinho —, mas o de compilação não o tinha. O repasse do rastro
+    // embrulha o builder dele, para o cabeçalho entrar depois da assinatura.
+    implementation 'software.amazon.awssdk:apache5-client'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
     // O Apache HttpClient 5 já vinha transitivo **em runtime**, e é ele que o RestClient usa nos

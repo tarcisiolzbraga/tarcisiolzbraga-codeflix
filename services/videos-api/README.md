@@ -402,6 +402,27 @@ O `rating` é `String`, e não enum, por um impedimento do GraphQL: os rótulos 
 `10`, `12`, `14`, `16` e `18`, e valor de enum GraphQL não pode começar com dígito. O filtro valida o
 rótulo e **recusa o desconhecido** com `BAD_REQUEST`, em vez de ignorá-lo e devolver o acervo inteiro.
 
+## O rastro atravessa o catálogo
+
+As duas saídas HTTP deste serviço — a API do admin e o Elasticsearch — levam o rastro da requisição
+que as originou (`infrastructure/tracing`). O Istio gera os spans; o trabalho daqui é só não quebrar
+a corrente.
+
+São **duas**, e isso não é detalhe: o salto medido como quebrado era `catálogo -> Elasticsearch`, que
+não passa pelo `RestClient` do admin. Consertar só um deles deixaria justamente esse de fora.
+
+Duas armadilhas que a medição no cluster revelou, e que valem a leitura antes de mexer:
+
+- **o cliente do Elasticsearch é assíncrono**, e o interceptor de *requisição* do Apache HttpClient
+  roda na thread de I/O do reator, onde o `RequestContextHolder` está vazio. O gancho que funciona é
+  o de `exec`, que roda na thread do chamador;
+- **o graphql-java executa os data fetchers em outra thread.** Com o repasse ligado e os testes
+  verdes, a rota de mídia juntava o rastro e a consulta GraphQL continuava partida. O que fechou foi
+  registrar o `RequestAttributesThreadLocalAccessor` no `ContextRegistry` — o acessador vem no
+  spring-web, o registro não.
+
+Os números do antes e depois estão no `deploy/README.md`.
+
 ## Testes
 
 ```bash
