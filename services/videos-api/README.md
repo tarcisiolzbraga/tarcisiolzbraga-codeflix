@@ -177,6 +177,48 @@ nova: o `VideoMediaE2ETest` dubla o `VideoClient`, então nunca exercitou essa p
 servidor escrever o primeiro bloco e **só escrever o segundo depois de o primeiro chegar ao destino
 do cliente**; se o catálogo bufferizasse, o servidor esperaria para sempre.
 
+### Foi desfeito uma vez, e o que faltava era instrumento
+
+Este repasse em fluxo foi revertido em 19/10, e a razão registrada era honesta: havia uma
+instabilidade intermitente que não se conseguiu fechar. O revert não a resolveu — contornou,
+tirando o assíncrono do caminho, e custou um terço do ganho de memória.
+
+A causa apareceu em 26/10, na admin-api: o `HeaderWriterFilter` do Spring Security escreve os
+cabeçalhos **na volta** da cadeia de filtros, e com despacho assíncrono "depois da cadeia" não é
+"depois da resposta" — a cadeia volta assim que o assíncrono começa, o Tomcat recicla o `Response`
+ao terminar, e o filtro lê cabeçalho que já não existe.
+
+**O catálogo tinha a mesma exposição, e isso não era suposição.** Devolver o fluxo aqui põe esta
+rota no mesmo arranjo: `StreamingResponseBody` dentro de uma cadeia do Spring Security. Então antes
+de declarar o repasse de volta eu escrevi o instrumento que faltava em 19/10 —
+`VideoMediaRelayStressTest`, com tag `stressTest` e fora do `build` — e ele reproduziu:
+
+| arco medido | pedidos | falhas |
+|---|---|---|
+| repasse em fluxo, sem o conserto no filtro | 384.000 e 1.152.000, em 2 rodadas | **3 em cada rodada** |
+| repasse em fluxo, com o conserto | 1.920.000, em 5 rodadas | **0** |
+| controle síncrono, mesmo cliente e mesmo pool | o mesmo volume de cada rodada | **0 em todas** |
+
+Os dois sintomas nomeiam o mecanismo, e são do lado do cliente porque o servidor não registra nada:
+
+```
+ParseException: Invalid header; error at offset 0: <: >
+InvalidMimeTypeException: Invalid mime type "0": does not contain '/'
+```
+
+Um cabeçalho com nome vazio e um `Content-Type` lido como `"0"` — é resposta montada sobre memória
+de cabeçalho reciclada, que é exatamente o que a pilha do servidor mostrou na admin-api.
+
+O conserto é o mesmo de lá: `setShouldWriteHeadersEagerly(true)`, e o `SecurityConfig` explica o
+preço. Há teste fixando que os cabeçalhos de segurança continuam saindo — e, diferente do irmão na
+admin-api, ele mede **na rota de mídia**, que é a assíncrona.
+
+**Duas coisas que a medição corrigiu em mim.** A concorrência é o que expõe a corrida, não o volume:
+a 16 threads a taxa era de 1 falha em 288.000, e duas rodadas de 96.000 saíram limpas — por pouco eu
+teria chamado isso de "não reproduz". E as falhas se concentram por execução, não por pedido: 3
+falhas em 384.000 e 3 em 1.152.000, o mesmo número no triplo do volume. Por isso a comparação acima
+é por rodada, e não por taxa.
+
 ### O que ainda custa
 
 Do caminho da mídia, nada: ele atravessa os dois serviços em fluxo, nos dois sentidos. O envio, que
@@ -193,18 +235,24 @@ artes do catálogo, que são pequenas, e o player sempre manda `Range`.
 | onde se autoriza | **um lugar**: este controller | dois: aqui e na validade da URL |
 | o que precisa ser alcançável | nada novo | o Garage, de fora |
 | credencial nova | **nenhuma** (usa o service account que já existe) | chave de assinatura |
-| custo | o arquivo passa pela memória dos dois serviços | nenhum |
+| custo | um salto de rede a mais por pedido | nenhum |
 
 Para um acervo de POC o repasse ganha. **Para arquivo grande não ganha**, e o README diz por quê
 logo abaixo.
 
 ### O que isso custa, dito antes de alguém descobrir
 
-- **o arquivo passa inteiro pela memória** dos dois serviços: a rota do admin responde `byte[]`, e o
-  catálogo repassa sem melhorar isso;
-- **não há suporte a `Range`**, então não há busca na linha de tempo: o player reproduz do começo.
+Estas duas linhas estavam aqui, e **as duas deixaram de ser verdade** — ficaram no texto porque o
+revert de 19/10 trouxe de volta a versão antiga desta seção junto com o resto:
 
-O caminho para arquivo grande é URL assinada de validade curta, e aí a decisão de produto é outra.
+- ~~o arquivo passa inteiro pela memória dos dois serviços~~ — não passa mais: os dois lados são
+  fluxo, e é o que a seção acima mede;
+- ~~não há suporte a `Range`~~ — há, e tem seção própria neste README.
+
+O que **continua** custando é o salto de rede a mais: todo byte do vídeo atravessa o catálogo, que
+soma latência e banda a cada pedido. Para um acervo de POC isso se paga pela autorização num lugar
+só. Para arquivo grande não se paga, e o caminho é URL assinada de validade curta — aí a decisão é
+de produto.
 
 ### Duas decisões em aberto
 
@@ -362,12 +410,22 @@ rótulo e **recusa o desconhecido** com `BAD_REQUEST`, em vez de ignorá-lo e de
 ./gradlew integrationTests           # só @IntegrationTest
 ./gradlew e2eTests                   # só @E2ETest
 ./gradlew :domain:test --tests '*VideoTest'   # uma classe
+./gradlew stressTests                # mede o repasse sob carga; FORA do build
 ```
 
 Quem precisa de Docker é marcado por tag na própria anotação, nunca classe por classe, e `unitTests`
 é por exclusão — teste novo sem tag entra nela sozinho.
 
-Quatro níveis, cada um com um papel:
+`stressTests` fica **fora** do `build` de propósito: ele mede uma corrida, então falha por projeto
+quando a corrida acontece, e pôr isso no caminho de todo commit transformaria o build num sorteio —
+que é o problema que ele existe para investigar, não a solução. A concorrência e o volume se ajustam
+na linha de comando, e é por aí que se reproduz a medição registrada acima:
+
+```bash
+./gradlew stressTests -Dstress.threads=64 -Dstress.iteracoes=6000
+```
+
+Cinco níveis, cada um com um papel:
 
 | Nível | Cobre | Simula |
 |---|---|---|
@@ -375,6 +433,7 @@ Quatro níveis, cada um com um papel:
 | fatia `@GraphQlTest` | o contrato do schema | os casos de uso |
 | `@IntegrationTest` | gateway e listener, com Elasticsearch e Kafka reais | o cliente REST do admin |
 | `@E2ETest` | a jornada por HTTP, com Tomcat | só os clientes da API do admin |
+| `@StressTest` | a taxa de falha do repasse sob carga | o admin, por um `HttpServer` do JDK |
 
 **As mensagens de CDC dos testes não são inventadas:** foram capturadas dos tópicos do
 `admin-codeflix`, geradas pelo Debezium em cima do MySQL dele, e estão em
