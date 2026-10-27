@@ -175,6 +175,37 @@ Não é esquecimento: eles não expõem HTTP, consomem fila. Não há porta onde
 cluster sabe deles é o processo estar de pé. Medi-los pede outro instrumento — profundidade de fila,
 idade da mensagem mais velha —, e isso não está feito.
 
+## Quando o disco enche: o que acontece e como voltar
+
+Aconteceu, e a sequência de recuperação não é óbvia — o README já avisava da primeira armadilha, e as
+outras três só aparecem no meio do incidente.
+
+O disco passou de **88%**, o kubelet declarou `DiskPressure` e despejou **46 pods** entre `codeflix`
+e `istio-system`. O sintoma na porta é `503 upstream connect error` em todas as rotas, com os pods
+que sobraram aparentemente saudáveis.
+
+A ordem importa, e cada passo tem um porquê:
+
+| passo | por quê |
+|---|---|
+| `docker builder prune -f` | o cache de build é o maior pedaço descartável de quem anda construindo imagem. Aqui foram 6,7 GB, e levou o disco de 88% para 83% |
+| `kubectl delete pods --field-selector status.phase=Failed` nos **dois** namespaces | pod despejado não volta sozinho, e o `istio-system` também é despejado — 24 dos 46 eram dele |
+| `bash deploy/cluster/import-images.sh` | **o kubelet coleta as imagens carregadas à mão, e o rótulo `pinned` não resiste à pressão.** Ele não as removeu de um nó só: faltavam 2 num, 6 noutro e 6 no terceiro |
+| `kubectl rollout restart` em cada aplicação | **esta é a que custa achar.** O `istiod` reinicia no despejo, e os sidecars precisam de certificado novo; sem o reinício o gateway segue dando 503 com o pod servindo normalmente por dentro. Reiniciar **só** o `istio-ingressgateway` não resolve |
+
+Dois detalhes que economizam tempo:
+
+- **o pod velho continua servindo**, e isso engana: `kubectl exec ... wget localhost:8082` responde certo,
+  o Service tem endpoint, a sonda diz `Ready` — e o gateway dá 503. A diferença está no mTLS entre os
+  dois Envoy, não na aplicação;
+- **reiniciar antes de reimportar trava o rollout**: o pod novo nasce em `ImagePullBackOff` porque a
+  imagem não está mais no nó, e o antigo fica. `kubectl rollout undo` desfaz enquanto a imagem não
+  voltar.
+
+O caminho que evita tudo isso é o que o README já aponta como o certo: um **registro local do k3d**,
+em vez de carregar imagem por tarball. Com registro, a coleta do kubelet é inofensiva — a imagem tem
+de onde voltar.
+
 ## O que ainda depende de rede
 
 Nesta máquina os nós **não têm saída TCP para a internet** (ICMP passa, 443 não). As imagens de
