@@ -206,6 +206,31 @@ O caminho que evita tudo isso é o que o README já aponta como o certo: um **re
 em vez de carregar imagem por tarball. Com registro, a coleta do kubelet é inofensiva — a imagem tem
 de onde voltar.
 
+## Cada carga tem identidade própria, e isso só aparece ao escrever a primeira política
+
+Os 18 workloads rodavam com o service account `default`. Isso não incomoda em nada — até a primeira
+tentativa de `AuthorizationPolicy`: o certificado que o istiod emite carrega a identidade do service
+account, então com `default` em todos eles o certificado de **todo** pod dizia a mesma coisa.
+
+```
+antes:  spiffe://cluster.local/ns/codeflix/sa/default      (os 18)
+depois: spiffe://cluster.local/ns/codeflix/sa/videos-api   (lido do certificado do pod)
+```
+
+Com uma identidade só, "apenas o catálogo pode chamar o admin" é **inexprimível**: dava para dizer
+"alguém da malha", e nada além. O mTLS `STRICT` continua valendo o que vale — ele cifra e exige
+certificado —, mas o que ele não dava sozinho era identidade por carga.
+
+Um service account por workload, com o mesmo nome do Deployment, para não haver mapa a consultar.
+Eles entram **antes** de qualquer Deployment no `up.sh`: pod que referencia service account
+inexistente não é criado, e o erro — "error looking up service account" — fica no evento do pod, não
+no rollout.
+
+Nenhum deles recebe permissão de API do Kubernetes. Service account aqui é **só** identidade de rede.
+
+Conferido depois da troca: as rotas pelo gateway, os fronts por NodePort, os 18 pods prontos, os 18
+alvos de métrica — todos como antes.
+
 ## O que ainda depende de rede
 
 Nesta máquina os nós **não têm saída TCP para a internet** (ICMP passa, 443 não). As imagens de
