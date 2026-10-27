@@ -34,6 +34,11 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
     implementation 'org.springframework.boot:spring-boot-starter-graphql'
+    // Declarado, e não herdado: ele já vinha no classpath de execução por transitividade, mas o de
+    // compilação não o tinha. É o que o registro do acessador de ThreadLocal usa, para o rastro da
+    // requisição alcançar as threads em que o graphql-java executa os data fetchers. A versão vem do
+    // BOM do Boot.
+    implementation 'io.micrometer:context-propagation'
     // No Boot 4 a autoconfiguração do RestClient saiu do starter de web para um módulo próprio:
     // sem ele não existe o RestClient.Builder que o cliente da API do admin injeta.
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
