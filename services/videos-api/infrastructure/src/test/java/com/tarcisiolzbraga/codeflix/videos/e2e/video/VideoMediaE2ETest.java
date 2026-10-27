@@ -2,6 +2,7 @@ package com.tarcisiolzbraga.codeflix.videos.e2e.video;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -104,6 +105,41 @@ class VideoMediaE2ETest {
         final var disposition = String.valueOf(actual.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION));
         assertTrue(disposition.startsWith("inline"), disposition);
         assertTrue(disposition.contains("filme.mp4"), disposition);
+    }
+
+    // **Os cabeçalhos de segurança continuam saindo, e este teste existe por causa de uma troca.**
+    //
+    // O `HeaderWriterFilter` passou a escrever **antes** da cadeia, e não depois, porque escrever
+    // depois corrompia a resposta nesta rota: com despacho assíncrono, "depois da cadeia" não é
+    // "depois da resposta", e o filtro ia ler cabeçalho de um `Response` que o Tomcat já reciclou.
+    //
+    // O preço de escrever antes é que um handler que ponha o mesmo cabeçalho depois o sobrescreve,
+    // em vez de o `hasHeader` do writer o respeitar. Nenhuma rota daqui define esses cabeçalhos, mas
+    // sem este teste a troca poderia virar "consertei desligando a proteção" sem nada acusar.
+    //
+    // E é de propósito que ele mede na rota **de mídia**, que é a assíncrona: o irmão na admin-api
+    // mede numa rota síncrona, onde a escrita antecipada nem é exercitada.
+    @Test
+    void givenTheMediaIsRelayed_whenItAnswers_thenTheSecurityHeadersAreThere() {
+        // Given o admin tendo o arquivo
+        when(this.videoClient.mediaOf(any(), any(), any()))
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, null)));
+
+        // When quem assina pede a mídia
+        final var actual = clientWith(this.token.catalogTest())
+                .get()
+                .uri("/videos/{id}/medias/{type}", A_VIDEO, "VIDEO")
+                .retrieve()
+                .toEntity(byte[].class);
+
+        // Then os cabeçalhos padrão do Spring Security vieram junto
+        final var headers = actual.getHeaders();
+        assertEquals("nosniff", headers.getFirst("X-Content-Type-Options"));
+        assertEquals("DENY", headers.getFirst("X-Frame-Options"));
+        assertEquals("0", headers.getFirst("X-XSS-Protection"));
+        assertNotNull(headers.getCacheControl(), "faltou o Cache-Control");
+        assertEquals("no-cache", headers.getFirst("Pragma"));
+        assertEquals("0", headers.getFirst("Expires"));
     }
 
     // Título cadastrado sem upload existe no acervo e não tem o que reproduzir: 404 limpo, e não erro.
