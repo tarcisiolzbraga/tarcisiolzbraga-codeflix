@@ -56,7 +56,7 @@ bash deploy/infra/apply-keycloak.sh
 passo "8/10 infra, aplicativos e rotas"
 bash deploy/infra/apply-infra.sh
 kubectl apply -f deploy/apps/java.yaml -f deploy/apps/go-and-fronts.yaml -f deploy/apps/fronts-nodeport.yaml
-kubectl apply -f deploy/mesh/routes.yaml -f deploy/mesh/dashboards.yaml
+kubectl apply -f deploy/mesh/routes.yaml -f deploy/mesh/dashboards.yaml -f deploy/mesh/peer-authentication.yaml
 echo "esperando os pods..."
 kubectl -n codeflix wait --for=condition=Available deployment --all --timeout=600s
 
