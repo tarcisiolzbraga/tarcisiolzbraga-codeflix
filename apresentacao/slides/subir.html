@@ -1,0 +1,21 @@
+<section id="subir" data-transition="fade" style="background:#14161C;color:#F4F2ED;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<h2 style="font-family:'Oswald', Arial, sans-serif;font-size:72px;font-weight:500;line-height:1.1">Sobe com um comando</h2>
+<div style="display:flex;gap:48px;align-items:start">
+<div style="flex:1;display:flex;flex-direction:column;gap:28px">
+<p style="font-family:'Oswald', Arial, sans-serif;font-size:44px;font-weight:500;background:#1C1F27;padding:32px 40px;border-radius:12px;color:#6AA9D6">bash deploy/up.sh</p>
+<p style="font-size:30px;line-height:1.45;color:#A8AEBA">Dez passos em ordem, e a ordem não é arbitrária: cada um depende do anterior de um jeito que não é óbvio &mdash; o DNS dos nós antes das imagens, a malha antes do gateway existir, o Keycloak antes de tudo que valida token.</p>
+<p style="font-size:30px;line-height:1.45;color:#A8AEBA">No fim, o cluster semeado e as páginas abertas no navegador.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#1C1F27;padding:48px;border-radius:16px">
+<h3 style="font-family:'Oswald', Arial, sans-serif;font-size:40px;font-weight:500;color:#EE6B50">O que falta, dito</h3>
+<ul style="font-size:28px;line-height:1.5;color:#A8AEBA">
+<li>registro de imagens: hoje elas entram no cluster por arquivo, à mão</li>
+<li>backup fora da máquina, e agendado</li>
+<li>volume no Kafka: reiniciar o pod dele prende o conector de replicação</li>
+<li>rastro dentro das mensagens de fila</li>
+</ul>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#6A7179">11</p>
+<aside>O que falta está escrito no README da pasta deploy, com o motivo de cada um. O projeto é de aprendizado, então o critério não foi entregar rápido: foi não deixar afirmação sem medida e não deixar decisão sem o porquê registrado.</aside>
+</section>

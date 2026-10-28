@@ -1,0 +1,10 @@
+<section id="medir" data-transition="push" style="background:#EE6B50;color:#14161C;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;justify-content:space-between;gap:56px">
+<p style="font-size:28px;font-weight:600;letter-spacing:6px;text-transform:uppercase">O hábito que define o projeto</p>
+<h1 style="font-family:'Oswald', Arial, sans-serif;font-size:132px;font-weight:600;line-height:1.02;width:1500px">Medir antes de afirmar</h1>
+<div style="display:flex;gap:32px">
+<div style="flex:1;display:flex;flex-direction:column;gap:12px"><h3 style="font-family:'Oswald', Arial, sans-serif;font-size:56px;font-weight:600">7,3% &rarr; 1,4%</h3><p style="font-size:28px;line-height:1.4">do tempo em pausa de GC, depois de descobrir que a JVM usava um quarto do limite do container</p></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px"><h3 style="font-family:'Oswald', Arial, sans-serif;font-size:56px;font-weight:600">11 &rarr; 0</h3><p style="font-size:28px;line-height:1.4">falhas em 144.000 pedidos de mídia, numa intermitência que estava registrada como &ldquo;sem causa&rdquo;</p></div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px"><h3 style="font-family:'Oswald', Arial, sans-serif;font-size:56px;font-weight:600">30 &rarr; 1</h3><p style="font-size:28px;line-height:1.4">rastros por requisição: 30 fragmentos soltos viraram uma árvore que atravessa os serviços</p></div>
+</div>
+<aside>Em todos os três casos a conclusão mudou depois da medição. O GC parecia problema de aplicação e era ergonomia da JVM no container. A intermitência da mídia estava documentada como artefato do cliente de teste e era uma corrida no filtro de segurança. E o rastreamento parecia só faltar ser ligado.</aside>
+</section>

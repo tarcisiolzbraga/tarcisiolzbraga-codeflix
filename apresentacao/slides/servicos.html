@@ -1,0 +1,19 @@
+<section id="servicos" data-transition="fade" style="background:#1C1F27;color:#F4F2ED;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<h2 style="font-family:'Oswald', Arial, sans-serif;font-size:72px;font-weight:500;line-height:1.1">As peças, num repositório só</h2>
+<table style="font-family:'IBM Plex Sans', Arial, sans-serif;font-size:30px;color:#F4F2ED;padding:16px 20px">
+<tr style="background:#14161C">
+<th style="width:24%;text-align:left;font-weight:600">Peça</th>
+<th style="width:52%;text-align:left;font-weight:600">O que faz</th>
+<th style="width:24%;text-align:left;font-weight:600">Stack</th>
+</tr>
+<tr><td style="color:#EE6B50">admin-api</td><td style="color:#A8AEBA">administra o catálogo. É a fonte do dado.</td><td style="color:#A8AEBA">Java</td></tr>
+<tr style="background:#171A21"><td style="color:#EE6B50">videos-api</td><td style="color:#A8AEBA">serve o catálogo a quem assina</td><td style="color:#A8AEBA">Java</td></tr>
+<tr><td style="color:#EE6B50">subscription-api</td><td style="color:#A8AEBA">diz quem é assinante e se pagou</td><td style="color:#A8AEBA">Java</td></tr>
+<tr style="background:#171A21"><td style="color:#EE6B50">encoder-api</td><td style="color:#A8AEBA">converte as mídias recebidas</td><td style="color:#A8AEBA">Go</td></tr>
+<tr><td style="color:#EE6B50">mail-api</td><td style="color:#A8AEBA">entrega o e-mail, consumindo a fila</td><td style="color:#A8AEBA">Go</td></tr>
+<tr style="background:#171A21"><td style="color:#6AA9D6">portal</td><td style="color:#A8AEBA">o front de quem assiste</td><td style="color:#A8AEBA">Next.js</td></tr>
+<tr><td style="color:#6AA9D6">back-office</td><td style="color:#A8AEBA">o front de quem administra</td><td style="color:#A8AEBA">React</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#6A7179">3</p>
+<aside>Um repositório só, e por quatro razões medidas: o realm do Keycloak é um, o contrato do CDC atravessa dois serviços, a infraestrutura é compartilhada e o build é o mesmo. Antes eram dois buildSrc iguais que já tinham começado a divergir.</aside>
+</section>

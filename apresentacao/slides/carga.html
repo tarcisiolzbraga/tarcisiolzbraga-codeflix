@@ -1,0 +1,22 @@
+<section id="carga" data-transition="fade" style="background:#14161C;color:#F4F2ED;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<h2 style="font-family:'Oswald', Arial, sans-serif;font-size:72px;font-weight:500;line-height:1.1">Quanto ele aguenta</h2>
+<div style="display:flex;gap:64px;align-items:start">
+<table style="flex:1;font-family:'IBM Plex Sans', Arial, sans-serif;font-size:32px;color:#F4F2ED;padding:18px 24px">
+<tr style="background:#1C1F27">
+<th style="width:30%;text-align:left;font-weight:600">VUs</th>
+<th style="width:35%;text-align:right;font-weight:600">antes</th>
+<th style="width:35%;text-align:right;font-weight:600">depois</th>
+</tr>
+<tr><td style="color:#A8AEBA">10</td><td style="text-align:right;color:#A8AEBA">701</td><td style="text-align:right;color:#6AA9D6">790</td></tr>
+<tr><td style="color:#A8AEBA">20</td><td style="text-align:right;color:#A8AEBA">769</td><td style="text-align:right;color:#6AA9D6">869</td></tr>
+<tr><td style="color:#A8AEBA">40</td><td style="text-align:right;color:#A8AEBA">723</td><td style="text-align:right;color:#6AA9D6">899</td></tr>
+</table>
+<div style="flex:1;display:flex;flex-direction:column;gap:32px">
+<p style="font-size:30px;line-height:1.45;color:#A8AEBA">Requisições por segundo na leitura paginada do acervo, com as relações resolvidas. <b>Zero erro em todos os níveis</b>: o serviço degrada, não quebra.</p>
+<p style="font-size:30px;line-height:1.45;color:#A8AEBA">Antes do conserto do GC a vazão <b>caía</b> ao passar de 20 usuários simultâneos, enquanto a latência crescia. Depois, ela continua subindo.</p>
+<p style="font-size:30px;line-height:1.45;color:#EE6B50">E o custo tem nome: resolver categorias, gêneros e elenco custa 2,4&times; da vazão.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#6A7179">9</p>
+<aside>Medido com k6, em degraus. O número que importa não é o pico, é o joelho: ele estava entre 10 e 20 usuários simultâneos. E a conta das relações não é N+1 — o batch já existe —, são três idas extras ao índice por página.</aside>
+</section>

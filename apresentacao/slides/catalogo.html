@@ -1,0 +1,20 @@
+<section id="catalogo" data-transition="fade" style="background:#1C1F27;color:#F4F2ED;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:64px">
+<h2 style="font-family:'Oswald', Arial, sans-serif;font-size:72px;font-weight:500;line-height:1.1">Como o catálogo fica em dia</h2>
+<div style="display:flex;gap:16px;align-items:center">
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#14161C;padding:24px;border-radius:12px"><p style="font-size:28px;font-weight:600;color:#EE6B50">MySQL</p><p style="font-size:24px;color:#A8AEBA">a fonte</p></div>
+<x-shape kind="arrow-right" style="width:64px;height:32px;background:#6A7179"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#14161C;padding:24px;border-radius:12px"><p style="font-size:28px;font-weight:600;color:#EE6B50">Debezium</p><p style="font-size:24px;color:#A8AEBA">lê o binlog</p></div>
+<x-shape kind="arrow-right" style="width:64px;height:32px;background:#6A7179"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#14161C;padding:24px;border-radius:12px"><p style="font-size:28px;font-weight:600;color:#EE6B50">Kafka</p><p style="font-size:24px;color:#A8AEBA">transporta</p></div>
+<x-shape kind="arrow-right" style="width:64px;height:32px;background:#6A7179"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#14161C;padding:24px;border-radius:12px"><p style="font-size:28px;font-weight:600;color:#6AA9D6">catálogo</p><p style="font-size:24px;color:#A8AEBA">busca e indexa</p></div>
+<x-shape kind="arrow-right" style="width:64px;height:32px;background:#6A7179"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px;background:#14161C;padding:24px;border-radius:12px"><p style="font-size:28px;font-weight:600;color:#6AA9D6">índice</p><p style="font-size:24px;color:#A8AEBA">a réplica</p></div>
+</div>
+<div style="display:flex;gap:48px">
+<p style="flex:1;font-size:30px;line-height:1.45;color:#A8AEBA">O aviso do CDC diz apenas <b>o que mudou</b>. O catálogo então busca o registro completo na API do admin e indexa — então o índice é <b>réplica, não fonte</b>.</p>
+<p style="flex:1;font-size:30px;line-height:1.45;color:#A8AEBA">Apagar o volume do índice não perde dado: o Debezium refaz o retrato. Medido de ponta a ponta, uma categoria nova chega ao catálogo em <b>cerca de 5 segundos</b>.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#6A7179">5</p>
+<aside>Replicação por mudança de dado, e não por chamada entre serviços: o admin não sabe que o catálogo existe. O preço é consistência eventual, de poucos segundos, e o ganho é que o catálogo continua servindo mesmo com o admin fora do ar.</aside>
+</section>
