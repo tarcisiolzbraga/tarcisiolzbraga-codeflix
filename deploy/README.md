@@ -288,6 +288,110 @@ Nenhum deles recebe permissão de API do Kubernetes. Service account aqui é **s
 Conferido depois da troca: as rotas pelo gateway, os fronts por NodePort, os 18 pods prontos, os 18
 alvos de métrica — todos como antes.
 
+## Quem pode chamar quem
+
+O par do mTLS: ele diz que o chamador tem identidade verificável, e a `AuthorizationPolicy` decide o
+que ele pode fazer com ela. Sem a segunda, a primeira só garante que o chamador é **alguém** da
+malha — e hoje o portal poderia abrir conexão no MySQL do admin.
+
+**O grafo não foi adivinhado.** Saiu das métricas do Istio, do que de fato aconteceu neste cluster:
+
+```bash
+kubectl -n istio-system exec deploy/prometheus -c prometheus-server -- wget -qO- \
+  'http://localhost:9090/api/v1/query?query=sum(istio_requests_total)by(source_workload,destination_workload)'
+```
+
+16 pares HTTP, e — na métrica **separada** `istio_tcp_connections_opened_total` — 14 pares TCP. Os
+TCP são a parte que mais importa e quase me escaparam: eles **não** aparecem em
+`istio_requests_total`. Uma política escrita só a partir do HTTP bloquearia todo banco, toda fila e o
+índice, e o sintoma seria a aplicação subindo e não falando com nada.
+
+`nada-passa-sem-regra` é um `ALLOW` sem regra nenhuma, que é o idioma do Istio para negar tudo: a
+partir dele, workload sem política própria não recebe chamada. O `kafka-connect` é um desses, e de
+propósito — nada o chama pela malha.
+
+### O que foi medido
+
+Da **mesma** origem, um permitido e dois negados, que é o que mostra que a política discrimina por
+identidade e não por sorte:
+
+```
+kafka-connect -> mysql:3306        conectou   (está na lista do mysql)
+kafka-connect -> videos-api:8082   403        (não está na lista do catálogo)
+kafka-connect -> garage:3900       403        (nem na do armazenamento)
+```
+
+E os fluxos inteiros, com a política valendo: as rotas pelo gateway, os fronts por NodePort, o
+cadastro (`202`), a mídia atravessando `gateway -> catálogo -> admin -> armazenamento`, e o **CDC de
+ponta a ponta** — uma categoria criada no admin chegou ao catálogo em cerca de 5 segundos. 18 pods
+prontos, 18 alvos de métrica, nenhum 403 fora dos testes.
+
+### Três coisas que eu errei antes de acertar
+
+**O Kafka precisa estar na própria lista.** O `advertised.listeners` dele é `INTERNAL://kafka:9092`,
+então todo cliente — inclusive o `kafka-topics.sh` rodando **dentro** do pod — pede metadado e
+reconecta pelo nome do serviço, saindo pelo sidecar com identidade `sa/kafka`. Sem a regra:
+
+```
+kafka-topics.sh --bootstrap-server localhost:9092 --list
+-> Timed out waiting for a node assignment. Call: listTopics
+```
+
+O quórum do controlador **não** precisa de regra — é `1@localhost:9093`, e localhost não passa pelo
+sidecar. Foi a primeira coisa que suspeitei, e estava errado.
+
+**E esse erro meu produziu um diagnóstico errado.** Com o `kafka-topics.sh` bloqueado, minha
+verificação de tópicos devolveu zero, e eu conclui que o Kafka tinha perdido tudo. Tinha 44 tópicos.
+O que contei foram as linhas de um comando que falhou, com o erro mandado para `/dev/null`.
+
+**O `port-forward` não precisa de exceção.** Eu previ que o `register-cdc.sh` quebraria, porque ele
+alcança o Connect por `kubectl port-forward` e isso não tem identidade. Funcionou: o port-forward
+entra pelo namespace de rede do pod, como localhost, e não passa pelo sidecar inbound.
+
+### Quando o Kafka Connect fica preso
+
+Sintoma: conector `UNASSIGNED`, worker em laço com "unknown topic or partition" em
+`connect_statuses-N`. Causa: o Kafka reiniciou, perdeu os tópicos internos do Connect, e eles foram
+recriados com 1 partição enquanto o worker espera 5.
+
+```bash
+kubectl -n codeflix scale deploy/kafka-connect --replicas=0
+for t in connect_configs connect_offsets connect_statuses; do
+  kubectl -n codeflix exec deploy/kafka -c kafka -- \
+    /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic "$t"
+done
+kubectl -n codeflix scale deploy/kafka-connect --replicas=1
+bash deploy/infra/register-cdc.sh
+```
+
+### O risco desta abordagem, dito antes de alguém descobrir
+
+Métrica mostra o que **rodou**, não o que **existe**. Caminho que ninguém exercitou na janela medida
+não entra na lista e passa a ser recusado — com `403` no HTTP e conexão fechada no TCP.
+
+Por isso o grafo medido foi **conferido contra o que cada serviço declara depender**, lendo as
+variáveis de ambiente que os manifestos dão a ele:
+
+| serviço | destinos declarados | na política |
+|---|---|---|
+| `admin-api` | mysql, rabbitmq, garage, keycloak | sim |
+| `videos-api` | admin-api, catalog-elasticsearch, kafka, keycloak | sim |
+| `subscription-api` | subscription-mysql, kafka, rabbitmq, keycloak | sim |
+| `encoder-api` | encoder-postgres, rabbitmq, garage | sim |
+| `mail-api` | rabbitmq, mailpit (SMTP) | sim |
+
+As duas listas fecham, e é isso que dá confiança de que a janela medida não escondeu caminho.
+
+**Um detalhe que a conferência revelou:** os três serviços Java alcançam o Keycloak pelo **nome
+público** — `keycloak.localtest.me` —, e não pelo nome de serviço do cluster. Então aquele tráfego
+pode entrar no Keycloak vindo do gateway, e não direto do serviço. A lista dele permite **os dois**,
+e por isso o caminho fecha de qualquer forma; se permitisse só um, funcionaria ou não dependendo de
+como o DNS do cluster estivesse resolvendo naquele dia — que é o tipo de dependência invisível que
+não se quer numa regra de segurança.
+
+Caminho novo entre serviços precisa de regra nova, e o sintoma de esquecer é um `403` que o Jaeger
+agora mostra em qual salto aconteceu.
+
 
 ## O que ainda depende de rede
 
@@ -451,11 +555,12 @@ kubectl -n istio-system patch telemetry rastreamento --type=merge \
 
 ## O que falta
 
-- **Nenhuma `AuthorizationPolicy`**: o mTLS obrigatório já entrou, então a identidade de cada
-  chamador é verificável — mas ninguém decide nada com ela. Qualquer pod da malha pode chamar
-  qualquer pod: hoje o portal pode abrir conexão no MySQL do admin, e o que o impede é só não haver
-  motivo. É o que falta para a malha fechar de verdade, e agora há rastreamento para dizer em qual
-  salto o tráfego parou se uma política apertar demais.
+- **O Kafka não tem volume.** MySQL, Elasticsearch e Garage têm PVC; ele não, então todo reinício do
+  pod leva os tópicos. Isso não perde dado de negócio — o que está no MySQL e no índice sobrevive, e
+  o CDC reconstrói —, mas **deixa o Kafka Connect preso**: os tópicos internos dele são recriados com
+  1 partição pelo padrão do broker enquanto o worker espera 5, e ele fica em laço buscando
+  `connect_statuses-1..4`. A recuperação está na seção "Quem pode chamar quem"; o conserto é dar
+  volume a ele.
 - **O rastreamento das filas.** O das requisições HTTP está fechado: os spans chegam e as
   requisições atravessam os serviços num trace só, medido acima. O que continua solto é o que passa
   por Kafka e RabbitMQ — o encoder e os listeners de CDC. Ligá-los é propagar o rastro **pela
