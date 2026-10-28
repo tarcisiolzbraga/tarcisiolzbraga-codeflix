@@ -151,6 +151,10 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'
           format: table
+          # Explícito, e não pelo diretório de trabalho: o Trivy lê o `.trivyignore` do cwd por
+          # padrão, e depender disso faria a exceção sumir calada se o passo mudar de pasta. Cada
+          # linha de lá traz a medição que a justifica e o que a faria sair.
+          trivyignores: .trivyignore
 
   # Os serviços em Go têm job próprio, e não entram nas matrizes dos de cima: a cadeia é outra —
   # Go, com o seu cache e o seu jeito de rodar teste. Desde que a imagem do mail-api ficou meses
@@ -205,6 +209,10 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'
           format: table
+          # Explícito, e não pelo diretório de trabalho: o Trivy lê o `.trivyignore` do cwd por
+          # padrão, e depender disso faria a exceção sumir calada se o passo mudar de pasta. Cada
+          # linha de lá traz a medição que a justifica e o que a faria sair.
+          trivyignores: .trivyignore
 
   # Os clientes têm job próprio pelo mesmo motivo dos serviços em Go: a cadeia de ferramentas é
   # outra. `npm run check` é a porta de entrada de cada commit do portal — lint, tipos, testes e
@@ -274,3 +282,7 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'
           format: table
+          # Explícito, e não pelo diretório de trabalho: o Trivy lê o `.trivyignore` do cwd por
+          # padrão, e depender disso faria a exceção sumir calada se o passo mudar de pasta. Cada
+          # linha de lá traz a medição que a justifica e o que a faria sair.
+          trivyignores: .trivyignore
