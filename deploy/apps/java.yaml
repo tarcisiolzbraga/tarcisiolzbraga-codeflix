@@ -40,6 +40,11 @@ spec:
         prometheus.io/port: "9090"
         prometheus.io/path: /actuator/prometheus
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: admin-api
       # A janela entre o SIGTERM e o SIGKILL, igual à do compose e pelo mesmo motivo: a aplicação
       # espera até 30s pela requisição em voo, e o padrão do Kubernetes é 30 — sem margem, quem
       # decide é o relógio do kubelet e não o `timeout-per-shutdown-phase`, que ao menos registra o
@@ -160,6 +165,11 @@ spec:
         prometheus.io/port: "9091"
         prometheus.io/path: /actuator/prometheus
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: videos-api
       # A janela entre o SIGTERM e o SIGKILL, igual à do compose e pelo mesmo motivo: a aplicação
       # espera até 30s pela requisição em voo, e o padrão do Kubernetes é 30 — sem margem, quem
       # decide é o relógio do kubelet e não o `timeout-per-shutdown-phase`, que ao menos registra o
@@ -284,6 +294,11 @@ spec:
         prometheus.io/port: "9092"
         prometheus.io/path: /actuator/prometheus
     spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: subscription-api
       # A janela entre o SIGTERM e o SIGKILL, igual à do compose e pelo mesmo motivo: a aplicação
       # espera até 30s pela requisição em voo, e o padrão do Kubernetes é 30 — sem margem, quem
       # decide é o relógio do kubelet e não o `timeout-per-shutdown-phase`, que ao menos registra o

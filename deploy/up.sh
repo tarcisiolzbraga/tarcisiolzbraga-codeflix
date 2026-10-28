@@ -11,7 +11,8 @@
 #   3. as imagens entram nos nós      — antes do Istio, porque nesta rede os nós não baixam nada
 #   4. a malha instala                — e só então existe o Service do gateway
 #   5. o DNS do cluster aponta para o gateway  — precisa do IP dele, que acabou de nascer
-#   6. o segredo do .env              — tudo depois disto o consome
+#   6. o segredo do .env e as identidades  — tudo depois disto os consome; pod que referencia
+#                                       service account inexistente não é criado
 #   7. Keycloak primeiro              — o `iss` dos tokens depende do nome dele estar de pé
 #   8. a infra, os aplicativos, as rotas
 #   9. o conector de CDC              — o Kafka nasce vazio; sem isto o catálogo fica vazio para sempre
@@ -42,8 +43,12 @@ bash deploy/mesh/install-istio.sh
 passo "5/10 DNS do cluster apontando para o gateway"
 bash deploy/cluster/dns-localtest.sh
 
-passo "6/10 segredo do .env"
+passo "6/10 segredo do .env e as identidades"
 bash deploy/cluster/create-secret.sh
+# **Antes de qualquer Deployment**, e não junto deles: todo pod daqui para baixo declara
+# `serviceAccountName`, e pod que referencia service account inexistente não é criado — o kubelet
+# responde "error looking up service account" e o rollout fica pendurado sem dizer o porquê.
+kubectl apply -f deploy/mesh/service-accounts.yaml
 
 passo "7/10 Keycloak"
 bash deploy/infra/apply-keycloak.sh
