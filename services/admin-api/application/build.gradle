@@ -15,7 +15,7 @@ configurations {
 
 dependencies {
     api project(':domain')
-    api 'io.vavr:vavr:0.10.6'
+    api 'io.vavr:vavr:1.0.1'
 
     testImplementation testFixtures(project(':domain'))
     testImplementation "org.mockito:mockito-junit-jupiter:$mockitoVersion"
