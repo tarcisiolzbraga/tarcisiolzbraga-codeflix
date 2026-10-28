@@ -1,0 +1,80 @@
+# O mTLS da malha: obrigatório, com duas exceções estreitas e medidas.
+#
+# **O que muda.** Sem isto a malha está `PERMISSIVE`: ela cifra quando os dois lados falam Istio, e
+# aceita texto puro quando não. Isso significa que qualquer coisa que alcance o IP de um pod fala com
+# ele sem credencial nenhuma — medido, de dentro do cluster e de fora da malha:
+#
+#     sem STRICT:  GET http://10.42.0.28:8082/api/graphql  -> 405 (a aplicação respondeu)
+#     com STRICT:  o mesmo pedido                          -> conexão recusada
+#
+# `STRICT` não é só cifra: é **autenticação**. O sidecar passa a exigir um certificado emitido pelo
+# istiod, e é isso que torna a identidade de cada chamador verificável — o que a
+# `AuthorizationPolicy` depois usa para decidir quem pode chamar quem. Uma sem a outra não fecha
+# nada: política sem mTLS confia num cabeçalho, e mTLS sem política só diz que o chamador é alguém
+# da malha.
+#
+# **O que foi medido não quebrar**, com o STRICT aplicado: as rotas pelo gateway, os 18 pods
+# prontos, e os 18 alvos de métrica do Prometheus. Dois motivos, nenhum deles óbvio:
+#
+#   - as **sondas** do kubelet chegam de fora da malha, mas o Istio as reescreve na injeção: o pod em
+#     execução aponta para `:15020/app-health/<container>/readyz`, a porta do pilot-agent, que fica
+#     fora do mTLS. Sem essa reescrita o STRICT marcaria todo pod como não pronto;
+#   - o **Prometheus** não tem sidecar (nada em `istio-system` tem), e raspa de fora da malha. O
+#     `enablePrometheusMerge` reescreve a anotação do pod para `:15020/stats/prometheus`, também fora
+#     do mTLS, e o sidecar mescla ali as métricas da aplicação com as do Envoy — conferido: as
+#     `jvm_memory_used_bytes` continuam presentes.
+#
+# **E o que quebrou**: os dois fronts, pelo NodePort. Está logo abaixo.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: mtls-obrigatorio
+  namespace: codeflix
+spec:
+  mtls:
+    mode: STRICT
+---
+# **As duas exceções, e por que elas não são folga.**
+#
+# O portal e o back-office são servidos por NodePort — `localhost:3000` e `localhost:3001` —, e isso
+# é escolha registrada no `deploy/README.md`: o login precisa de **contexto seguro**, que `localhost`
+# tem e `http://nome.localtest.me` não. Tráfego de NodePort entra pelo nó e chega ao pod em texto
+# puro, de fora da malha; com STRICT ele é recusado, e os dois fronts respondem nada. Medido: os dois
+# passaram de 200 para conexão recusada no instante em que o STRICT entrou.
+#
+# A exceção é **por porta**, e não por workload: o `portLevelMtls` libera só a porta que o NodePort
+# alcança. Todo o resto do tráfego desses dois pods — inclusive o que eles mandam para as APIs —
+# continua sob STRICT. Um `mode: PERMISSIVE` no workload inteiro seria mais simples e abriria mais do
+# que o necessário.
+#
+# Isto sai quando os fronts deixarem de depender de NodePort, o que depende de servi-los por https no
+# gateway — e aí o contexto seguro vem do próprio esquema.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: portal-por-nodeport
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels:
+      app: portal
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    3000:
+      mode: PERMISSIVE
+---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: back-office-por-nodeport
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels:
+      app: back-office
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    3001:
+      mode: PERMISSIVE
