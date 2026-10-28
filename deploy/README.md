@@ -310,10 +310,30 @@ bash deploy/infra/register-cdc.sh
 ### O risco desta abordagem, dito antes de alguém descobrir
 
 Métrica mostra o que **rodou**, não o que **existe**. Caminho que ninguém exercitou na janela medida
-não entra na lista e passa a ser recusado — com `403` no HTTP e conexão fechada no TCP. Por isso cada
-regra foi conferida contra o que o README de cada serviço declara depender, e por isso o que foi
-exercitado para validar está listado acima. Caminho novo entre serviços precisa de regra nova, e o
-sintoma de esquecer é um `403` que o Jaeger agora mostra em qual salto aconteceu.
+não entra na lista e passa a ser recusado — com `403` no HTTP e conexão fechada no TCP.
+
+Por isso o grafo medido foi **conferido contra o que cada serviço declara depender**, lendo as
+variáveis de ambiente que os manifestos dão a ele:
+
+| serviço | destinos declarados | na política |
+|---|---|---|
+| `admin-api` | mysql, rabbitmq, garage, keycloak | sim |
+| `videos-api` | admin-api, catalog-elasticsearch, kafka, keycloak | sim |
+| `subscription-api` | subscription-mysql, kafka, rabbitmq, keycloak | sim |
+| `encoder-api` | encoder-postgres, rabbitmq, garage | sim |
+| `mail-api` | rabbitmq, mailpit (SMTP) | sim |
+
+As duas listas fecham, e é isso que dá confiança de que a janela medida não escondeu caminho.
+
+**Um detalhe que a conferência revelou:** os três serviços Java alcançam o Keycloak pelo **nome
+público** — `keycloak.localtest.me` —, e não pelo nome de serviço do cluster. Então aquele tráfego
+pode entrar no Keycloak vindo do gateway, e não direto do serviço. A lista dele permite **os dois**,
+e por isso o caminho fecha de qualquer forma; se permitisse só um, funcionaria ou não dependendo de
+como o DNS do cluster estivesse resolvendo naquele dia — que é o tipo de dependência invisível que
+não se quer numa regra de segurança.
+
+Caminho novo entre serviços precisa de regra nova, e o sintoma de esquecer é um `403` que o Jaeger
+agora mostra em qual salto aconteceu.
 
 ## O que ainda depende de rede
 
