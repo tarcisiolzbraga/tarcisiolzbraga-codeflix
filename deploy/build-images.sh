@@ -31,5 +31,15 @@ done
 echo "==> imagens"
 docker compose build admin-api videos-api subscription-api encoder-api mail-api portal-codeflix back-office-codeflix
 
+# **A tag imutável, ao lado da `latest`.** O compose só sabe construir `:latest`, então a marcação
+# vem depois. As duas existem de propósito: a `latest` serve ao `docker compose up` do dia a dia, e
+# a do commit é a que vai para o cluster — é ela que torna possível saber o que está no ar e
+# desfazer um deploy.
+TAG="$(bash "$(dirname "${BASH_SOURCE[0]}")/tag.sh")"
+echo "==> marcando como ${TAG}"
+for servico in admin-api videos-api subscription-api encoder-api mail-api portal-codeflix back-office-codeflix; do
+  docker tag "admin-codeflix-${servico}:latest" "admin-codeflix-${servico}:${TAG}"
+done
+
 echo
 echo "pronto. Agora: bash deploy/up.sh (ou deploy/cluster/push-images.sh, se o cluster já existe)"

@@ -22,6 +22,9 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
 REGISTRO="${REGISTRO:-localhost:5000}"
+# A mesma fonte que o build usou: se as duas divergirem, o cluster pede uma imagem que ninguém
+# empurrou, e o sintoma aparece como ImagePullBackOff longe daqui.
+TAG="${TAG:-$(bash deploy/tag.sh)}"
 
 # As nossas, construídas pelo compose. São as que mudam a cada commit.
 NOSSAS=(
@@ -61,7 +64,7 @@ caminho_no_registro() {
 # Imagem que não está no host falha aqui, com o nome dela — e não lá na frente, como
 # ImagePullBackOff num pod qualquer.
 faltando=0
-for imagem in "${NOSSAS[@]/%/:latest}" "${DE_FORA[@]}"; do
+for imagem in "${NOSSAS[@]/%/:$TAG}" "${DE_FORA[@]}"; do
   docker image inspect "$imagem" >/dev/null 2>&1 || { echo "   FALTA no host: $imagem" >&2; faltando=1; }
 done
 if [ "$faltando" != 0 ]; then
@@ -71,8 +74,17 @@ if [ "$faltando" != 0 ]; then
   exit 1
 fi
 
-echo "==> empurrando para ${REGISTRO}"
-for imagem in "${NOSSAS[@]/%/:latest}" "${DE_FORA[@]}"; do
+echo "==> empurrando para ${REGISTRO} (tag ${TAG})"
+# As nossas vão com **as duas** tags: a do commit, que é a que o manifesto referencia, e a `latest`,
+# que mantém o `docker compose up` local funcionando sem precisar saber de tag nenhuma.
+for nome in "${NOSSAS[@]}"; do
+  for t in "$TAG" latest; do
+    docker tag "${nome}:${TAG}" "${REGISTRO}/${nome}:${t}"
+    docker push -q "${REGISTRO}/${nome}:${t}" >/dev/null
+  done
+  echo "   ${REGISTRO}/${nome}:${TAG} (+ latest)"
+done
+for imagem in "${DE_FORA[@]}"; do
   destino="$(caminho_no_registro "$imagem")"
   docker tag "$imagem" "$destino"
   docker push -q "$destino" >/dev/null
@@ -84,7 +96,7 @@ done
 echo "==> conferindo o catálogo do registro"
 catalogo="$(curl -sf "http://${REGISTRO}/v2/_catalog" || true)"
 falta=0
-for imagem in "${NOSSAS[@]/%/:latest}" "${DE_FORA[@]}"; do
+for imagem in "${NOSSAS[@]/%/:$TAG}" "${DE_FORA[@]}"; do
   destino="$(caminho_no_registro "$imagem")"
   repo="${destino#"${REGISTRO}/"}"; repo="${repo%:*}"
   printf '%s' "$catalogo" | grep -q "\"$repo\"" || { echo "   NAO CHEGOU: $repo" >&2; falta=1; }
