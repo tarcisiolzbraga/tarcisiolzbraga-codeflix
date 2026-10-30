@@ -34,13 +34,22 @@ media:
   signing-secret: ${CATALOG_MEDIA_SIGNING_SECRET}
 
 kafka:
+  # As partições com que os tópicos de CDC e de retentativa nascem.
+  #
+  # **Quem os cria é a aplicação, na subida** — pelo `@RetryableTopic` —, e não o Debezium
+  # nem o padrão do broker. Medido: apagar um tópico e deixar o broker recriá-lo dava 3
+  # partições, enquanto a subida da aplicação dava 1. Por isso a contagem mora aqui também.
+  #
+  # Três é o que permite a segunda réplica do catálogo consumir.
+  topic-partitions: 3
   consumers:
     category:
       id: kafka-listener-category
       topics: adm_videos_mysql.adm_videos.category
       group-id: videos-api-codeflix
-      # Um por tópico: os tópicos do Debezium nascem com uma partição, e concorrência acima do
-      # número de partições só deixa consumidor ocioso.
+      # Um por instância, e a escala vem da réplica, não daqui. Os tópicos nascem com três
+      # partições agora, então caberia concorrência maior — mas com duas réplicas isso daria seis
+      # consumidores para três partições, e três ficariam ociosos. Quem sobe é o número de pods.
       concurrency: 1
       # earliest para o snapshot inicial do Debezium ser consumido na primeira subida: com latest o
       # catálogo nasceria vazio e só veria o que mudasse a partir de então.

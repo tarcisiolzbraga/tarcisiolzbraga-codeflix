@@ -143,6 +143,14 @@ subscription:
 # ../provisioning/cdc/subscription-mysql-cdc.json. Divergir faz o consumidor esperar por um tópico
 # que nunca recebe nada — sem erro no log, que é o pior jeito de falhar.
 kafka:
+  # As partições com que os tópicos de CDC e de retentativa nascem.
+  #
+  # **Quem os cria é a aplicação, na subida** — pelo `@RetryableTopic` —, e não o Debezium
+  # nem o padrão do broker. Medido: apagar um tópico e deixar o broker recriá-lo dava 3
+  # partições, enquanto a subida da aplicação dava 1. Por isso a contagem mora aqui também.
+  #
+  # Três é o que permite a segunda réplica do catálogo consumir.
+  topic-partitions: 3
   consumers:
     events:
       id: kafka-listener-events
