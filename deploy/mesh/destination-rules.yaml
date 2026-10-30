@@ -1,0 +1,70 @@
+# O que a malha faz quando o outro lado vai mal.
+#
+# Até aqui a malha sabia **quem** pode chamar quem (`AuthorizationPolicy`) e que a chamada é cifrada
+# e autenticada (`PeerAuthentication`). O que faltava era o comportamento sob falha: sem
+# `DestinationRule`, um pod doente continua recebendo tráfego até a sonda o derrubar, e uma
+# sobrecarga vira fila crescendo em vez de recusa rápida.
+#
+# **A ejeção só entra onde há mais de uma réplica**, e isso não é detalhe de configuração: ejetar o
+# único endpoint de um serviço é auto-infligir a indisponibilidade que a ejeção existe para evitar.
+# Por isso a assinatura, que fica em uma réplica pelo limitador, recebe pool e balanceamento mas
+# **não** ejeção.
+#
+# **`LEAST_REQUEST` em vez do round-robin padrão.** A latência do catálogo varia muito entre a
+# consulta com relações resolvidas e a sem — medido, 2,4× de diferença de vazão. Round-robin manda
+# a mesma quantidade para quem está ocupado e para quem está livre; `LEAST_REQUEST` olha a fila.
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: admin-api
+  namespace: codeflix
+spec:
+  host: admin-api.codeflix.svc.cluster.local
+  trafficPolicy:
+    loadBalancer: { simple: LEAST_REQUEST }
+    connectionPool:
+      tcp: { maxConnections: 64 }
+      # `http1MaxPendingRequests` é o que transforma sobrecarga em 503 rápido em vez de fila: sem
+      # teto, a requisição espera até o timeout e o cliente não sabe que já era.
+      http: { http1MaxPendingRequests: 32, maxRequestsPerConnection: 0 }
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+      # 50% porque são duas réplicas: com o padrão de 10%, nenhuma seria ejetada (10% de 2 = 0) e a
+      # configuração seria enfeite.
+      maxEjectionPercent: 50
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: videos-api
+  namespace: codeflix
+spec:
+  host: videos-api.codeflix.svc.cluster.local
+  trafficPolicy:
+    loadBalancer: { simple: LEAST_REQUEST }
+    connectionPool:
+      tcp: { maxConnections: 64 }
+      http: { http1MaxPendingRequests: 32, maxRequestsPerConnection: 0 }
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+---
+# **Sem `outlierDetection`, e de propósito.** A assinatura fica em uma réplica enquanto o limitador
+# contar por instância; ejetar a única derrubaria o serviço inteiro. Pool e balanceamento valem;
+# ejeção, não. Isto sai quando o contador virar compartilhado e a réplica puder subir.
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: subscription-api
+  namespace: codeflix
+spec:
+  host: subscription-api.codeflix.svc.cluster.local
+  trafficPolicy:
+    loadBalancer: { simple: LEAST_REQUEST }
+    connectionPool:
+      tcp: { maxConnections: 64 }
+      http: { http1MaxPendingRequests: 32, maxRequestsPerConnection: 0 }

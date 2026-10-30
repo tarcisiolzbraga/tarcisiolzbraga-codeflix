@@ -68,7 +68,8 @@ TAG="$(bash deploy/tag.sh)" envsubst '${TAG}' < deploy/apps/java.yaml | kubectl 
 TAG="$(bash deploy/tag.sh)" envsubst '${TAG}' < deploy/apps/go-and-fronts.yaml | kubectl apply -f -
 kubectl apply -f deploy/apps/fronts-nodeport.yaml -f deploy/apps/autoscaling.yaml
 kubectl apply -f deploy/mesh/routes.yaml -f deploy/mesh/dashboards.yaml \
-  -f deploy/mesh/peer-authentication.yaml -f deploy/mesh/authorization-policies.yaml
+  -f deploy/mesh/peer-authentication.yaml -f deploy/mesh/authorization-policies.yaml \
+  -f deploy/mesh/destination-rules.yaml
 echo "esperando os pods..."
 kubectl -n codeflix wait --for=condition=Available deployment --all --timeout=600s
 
