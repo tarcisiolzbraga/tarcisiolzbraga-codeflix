@@ -21,13 +21,20 @@ FROM alpine:3.21
 
 # Nenhuma dependência de sistema: o SMTP vem da biblioteca padrão do Go. Só os certificados, para o
 # dia em que o destino for um provedor com TLS.
-RUN apk add --no-cache ca-certificates
+# O `upgrade` antes do `add` pega as correções publicadas depois de a base ser construída. No
+# encoder isto achou o CVE-2026-84782 no libssl3/libcrypto3 3.3.7-r1, com correção no -r2 já
+# disponível no repositório do Alpine.
+RUN apk -U upgrade --no-cache && apk add --no-cache ca-certificates
 
 # Usuário sem privilégio: mandar e-mail não tem motivo para rodar como root.
-RUN addgroup -S mail && adduser -S mail -G mail
+#
+# `mailer`, e não `mail`: o alpine **já traz** um grupo `mail` (gid 12) e um usuário `mail` (uid 8),
+# então `addgroup -S mail` falha com "group 'mail' in use" e a imagem não constrói. O encoder não
+# tropeça nisso porque `encoder` não existe na imagem base.
+RUN addgroup -S mailer && adduser -S mailer -G mailer
 
-COPY --from=build --chown=mail:mail /mail /opt/app/mail
+COPY --from=build --chown=mailer:mailer /mail /opt/app/mail
 
-USER mail:mail
+USER mailer:mailer
 
 ENTRYPOINT ["/opt/app/mail"]

@@ -1,0 +1,103 @@
+# Atualização de dependência automática, nos cinco ecossistemas que este repositório tem.
+#
+# Ela serve a uma regra que já vale aqui — usar a versão mais atual que der — e a um defeito que já
+# aconteceu: as imagens carregavam 104 vulnerabilidades HIGH/CRITICAL, e 17 delas sumiram com uma
+# linha (Spring Boot 4.1.1 -> 4.1.2). Ninguém tinha como saber sem olhar.
+#
+# **Agrupado de propósito.** Sem `groups`, dezenove diretórios dariam dezenas de PRs por semana, e
+# PR que ninguém lê é pior que nenhuma. Patch e minor vão juntos, num PR por ecossistema; major vem
+# sozinho, porque é o que precisa de leitura.
+#
+# O que o Dependabot **não** faz: ele atualiza versão, não confere vulnerabilidade do que está
+# dentro da imagem. Isso é o job `vulnerabilidades` do ci.yml, e os dois são necessários — o
+# `npm audit` deste projeto dizia zero enquanto a imagem do portal tinha cinco CVEs HIGH, porque
+# eram dependências do próprio npm na base.
+#
+# As mensagens dele saem em inglês e não seguem o Conventional Commits em português do projeto. É
+# aceito: o prefixo fica certo (`chore(deps)`), e reescrever a descrição exigiria mexer na PR dele
+# à mão, o que anula o automático.
+version: 2
+updates:
+  # --- Java -------------------------------------------------------------------------------------
+  # Um diretório por serviço, mais o build-logic, que é onde moram os plugins de convenção. O
+  # Dependabot lê os build.gradle dos submódulos a partir da raiz de cada serviço.
+  - package-ecosystem: gradle
+    directories:
+      - /services/admin-api
+      - /services/videos-api
+      - /services/subscription-api
+      - /build-logic
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    groups:
+      java-patch-e-minor:
+        update-types: [patch, minor]
+
+  # --- Go ---------------------------------------------------------------------------------------
+  - package-ecosystem: gomod
+    directories:
+      - /services/encoder-api
+      - /services/mail-api
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: chore(deps)
+    groups:
+      go-patch-e-minor:
+        update-types: [patch, minor]
+
+  # --- Os dois fronts ---------------------------------------------------------------------------
+  - package-ecosystem: npm
+    directories:
+      - /clients/portal-codeflix
+      - /clients/back-office-codeflix
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore(deps)
+    groups:
+      front-patch-e-minor:
+        update-types: [patch, minor]
+
+  # --- As imagens base --------------------------------------------------------------------------
+  # Sete Dockerfiles. Aqui o ganho é direto: foi base desatualizada que respondeu por 47 dos 104
+  # achados, incluindo os 46 do nginx do back-office.
+  - package-ecosystem: docker
+    directories:
+      - /services/admin-api
+      - /services/videos-api
+      - /services/subscription-api
+      - /services/encoder-api
+      - /services/mail-api
+      - /clients/portal-codeflix
+      - /clients/back-office-codeflix
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 4
+    commit-message:
+      prefix: chore(deps)
+    groups:
+      imagens-base:
+        patterns: ["*"]
+
+  # --- As actions do próprio CI -----------------------------------------------------------------
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: ci(deps)
+    groups:
+      actions:
+        patterns: ["*"]

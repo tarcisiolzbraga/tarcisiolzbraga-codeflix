@@ -11,6 +11,8 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
 import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.regions.Region;
+import com.tarcisiolzbraga.codeflix.admin.infrastructure.tracing.TracePropagatingHttpClient;
+import software.amazon.awssdk.http.apache5.Apache5HttpClient;
 import software.amazon.awssdk.services.s3.S3Client;
 
 @Configuration
@@ -31,6 +33,11 @@ public class StorageConfig {
                 .forcePathStyle(true)
                 .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
                 .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
+                // O rastro da requisição que pediu a mídia segue para o armazenamento, senão a
+                // chamada ao Garage vira um rastro solto e "quem demorou" fica sem resposta. Na
+                // camada do cliente HTTP de propósito: o rastro tem de entrar **depois** da
+                // assinatura, e o `TracePropagatingHttpClient` explica o que acontece se não.
+                .httpClientBuilder(TracePropagatingHttpClient.wrapping(Apache5HttpClient.builder()))
                 .build();
     }
 

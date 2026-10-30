@@ -2,6 +2,9 @@ plugins {
     id 'codeflix.java-conventions'
     id 'org.springframework.boot'
     id 'io.spring.dependency-management'
+    id 'jacoco-report-aggregation'
+    // O piso de cobertura, no build-logic: mexer nele mexe nos três serviços.
+    id 'codeflix.coverage-verification'
 }
 
 tasks.named('bootJar') {
@@ -14,12 +17,31 @@ tasks.named('jar') {
 }
 
 dependencies {
+    // O lz4-java vem do kafka-clients e **não é gerenciado pelo BOM do Boot**, então subir o Boot não
+    // o move: o 4.1.2 trouxe o 1.11.2, que carrega o CVE-2026-106451 (corrigido no 1.11.4).
+    //
+    // Constraint, e não dependência declarada: ninguém aqui usa lz4 diretamente — ele é detalhe de
+    // compressão do cliente Kafka. Declará-lo como dependência diria uma coisa falsa sobre o código;
+    // a constraint diz exatamente o que é, um piso de versão para o que vem transitivo.
+    constraints {
+        implementation('at.yawk.lz4:lz4-java:1.12.1') {
+            because 'CVE-2026-106451 no 1.11.2, que o kafka-clients traz'
+        }
+        implementation('org.xerial.snappy:snappy-java:1.1.10.12') {
+            because 'CVE-2026-108106 e CVE-2026-93451 no 1.1.10.7, que o kafka-clients traz'
+        }
+    }
     implementation project(':domain')
     implementation project(':application')
 
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-data-elasticsearch'
     implementation 'org.springframework.boot:spring-boot-starter-graphql'
+    // Declarado, e não herdado: ele já vinha no classpath de execução por transitividade, mas o de
+    // compilação não o tinha. É o que o registro do acessador de ThreadLocal usa, para o rastro da
+    // requisição alcançar as threads em que o graphql-java executa os data fetchers. A versão vem do
+    // BOM do Boot.
+    implementation 'io.micrometer:context-propagation'
     // No Boot 4 a autoconfiguração do RestClient saiu do starter de web para um módulo próprio:
     // sem ele não existe o RestClient.Builder que o cliente da API do admin injeta.
     implementation 'org.springframework.boot:spring-boot-starter-restclient'
@@ -32,6 +54,9 @@ dependencies {
     // autoconfiguração do Kafka mora em módulo próprio, e sem ela o @KafkaListener nunca sobe
     // o container de escuta nem existe KafkaTemplate algum — falha silenciosa, sem erro.
     implementation 'org.springframework.boot:spring-boot-starter-kafka'
+    // Saúde e métricas. O registro do Prometheus vem do BOM do Boot, por isso sem versão aqui.
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-graphql-test'
@@ -48,4 +73,22 @@ dependencies {
 
 tasks.named('bootRun') {
     workingDir = rootProject.projectDir
+}
+
+// Cobertura dos três módulos num relatório só (a infrastructure depende dos outros dois). Estava
+// faltando aqui, e só aqui: os outros dois serviços já agregavam. O efeito não era relatório feio,
+// era relatório **nenhum** — `./gradlew testCodeCoverageReport` não existia neste serviço, e a
+// cobertura do catálogo nunca tinha sido medida.
+tasks.named('testCodeCoverageReport', JacocoReport) {
+    reports {
+        html.required = true
+        html.outputLocation = rootProject.layout.buildDirectory.dir('reports/jacoco/html')
+        xml.required = true
+        xml.outputLocation = rootProject.layout.buildDirectory.file('reports/jacoco/jacoco.xml')
+    }
+}
+
+// O build já roda os testes; gerar o relatório junto sai quase de graça e mantém ele atualizado.
+tasks.named('check') {
+    dependsOn tasks.named('testCodeCoverageReport')
 }

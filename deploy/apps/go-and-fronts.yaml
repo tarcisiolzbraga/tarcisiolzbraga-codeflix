@@ -1,0 +1,190 @@
+# Os dois serviços em Go e os dois fronts.
+#
+# Os em Go não têm Service: eles não atendem HTTP, consomem fila. Sem porta, o Istio ainda os
+# enxerga — o sidecar reporta o tráfego **de saída** deles, e é por isso que aparecem no grafo
+# ligados ao RabbitMQ e ao armazenamento mesmo sem ninguém os chamar.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: encoder-api
+  namespace: codeflix
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: encoder-api }
+  template:
+    metadata:
+      labels: { app: encoder-api, version: v1 }
+    spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: encoder-api
+      containers:
+        - name: encoder
+          image: admin-codeflix-encoder-api:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef: { name: codeflix-env }
+          env:
+            # O usuário e a senha saem do segredo para o `env` antes da URL porque o `$(VAR)` do
+            # Kubernetes só interpola variável declarada **nesta** lista — o que vem por `envFrom`
+            # não está visível para ela.
+            - name: AMQP_USER
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: AMQP_USER } }
+            - name: AMQP_PASSWORD
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: AMQP_PASSWORD } }
+            - { name: AMQP_URL, value: "amqp://$(AMQP_USER):$(AMQP_PASSWORD)@rabbitmq:5672/" }
+            - { name: ENCODER_DB_HOST, value: encoder-postgres }
+            - { name: ENCODER_DB_PORT, value: "5432" }
+            - { name: STORAGE_HOST, value: garage }
+            - { name: STORAGE_ENDPOINT, value: "http://garage:3900" }
+            # O serviço em Go lê uma URL só, montada pelo compose a partir das partes. Mesma coisa
+            # aqui, com o host do Service — e com as partes vindo do segredo antes, porque o `$(VAR)`
+            # do Kubernetes só vê o que está nesta lista.
+            - name: ENCODER_DB_USER
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: ENCODER_DB_USER } }
+            - name: ENCODER_DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: ENCODER_DB_PASSWORD } }
+            - name: ENCODER_DB_NAME
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: ENCODER_DB_NAME } }
+            - { name: DATABASE_URL, value: "postgres://$(ENCODER_DB_USER):$(ENCODER_DB_PASSWORD)@encoder-postgres:5432/$(ENCODER_DB_NAME)?sslmode=disable" }
+          resources:
+            requests: { memory: 64Mi, cpu: 100m }
+            limits: { memory: 1Gi, cpu: "2" }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mail-api
+  namespace: codeflix
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: mail-api }
+  template:
+    metadata:
+      labels: { app: mail-api, version: v1 }
+    spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: mail-api
+      containers:
+        - name: mail
+          image: admin-codeflix-mail-api:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef: { name: codeflix-env }
+          env:
+            - name: AMQP_USER
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: AMQP_USER } }
+            - name: AMQP_PASSWORD
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: AMQP_PASSWORD } }
+            - { name: AMQP_URL, value: "amqp://$(AMQP_USER):$(AMQP_PASSWORD)@rabbitmq:5672/" }
+            - { name: SMTP_ADDR, value: "mailpit:1025" }
+          resources:
+            requests: { memory: 32Mi, cpu: 50m }
+            limits: { memory: 128Mi }
+---
+# Os fronts. As URLs das APIs **já estão dentro das imagens**: elas são embutidas no build, e as
+# imagens aqui foram construídas com os nomes do gateway. Trocar o endereço exige reconstruir — é o
+# preço de um front que não lê configuração em tempo de execução, e está escrito no README deles.
+apiVersion: v1
+kind: Service
+metadata:
+  name: portal
+  namespace: codeflix
+  labels: { app: portal }
+spec:
+  selector: { app: portal }
+  ports:
+    - { name: http, port: 3000, targetPort: 3000 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: portal
+  namespace: codeflix
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: portal }
+  template:
+    metadata:
+      labels: { app: portal, version: v1 }
+    spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: portal
+      containers:
+        - name: portal
+          image: admin-codeflix-portal-codeflix:latest
+          imagePullPolicy: IfNotPresent
+          # **Sem variável de ambiente aqui, e isso é a correção de um problema do compose.**
+          #
+          # A tela de planos é server component: quem busca a lista é o servidor do Next, com a URL
+          # embutida no build. No compose essa URL era `http://localhost:8084`, que dentro do
+          # container é o próprio container — a busca falhava com ECONNREFUSED e a tela mostrava o
+          # estado vazio, como se não houvesse plano.
+          #
+          # Aqui a URL embutida é `http://assinatura.localtest.me`, e o CoreDNS do cluster responde
+          # por esse nome com o IP do gateway. Então a mesma URL que o browser usa funciona **de
+          # dentro do pod** — sem segunda variável, sem segundo endereço para manter em dia. O preço
+          # é que essa chamada aparece no Kiali passando pelo gateway em vez de direta.
+          ports:
+            - { name: http, containerPort: 3000 }
+          readinessProbe:
+            httpGet: { path: /, port: 3000 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: { memory: 128Mi, cpu: 100m }
+            limits: { memory: 512Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: back-office
+  namespace: codeflix
+  labels: { app: back-office }
+spec:
+  selector: { app: back-office }
+  ports:
+    - { name: http, port: 3001, targetPort: 3001 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: back-office
+  namespace: codeflix
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: back-office }
+  template:
+    metadata:
+      labels: { app: back-office, version: v1 }
+    spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: back-office
+      containers:
+        - name: back-office
+          image: admin-codeflix-back-office-codeflix:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 3001 }
+          readinessProbe:
+            httpGet: { path: /, port: 3001 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { memory: 32Mi, cpu: 50m }
+            limits: { memory: 128Mi }

@@ -1,0 +1,254 @@
+# O Keycloak dentro da malha.
+#
+# **Por que ele é a primeira peça de infra a entrar:** o `iss` de um token é a URL que o cliente usou
+# para pedi-lo, e quem valida busca as chaves na mesma URL. Com o Keycloak fora do cluster, browser e
+# pod chegariam nele por endereços diferentes, e o token de um seria recusado pelo outro. Dentro, e
+# atrás do gateway, o nome é um só: `keycloak.localtest.me`.
+#
+# Sem volume, como no compose: o realm é inteiramente descrito pelo arquivo versionado, então o pod é
+# descartável e sempre reflete o que está no git. O que for criado à mão no console se perde ao
+# recriar — e isso é o comportamento desejado para uma peça de desenvolvimento.
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: codeflix
+  labels:
+    app: keycloak
+spec:
+  selector:
+    app: keycloak
+  ports:
+    # `name: http` não é enfeite: é por ele que o Istio sabe que o tráfego é HTTP e consegue medir
+    # rota, código de resposta e latência. Porta sem nome aparece no Kiali como TCP, sem nada dentro.
+    - name: http
+      port: 8081
+      targetPort: 8081
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: codeflix
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+        # O Kiali agrupa e versiona por estes dois rótulos; sem eles o grafo mostra "unknown".
+        version: v1
+    spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: keycloak
+      # **Espera o banco aceitar conexão.** O compose tem `depends_on: service_healthy` para isso; o
+      # Kubernetes não tem equivalente, e sem esta espera o Keycloak subia antes do Postgres, morria
+      # com `SQLState: 08001` ("the connection attempt failed") e era reiniciado — medido: um
+      # restart em toda subida a frio do cluster. Funcionava por acidente do kubelet, e o preço era
+      # meio minuto de Keycloak fora do ar logo quando os sete aplicativos o procuram.
+      #
+      # A imagem é a mesma do banco, pelo `pg_isready` que ela já traz: nada novo para baixar.
+      initContainers:
+        - name: espera-o-banco
+          image: postgres:18-alpine
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              until pg_isready -h keycloak-postgres -U keycloak -d keycloak; do
+                echo "o banco ainda não aceita conexão; esperando"
+                sleep 2
+              done
+          resources:
+            requests: { memory: 32Mi, cpu: 10m }
+            limits: { memory: 128Mi }
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.8.0
+          # O mesmo roteiro do compose: a substituição do segredo e da senha do operador acontece
+          # antes de o Keycloak ler o arquivo, porque ele não interpola variável dentro do import.
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              mkdir -p /opt/keycloak/data/import
+              template=$(cat /realm-template.json)
+              comSegredo="${template//__KEYCLOAK_CLIENT_SECRET__/$KEYCLOAK_CLIENT_SECRET}"
+              printf '%s' "${comSegredo//__OPERATOR_TEST_PASSWORD__/$OPERATOR_TEST_PASSWORD}" \
+                > /opt/keycloak/data/import/realm.json
+              # `start`, e não `start-dev`: o de desenvolvimento guarda tudo num H2 dentro do
+              # container, e aqui isso era perda de dado a cada reinício de pod — pior que no
+              # compose, porque pod reinicia muito mais que container. Sem `--optimized`, porque o
+              # vendor de banco é opção de tempo de build e esta imagem não foi aumentada para
+              # postgres; o próprio `start` reaumenta na subida.
+              exec /opt/keycloak/bin/kc.sh start --import-realm --http-port=8081
+          envFrom:
+            - secretRef:
+                name: codeflix-env
+          env:
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef: { name: codeflix-env, key: KEYCLOAK_ADMIN_USER }
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: codeflix-env, key: KEYCLOAK_ADMIN_PASSWORD }
+            # **O trio que faz o Keycloak atrás de proxy emitir a URL certa.** Sem `KC_HOSTNAME` ele
+            # monta os endereços com o host que recebeu do Envoy; sem `KC_PROXY_HEADERS` ele ignora
+            # o X-Forwarded-* e volta a dizer `http://10.42.x.y:8081` no `iss` — e aí nenhum token
+            # vale em lugar nenhum.
+            - name: KC_HOSTNAME
+              value: http://keycloak.localtest.me
+            - name: KC_HOSTNAME_STRICT
+              value: "false"
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            # O banco. Mesma razão do compose: o H2 do `start-dev` vivia na camada do container, e
+            # reinício de pod levava consigo todo assinante criado em execução — enquanto a linha
+            # dele em `account`, que está em PVC, sobrevivia. O banco e o provedor de identidade se
+            # separavam, e a pessoa não conseguia mais entrar.
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: jdbc:postgresql://keycloak-postgres:5432/keycloak
+            - name: KC_DB_USERNAME
+              value: keycloak
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: codeflix-env, key: KEYCLOAK_DB_PASSWORD }
+          ports:
+            - name: http
+              containerPort: 8081
+          volumeMounts:
+            - name: realm
+              mountPath: /realm-template.json
+              subPath: realm.json
+              readOnly: true
+            - name: tema
+              mountPath: /opt/keycloak/themes/codeflix
+              readOnly: true
+          readinessProbe:
+            httpGet: { path: /realms/codeflix, port: 8081 }
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            failureThreshold: 30
+          resources:
+            requests: { memory: 512Mi, cpu: 200m }
+            limits: { memory: 1Gi }
+      volumes:
+        - name: realm
+          configMap:
+            name: keycloak-realm
+        # Os caminhos com barra montam subdiretório: é assim que dois arquivos de um ConfigMap viram
+        # a árvore que o Keycloak espera de um tema.
+        - name: tema
+          configMap:
+            name: keycloak-theme
+            items:
+              - key: theme.properties
+                path: login/theme.properties
+              - key: codeflix.css
+                path: login/resources/css/codeflix.css
+---
+# O banco do Keycloak, aqui e não no databases.yaml pela mesma razão que no compose ele mora na
+# pasta do Keycloak: é estado dele, não um banco compartilhado.
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-postgres
+  namespace: codeflix
+  labels: { app: keycloak-postgres }
+spec:
+  selector: { app: keycloak-postgres }
+  ports:
+    # `tcp-postgres`: toda porta não-HTTP se chama tcp-* nesta malha. Sem o nome certo o sidecar
+    # fareja protocolo, e o Postgres — que fala primeiro do lado do servidor — morre no tempo limite.
+    - { name: tcp-postgres, port: 5432, targetPort: 5432 }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: keycloak-postgres-dados
+  namespace: codeflix
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak-postgres
+  namespace: codeflix
+spec:
+  replicas: 1
+  # Recreate, e não RollingUpdate: dois Postgres no mesmo volume ao mesmo tempo corrompem o banco.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: { app: keycloak-postgres }
+  template:
+    metadata:
+      labels: { app: keycloak-postgres, version: v1 }
+    spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: keycloak-postgres
+      containers:
+        - name: postgres
+          image: postgres:18-alpine
+          env:
+            - { name: POSTGRES_DB, value: keycloak }
+            - { name: POSTGRES_USER, value: keycloak }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: codeflix-env, key: KEYCLOAK_DB_PASSWORD }
+          ports:
+            - { name: tcp-postgres, containerPort: 5432 }
+          # **Sem `PGDATA` e montando `/var/lib/postgresql`**, diferente do encoder-postgres, que é
+          # 17 e usa o caminho antigo. O 18 põe o PGDATA numa subpasta por versão e espera o mount no
+          # diretório de cima; com o caminho antigo a imagem **recusa subir**, dizendo que o mount
+          # está "unused". Medido no compose antes de chegar aqui.
+          volumeMounts:
+            - name: dados
+              mountPath: /var/lib/postgresql
+          readinessProbe:
+            exec:
+              command: [pg_isready, -U, keycloak, -d, keycloak]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests: { memory: 128Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+      volumes:
+        - name: dados
+          persistentVolumeClaim:
+            claimName: keycloak-postgres-dados
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: keycloak
+  namespace: codeflix
+spec:
+  hosts:
+    - keycloak.localtest.me
+  gateways:
+    # Os dois: pelo gateway (o browser) e `mesh` (os pods). Sem `mesh`, a chamada de um pod ao mesmo
+    # nome sairia da malha e voltaria pelo gateway como tráfego externo — e o Kiali a desenharia como
+    # saída para a internet em vez de uma aresta entre dois serviços.
+    - codeflix
+    - mesh
+  http:
+    - route:
+        - destination:
+            host: keycloak.codeflix.svc.cluster.local
+            port: { number: 8081 }

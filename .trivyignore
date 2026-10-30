@@ -1,0 +1,32 @@
+# O que o portão de vulnerabilidade deixa passar, e por quê.
+#
+# Este arquivo é a **exceção registrada**, não um silenciador: cada linha precisa dizer o que foi
+# medido, por que não há conserto, e o que faria a linha sair. Sem isso o portão deixa de valer —
+# e o README da raiz registra que as sete imagens chegaram a zero achado, que foi o que tornou o
+# portão possível.
+
+# CVE-2026-102554 — guava: DoS por alocação eager de array na desserialização
+#
+# **Não há versão para onde subir, e isso está medido.** O guava não é dependência deste projeto:
+# ele vem **shadado dentro** do `graphql-java`, com o `pom.properties` incluso, que é como o Trivy o
+# enxerga. Baixei os jares e conferi qual guava cada versão embute:
+#
+#     graphql-java 25.1  ->  guava 32.1.2-jre
+#     graphql-java 26.0  ->  guava 32.1.2-jre
+#     graphql-java 26.1  ->  guava 32.1.2-jre   (a mais recente publicada)
+#
+# Então subir o graphql-java não resolve, e uma restrição de dependência também não: ela traria um
+# `guava-33.7.2-jre.jar` ao lado, sem remover os bytes shadados.
+#
+# **E o caminho não é alcançável aqui.** A CVE exige desserialização de **fluxo Java** não confiável
+# em `CompactHashMap`, `CompactHashSet` ou `MapMakerInternalMap`. O `graphql-java` usa guava como
+# cache interno; o catálogo não desserializa fluxo Java em lugar nenhum — o que entra é JSON e
+# GraphQL sobre HTTP, e o que vem do Kafka é JSON do Debezium.
+#
+# **Sai daqui quando** o graphql-java publicar uma versão que shade guava >= 33.7.2. Para conferir:
+#
+#     curl -s https://repo1.maven.org/maven2/com/graphql-java/graphql-java/<versao>/graphql-java-<versao>.jar \
+#       -o /tmp/gj.jar && unzip -p /tmp/gj.jar META-INF/maven/com.google.guava/guava/pom.properties
+#
+# Afeta só o videos-api, que é o único serviço com GraphQL.
+CVE-2026-102554

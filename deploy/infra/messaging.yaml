@@ -1,0 +1,243 @@
+# O que carrega mensagem: RabbitMQ (a conversa com o codificador) e Kafka + Connect (a replicação por
+# CDC). Nenhum dos dois com volume de propósito — fila é estado de passagem aqui, e o Debezium refaz
+# o snapshot quando o tópico nasce vazio.
+#
+# `tcp-*` nas portas de protocolo, pelo motivo explicado em databases.yaml: AMQP e Kafka falam primeiro
+# do lado do servidor.
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: codeflix
+  labels: { app: rabbitmq }
+spec:
+  selector: { app: rabbitmq }
+  ports:
+    - { name: tcp-amqp, port: 5672, targetPort: 5672 }
+    - { name: http-management, port: 15672, targetPort: 15672 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: codeflix
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: rabbitmq }
+  template:
+    metadata:
+      labels: { app: rabbitmq, version: v1 }
+    spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: rabbitmq
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:4.2-management
+          # O mesmo roteiro do compose: as definições (exchanges, filas, bindings) são versionadas com
+          # marcadores, e usuário e senha entram antes de o servidor ler o arquivo.
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              template=$(cat /definitions-template.json)
+              template=${template//__AMQP_USER__/$AMQP_USER}
+              printf '%s' "${template//__AMQP_PASSWORD__/$AMQP_PASSWORD}" > /etc/rabbitmq/definitions.json
+              exec docker-entrypoint.sh rabbitmq-server
+          envFrom:
+            - secretRef: { name: codeflix-env }
+          ports:
+            - { name: tcp-amqp, containerPort: 5672 }
+            - { name: http-management, containerPort: 15672 }
+          volumeMounts:
+            - { name: definicoes, mountPath: /definitions-template.json, subPath: definitions.json, readOnly: true }
+            - { name: conf, mountPath: /etc/rabbitmq/conf.d/20-definitions.conf, subPath: rabbitmq.conf, readOnly: true }
+          readinessProbe:
+            exec: { command: ["rabbitmq-diagnostics", "-q", "check_running"] }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 20
+          resources:
+            requests: { memory: 256Mi, cpu: 100m }
+            limits: { memory: 768Mi }
+      volumes:
+        - name: definicoes
+          configMap: { name: rabbitmq-definitions }
+        - name: conf
+          configMap: { name: rabbitmq-conf }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: codeflix
+  labels: { app: kafka }
+spec:
+  selector: { app: kafka }
+  ports:
+    - { name: tcp-kafka, port: 9092, targetPort: 9092 }
+    - { name: tcp-controller, port: 9093, targetPort: 9093 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  namespace: codeflix
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: kafka }
+  template:
+    metadata:
+      labels: { app: kafka, version: v1 }
+    spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: kafka
+      containers:
+        - name: kafka
+          image: apache/kafka:4.3.1
+          env:
+            - { name: KAFKA_NODE_ID, value: "1" }
+            - { name: CLUSTER_ID, value: 2OftmwZMTJ-tjuYS48c7vg }
+            - { name: KAFKA_PROCESS_ROLES, value: "broker,controller" }
+            - { name: KAFKA_CONTROLLER_LISTENER_NAMES, value: CONTROLLER }
+            # **O controlador fala com ele mesmo por `localhost`, e isso não é detalhe.** Em KRaft o
+            # broker espera o reconhecimento do próprio controlador na subida; com o endereço
+            # `kafka:9093` essa volta sai do pod, passa pelo Envoy e volta — e o sidecar, que trata
+            # 9093 como TCP opaco, a embaralha. O sintoma é fatal e enigmático:
+            # "Received a fatal error while waiting for the controller to acknowledge that we are
+            # caught up". Tráfego para 127.0.0.1 não é interceptado, então o nó se enxerga.
+            #
+            # Num cluster de vários brokers isto seria outra coisa: lá os votantes se conhecem pelos
+            # nomes dos pods, e a exclusão da porta do controlador da interceptação é o caminho.
+            - { name: KAFKA_CONTROLLER_QUORUM_VOTERS, value: "1@localhost:9093" }
+            - { name: KAFKA_LISTENERS, value: "INTERNAL://:9092,CONTROLLER://localhost:9093" }
+            # **Um ouvinte só, e não dois como no compose.** Lá existia um EXTERNAL anunciando
+            # `localhost:29092` para quem rodasse no host; aqui todo cliente é um pod, e um ouvinte
+            # anunciado com nome que só vale fora seria a causa clássica de "conecta e não produz".
+            - { name: KAFKA_ADVERTISED_LISTENERS, value: "INTERNAL://kafka:9092" }
+            - { name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, value: "INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT" }
+            - { name: KAFKA_INTER_BROKER_LISTENER_NAME, value: INTERNAL }
+            - { name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, value: "1" }
+            - { name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, value: "1" }
+            - { name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR, value: "1" }
+            - { name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS, value: "0" }
+          ports:
+            - { name: tcp-kafka, containerPort: 9092 }
+            - { name: tcp-controller, containerPort: 9093 }
+          readinessProbe:
+            tcpSocket: { port: 9092 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: { memory: 768Mi, cpu: 200m }
+            limits: { memory: 1536Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-connect
+  namespace: codeflix
+  labels: { app: kafka-connect }
+spec:
+  selector: { app: kafka-connect }
+  ports:
+    - { name: http, port: 8083, targetPort: 8083 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-connect
+  namespace: codeflix
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: kafka-connect }
+  template:
+    metadata:
+      labels: { app: kafka-connect, version: v1 }
+    spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: kafka-connect
+      containers:
+        - name: connect
+          image: quay.io/debezium/connect:3.6.3.Final
+          env:
+            - { name: BOOTSTRAP_SERVERS, value: "kafka:9092" }
+            - { name: GROUP_ID, value: adm_videos_connect }
+            - { name: CONFIG_STORAGE_TOPIC, value: connect_configs }
+            - { name: OFFSET_STORAGE_TOPIC, value: connect_offsets }
+            - { name: STATUS_STORAGE_TOPIC, value: connect_statuses }
+            - { name: CONFIG_STORAGE_REPLICATION_FACTOR, value: "1" }
+            - { name: OFFSET_STORAGE_REPLICATION_FACTOR, value: "1" }
+            - { name: STATUS_STORAGE_REPLICATION_FACTOR, value: "1" }
+            # **O heap declarado, e não o padrão.** Sem isto a JVM do Connect dimensiona o heap pela
+            # memória da máquina, ignora o limite do container, e o kernel a mata: o pod aparece como
+            # OOMKilled sem nenhum erro de aplicação. No compose não acontecia porque lá não havia
+            # limite nenhum — o container simplesmente comia 1,2 GiB.
+            - { name: KAFKA_HEAP_OPTS, value: "-Xms256m -Xmx768m" }
+          ports:
+            - { name: http, containerPort: 8083 }
+          readinessProbe:
+            httpGet: { path: /connectors, port: 8083 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30
+          resources:
+            requests: { memory: 512Mi, cpu: 100m }
+            limits: { memory: 1536Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailpit
+  namespace: codeflix
+  labels: { app: mailpit }
+spec:
+  selector: { app: mailpit }
+  ports:
+    - { name: tcp-smtp, port: 1025, targetPort: 1025 }
+    - { name: http, port: 8025, targetPort: 8025 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailpit
+  namespace: codeflix
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: mailpit }
+  template:
+    metadata:
+      labels: { app: mailpit, version: v1 }
+    spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: mailpit
+      containers:
+        - name: mailpit
+          image: axllent/mailpit:v1.21
+          env:
+            - { name: MP_MAX_MESSAGES, value: "500" }
+            - { name: MP_SMTP_AUTH_ACCEPT_ANY, value: "1" }
+            - { name: MP_SMTP_AUTH_ALLOW_INSECURE, value: "1" }
+          ports:
+            - { name: tcp-smtp, containerPort: 1025 }
+            - { name: http, containerPort: 8025 }
+          readinessProbe:
+            httpGet: { path: /, port: 8025 }
+            initialDelaySeconds: 5
+          resources:
+            requests: { memory: 64Mi, cpu: 20m }
+            limits: { memory: 256Mi }

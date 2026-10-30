@@ -24,3 +24,14 @@ logging:
 # o que faz a lista ser revisável. Sem localhost nesta lista — ver o README.
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:https://tarcisiolzbraga.codeflix.com}
+
+# Atrás do gateway, a origem da requisição chega no X-Forwarded-For; sem isto o `getRemoteAddr()`
+# devolveria o IP do gateway, e o limitador de requisição viraria um **teto global** em vez de um
+# teto por origem — defeito que não aparece em teste nenhum, só em produção, como lentidão
+# inexplicável para todo mundo ao mesmo tempo.
+#
+# Vale dizer o limite: quem controla o cabeçalho escolhe a própria chave e escapa do balde. Quem
+# sanitiza o X-Forwarded-For é o gateway, e é nele que a defesa de borda mora — o filtro é a de base.
+# No development isto fica desligado porque não há proxy: ali o getRemoteAddr() já é a origem real.
+server:
+  forward-headers-strategy: framework

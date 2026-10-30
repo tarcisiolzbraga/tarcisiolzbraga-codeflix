@@ -3,8 +3,10 @@ package com.tarcisiolzbraga.codeflix.subscription.infrastructure.configuration;
 import com.tarcisiolzbraga.codeflix.subscription.infrastructure.security.KeycloakJwtConverter;
 import jakarta.servlet.DispatcherType;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -55,7 +57,16 @@ public class SecurityConfig {
     // pedir token, e quem clica no link de validação também não — é justamente a confirmação que
     // marca o e-mail como conferido. Listadas uma a uma em vez de /accounts/sign-up/**: com o
     // curinga, qualquer rota futura embaixo desse caminho nasceria aberta sem ninguém decidir.
-    private static final String[] SIGN_UP_PATHS = {"/accounts/sign-up", "/accounts/sign-up/confirm"};
+    //
+    // Pública porque o limitador de requisição lê **esta** lista, e não uma cópia dela: é o mesmo
+    // princípio do "duas listas, não uma" do README — rota nova aberta aqui nasce limitada lá
+    // sozinha, em vez de nascer aberta e sem teto porque alguém esqueceu o segundo lugar.
+    // Separadas por nome porque o limitador cobra preços diferentes pelas duas: pedir o cadastro
+    // cria usuário no provedor e manda e-mail, confirmar só confere um token.
+    public static final String SIGN_UP_PATH = "/accounts/sign-up";
+    public static final String SIGN_UP_CONFIRM_PATH = "/accounts/sign-up/confirm";
+
+    public static final String[] SIGN_UP_PATHS = {SIGN_UP_PATH, SIGN_UP_CONFIRM_PATH};
 
     // O catálogo de planos à venda, aberto: preço é informação pública, e é o que uma tela de
     // escolha mostra antes de alguém se cadastrar.
@@ -70,7 +81,22 @@ public class SecurityConfig {
         "/v3/api-docs/**", "/v3/api-docs", "/swagger-ui/**", "/swagger-ui.html"
     };
 
+    // O actuator, na porta de gerenciamento. O filtro desta aplicação atravessa o contexto filho do
+    // servidor de gerenciamento, então sem esta cadeia a regra geral pediria token às sondas — e o
+    // kubelet não carrega nenhum. Liberar aqui não abre nada para fora: a porta de gerenciamento
+    // não é publicada nem roteada, e o que responde nela está limitado pelo application.yml.
     @Bean
+    @Order(1)
+    SecurityFilterChain actuatorFilterChain(final HttpSecurity http) throws Exception {
+        return http.securityMatcher(EndpointRequest.toAnyEndpoint())
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(rules -> rules.anyRequest().permitAll())
+                .build();
+    }
+
+    @Bean
+    @Order(2)
     SecurityFilterChain apiFilterChain(final HttpSecurity http) throws Exception {
         return http.csrf(AbstractHttpConfigurer::disable)
                 // Usa o CorsConfigurationSource que o CorsConfig publica. A verificação prévia do

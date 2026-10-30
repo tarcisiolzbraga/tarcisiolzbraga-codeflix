@@ -3,10 +3,24 @@
 # vem de SPRING_PROFILES_ACTIVE.
 server:
   port: 8084
+  # Parada elegante: o Tomcat para de aceitar conexão nova e espera a que está em voo terminar,
+  # em vez de a cortar no meio. **É o padrão do Boot 4** — mudou da `immediate` do Boot 3 —, e fica
+  # declarado pelo mesmo motivo do binlog-format do MySQL: para o comportamento não depender de um
+  # padrão que já mudou uma vez.
+  #
+  # O actuator entra nisto de graça: com os grupos de sonda ligados, a prontidão passa a
+  # OUT_OF_SERVICE assim que a parada começa, então o balanceador para de mandar requisição antes
+  # de a aplicação começar a se desmontar.
+  shutdown: graceful
 
 spring:
   profiles:
     default: development
+  # O teto de espera de cada fase da parada, e também o padrão do Boot, declarado pela mesma razão.
+  # 30s é o que a requisição em voo tem para terminar; passou disso, a parada segue e o que
+  # sobrou é cortado — com linha no log, que é o que diferencia isto de um SIGKILL silencioso.
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   threads:
     virtual:
       # Cada requisição roda numa virtual thread: esperar o JDBC não prende thread do SO.
@@ -94,6 +108,25 @@ amqp:
   # leva até lá, e é o front que chama o POST de confirmar com o token.
   confirmation-url: ${SIGNUP_CONFIRMATION_URL}
 
+# Os prazos do cadastro, e a varredura que os aplica.
+#
+# `validation-ttl` é por quanto tempo o link do e-mail vale. `retention` é por quanto tempo a linha
+# de `pending_sign_up` sobrevive **depois de deixar de servir** — e isso é retenção de dado pessoal,
+# não arrumação: aquela tabela guarda e-mail, nome completo e documento de quem pediu cadastro,
+# inclusive de quem nunca confirmou e portanto nunca virou cliente.
+#
+# Os sete dias preservam o 422 de "o link venceu" por uma semana depois do vencimento. Apagar na
+# hora faria essa resposta virar 404, e qual das duas o cliente recebe passaria a depender de o
+# limpador ter rodado.
+#
+# O cron é em UTC e de madrugada, como a varredura de cobrança: o trabalho é de banco e não precisa
+# disputar com o pico.
+signup:
+  validation-ttl: ${SIGNUP_VALIDATION_TTL:24h}
+  retention: ${SIGNUP_RETENTION:7d}
+  cleanup-job:
+    cron: ${SIGNUP_CLEANUP_JOB_CRON:0 30 3 * * *}
+
 # A assinatura: a tolerância antes do cancelamento e a varredura das vencidas.
 #
 # O cron é em UTC, o mesmo fuso do vencimento: a varredura compara datas, e rodar perto da virada do
@@ -125,6 +158,67 @@ kafka:
       # Mesma conta da videos-api: o atraso dobra a cada tentativa, então 7 toleram 63 segundos de
       # Keycloak fora do ar. O que passar disso vai para a fila morta, que só registra em log.
       max-attempts: 7
+
+# Saúde e métricas, **numa porta à parte da aplicação**, pelo mesmo motivo dos outros dois serviços:
+# o gateway publica só a porta da aplicação, então /actuator não tem por onde ser alcançado de fora.
+# A proteção é a topologia, e não uma regra de caminho que alguém escreve errado um dia.
+#
+# A 9092 aqui, fechando a sequência: 9090 na admin-api, 9091 no catálogo. Portas distintas porque no
+# desenvolvimento os três rodam no mesmo host pelo bootRun, e a faixa é a 9090 porque a 8090 é do
+# gateway do Istio, publicada no host pelo deploy/cluster/create-cluster.sh.
+management:
+  server:
+    port: ${SUBSCRIPTION_MANAGEMENT_PORT:9092}
+  endpoints:
+    web:
+      exposure:
+        # O que se expõe é escolha, e não o padrão do Boot. Aqui `env` e `configprops` ficariam de
+        # fora mesmo que a porta fosse pública: é neste serviço que mora o segredo do client que
+        # administra o realm inteiro.
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    # Banco e broker no /actuator/health, fora do grupo readiness — a mesma conta dos outros dois.
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    tags:
+      application: subscription-codeflix
+
+# O teto de requisição por origem, em três degraus — um por preço. Ligado em **todos** os perfis,
+# inclusive o development, pela mesma razão da segurança: desligado no perfil em que se desenvolve, o
+# limite nunca é exercitado onde se trabalha, e a primeira vez que roda de verdade é em outro
+# ambiente.
+#
+# `sign-up` é o mais apertado: cada chamada cria usuário no Keycloak e põe e-mail na fila. `confirm`
+# é mais folgado porque só confere um token. `general` põe teto em tudo o mais sem estorvar quem está
+# atrás de um NAT compartilhado, onde muita gente divide uma origem.
+#
+# **10 e 20 saíram de uma conta.** A coleção do Postman é a regressão manual desta API e tem de rodar
+# inteira e repetidas vezes: são 4 chamadas a `sign-up` e 2 a `confirm`. Com teto de 5 ela tomava 429
+# na própria suíte de regressão. Estes números a deixam rodar duas vezes seguidas e ainda limitam
+# abuso a 60 cadastros por hora e por origem.
+#
+# O contador é **por instância**: com duas réplicas o teto efetivo dobra. Contador compartilhado
+# pediria Redis, que este projeto não tem, e para o que este limite protege dobrar 5 em 10 minutos
+# ainda é um teto. Está declarado aqui e no filtro em vez de escondido.
+rate-limit:
+  enabled: ${RATE_LIMIT_ENABLED:true}
+  sign-up:
+    capacity: ${RATE_LIMIT_SIGN_UP_CAPACITY:10}
+    period: ${RATE_LIMIT_SIGN_UP_PERIOD:10m}
+  confirm:
+    capacity: ${RATE_LIMIT_CONFIRM_CAPACITY:20}
+    period: ${RATE_LIMIT_CONFIRM_PERIOD:10m}
+  general:
+    capacity: ${RATE_LIMIT_GENERAL_CAPACITY:120}
+    period: ${RATE_LIMIT_GENERAL_PERIOD:1m}
 
 # Identifica a aplicação no log estruturado, que é como o Kibana a separa das outras.
 logging:

@@ -189,11 +189,124 @@ Duas coisas que isso acrescenta a quem retomar:
   em sequência, no mesmo pool — exatamente o que o catálogo suspeitava, e sem precisar dos dois
   serviços para reproduzir.
 
-> **O experimento que isto habilita:** declarar o caminho **sem** `Range` como resposta síncrona. O
+#### A segunda medição, em 24/10/2026: a corrida está provada, e tem taxa
+
+Nada no caminho de mídia em Java mudou entre 19/10 e 24/10. Mesmo assim a falha voltou, do **outro**
+lado: o `VideoE2ETest.givenAVideoWithAFile_whenUploadAnotherOfTheSameType_thenTheNewOneReplacesIt`
+deste serviço, com a mesma cadeia `ResourceAccessException` → `ClientProtocolException` →
+`ParseException`, numa PR que mexe **só** em `deploy/` e num `AGENTS.md` — nenhum arquivo Java,
+desta vez sem ressalva.
+
+**O que fecha o diagnóstico é o par de execuções.** O GitHub dispara dois workflows por push, um pelo
+evento `push` e outro pelo `pull_request`, e os dois rodam o **mesmo SHA** ao mesmo tempo:
+
+```
+sha 028a2cc6, 24/10 00:41    push         -> failure
+sha 028a2cc6, 24/10 00:41    pull_request -> success
+```
+
+Código idêntico, minuto idêntico, imagem de runner idêntica, resultados opostos. Isso não é
+regressão nem diferença de ambiente: é corrida, e não há mais o que discutir sobre isso.
+
+E não é um acaso isolado. Na janela de 18/10 a 24/10:
+
+| | |
+|---|---|
+| execuções concluídas do `ci.yml` | 66 (55 verdes, 11 vermelhas) |
+| SHAs distintos testados | 39 |
+| SHAs com ao menos uma execução vermelha | 9 |
+| **SHAs em que as duas execuções simultâneas divergiram** | **7** |
+
+Sete dos nove SHAs que falharam **também passaram**, no mesmo instante e no mesmo código. A taxa de
+commit afetado é de cerca de **1 em 4**, e todas as 11 falhas da janela são esta mesma cadeia de
+exceções — não houve, no período, uma única falha de CI que fosse outra coisa.
+
+Duas consequências práticas:
+
+- **a hipótese do despacho assíncrono curto segue de pé, e o experimento abaixo segue sem ser
+  feito.** Esta medição não o substitui: ela mede a frequência, não a causa;
+- **o par de execuções é o instrumento**, e é de graça. Para avaliar qualquer tentativa de conserto,
+  o sinal não é "o CI ficou verde" — é a divergência entre os dois runs do mesmo SHA desaparecer ao
+  longo de dezenas de commits.
+
+#### O instrumento: `./gradlew stressTests`
+
+Faltava reproduzir sob demanda, e é o que esta task faz. Ela concentra a condição que as duas
+medições anteriores identificaram — pool de conexões compartilhado, respostas **curtas** em
+sequência, várias threads:
+
+```
+32 threads, pool compartilhado, 19.200 pedidos
+execução 1: 3 falhas (0,02%)   {ParseException=3}
+execução 2: 2 falhas (0,01%)   {ParseException=2}
+execução 3: 1 falha  (0,01%)   {ParseException=1}
+```
+
+É a **mesma exceção** que derruba o CI. "1 commit em 4" virou "1 a 3 em 19.200 pedidos, em toda
+execução" — e com isso qualquer tentativa de conserto passa a ser avaliável, o que nunca foi o caso.
+
+Três coisas sobre ele que importam para quem o usar:
+
+- **a condição vem da lição registrada acima**: a classe isolada rodou 8 vezes verde, e só o build
+  inteiro falhava, porque lá o Tomcat e o pool são compartilhados. O teste não repete um cenário,
+  concentra a condição;
+- **o cliente é o mesmo da falha** — Apache HttpClient 5, cujo parser é quem reclama. Um gerador de
+  carga em Go toleraria ou relataria diferente, e o sintoma se perderia;
+- **o volume importa**: com 8 threads e 1.200 pedidos dá verde. A taxa é baixa o bastante para isso
+  ser informação sobre quanto o CI precisa para sortear.
+
+Ele fica **fora do `build`** de propósito: quem mede uma corrida falha quando a corrida acontece, e
+pôr isso no caminho de todo commit transformaria o build num sorteio.
+
+#### A causa, encontrada em 26/10/2026
+
+Não era artefato do cliente de teste. É do **servidor**, e a pilha a nomeia:
+
+```
+NullPointerException: Cannot invoke "MimeHeaderField.getName()"
+  because "this.headers[i]" is null
+  at MimeHeaders.getValue -> Response.getHeader
+  -> CacheControlHeadersWriter.hasHeader -> HeaderWriterFilter.doHeadersAfter
+```
+
+O `HeaderWriterFilter` do Spring Security escreve os cabeçalhos **depois** que a cadeia de filtros
+volta. Com despacho assíncrono, "depois da cadeia" **não é** "depois da resposta": a cadeia volta
+assim que o assíncrono começa, com o corpo ainda sendo escrito. O Tomcat recicla o `Response` ao
+terminar, e o filtro vai ler um cabeçalho que já não existe.
+
+A resposta sai pela metade, a conexão fica inconsistente, e **o pedido seguinte** daquela conexão do
+pool lê os bytes errados. Isso explica tudo o que estava anotado acima:
+
+- **por que só a rota de mídia**: é a única assíncrona, por devolver `StreamingResponseBody`;
+- **por que a assinatura mudava** — `NoHttpResponseException`, `ParseException`,
+  `InvalidMimeTypeException`: são parsers diferentes reclamando do mesmo desalinhamento, e foi essa
+  troca de sintoma que fez o diagnóstico anterior desconfiar do conserto;
+- **por que era intermitente**: é corrida entre o fim do assíncrono e a reciclagem.
+
+O conserto é `setShouldWriteHeadersEagerly(true)` no filtro — escrever antes da cadeia, onde não há
+resposta reciclada para tocar. A DSL não expõe a opção, daí o `withObjectPostProcessor` no
+`SecurityConfig`.
+
+Medido com o `stressTests`, três pares de 48.000 pedidos:
+
+| | antes | depois |
+|---|---:|---:|
+| rota de mídia | **11 falhas** | **0** |
+| rota síncrona (controle) | 0 | 0 |
+
+O controle é o que separa as conclusões possíveis: limpo nas duas vezes, sob a mesma carga e na
+mesma máquina, aponta o assíncrono e não a combinação cliente/pool/Tomcat em geral.
+
+O preço está no `SecurityHeadersIT`: escrever antes faz um handler que ponha o mesmo cabeçalho
+sobrescrevê-lo, em vez de o `hasHeader` do writer o respeitar. Nenhuma rota daqui os define, então a
+troca é de ordem e não de conteúdo — e o teste fixa que os seis continuam saindo.
+
+> **O experimento que isto torna desnecessário:** declarar o caminho **sem** `Range` como resposta síncrona. O
 > corpo dele já está inteiro em memória, então não se perde fluxo nenhum — só o despacho assíncrono
 > em respostas que não precisavam dele. Se o E2E parar de falhar, a hipótese se confirma, e a
 > exposição restante fica só no caminho do `Range`, que precisa mesmo ser em fluxo. **Um build verde
-> não prova nada**: quatro builds inteiros verdes aqui já conviveram com CI vermelho.
+> não prova nada**: quatro builds inteiros verdes aqui já conviveram com CI vermelho — e a medição de
+> 24/10 põe número nisso, com sete SHAs passando e falhando ao mesmo tempo.
 
 ### O envio também, e o checksum é o nó
 
@@ -247,9 +360,18 @@ devolve o mesmo `checksum` que recebeu:
 { "status": "ERROR",      "videoId": "...", "type": "VIDEO", "checksum": "...", "message": "codec não suportado" }
 ```
 
-`PROCESSING` e `COMPLETED` movem o status da mídia, e `COMPLETED` guarda onde o arquivo codificado ficou.
-`ERROR` é apenas registrado no log: o domínio ainda não tem um estado de falha para a mídia. Mensagem ilegível,
-ou com tipo de mídia desconhecido, é registrada e descartada em vez de voltar para a fila.
+As três movem o status da mídia: `PROCESSING`, `COMPLETED` — que também guarda onde o arquivo codificado
+ficou — e `ERROR`, que a leva para `FAILED`. Mensagem ilegível, ou com tipo de mídia desconhecido, é
+registrada e descartada em vez de voltar para a fila.
+
+`FAILED` é estado **terminal desta tentativa**, e não do vídeo: o arquivo enviado continua onde está, e um
+envio novo do mesmo tipo recomeça em `PENDING`. A `message` do `ERROR` **não** é persistida — o que o painel
+precisa é saber que falhou, e a causa vive no log dos dois lados, onde há contexto. Guardá-la no agregado
+pediria coluna nova e uma decisão sobre retenção de texto vindo de fora.
+
+Antes de `FAILED` existir, o `ERROR` só virava linha de log, e a mídia ficava em `PROCESSING` **para
+sempre**: indistinguível de codificação lenta para quem estava no back-office, e o único jeito de saber era
+procurar a linha no Kibana.
 
 O `checksum` existe porque o endereço do arquivo não distingue um envio do outro: reenviar o mesmo tipo
 sobrescreve o arquivo no mesmo lugar. Se o usuário trocar o arquivo enquanto a codificação do anterior ainda
@@ -269,8 +391,41 @@ isso o consumidor é idempotente — resposta com checksum de outro envio é des
 mesmo conteúdo não regrava a mídia nem mexe no `updated_at`.
 
 A linha entregue fica guardada por `OUTBOX_RETENTION` (padrão 7 dias) e depois é apagada, porque a tabela é fila
-e não histórico. Linha pendente nunca é apagada. O relay pressupõe **uma instância** da aplicação: com várias, o
-passo seguinte seria travar a leitura com `SKIP LOCKED`.
+e não histórico. Linha pendente nunca é apagada.
+
+##### O relay roda em mais de uma instância
+
+Ele pressupunha **uma só**, e com duas a mesma linha era lida duas vezes e entregue em dobro. A
+exclusão agora vem do banco: cada passagem trava a linha que vai entregar com
+
+```sql
+... where sent_at is null order by created_at limit 1 for update skip locked
+```
+
+e a instância vizinha **salta** o que está travado em vez de esperar por ele. Em JPA isso é
+`@Lock(PESSIMISTIC_WRITE)` mais o hint `jakarta.persistence.lock.timeout = -2`, que é o
+`SKIP_LOCKED` do Hibernate.
+
+O hint não é enfeite, e isto foi medido com o SQL na mão: **sem ele sai `for update` sem
+`skip locked`**, e o efeito é o outro defeito — a segunda instância fica parada atrás da primeira e
+depois entrega justamente a linha que estava travada. O `OutboxRelayIT` tem um teste que falha nesse
+caso (`expected: <segunda> but was: <primeira>`), com uma transação à parte segurando a linha mais
+antiga.
+
+Três consequências que valem saber:
+
+- **o lote virou um laço de transações curtas**, uma por entrega, e não uma leitura paginada: o lock
+  vale até o fim da transação, então travar cinquenta linhas de uma vez seguraria quarenta e nove
+  durante quarenta e nove envios. O `OUTBOX_BATCH_SIZE` passou a ser o teto de entregas por
+  passagem;
+- **o envio acontece com o lock na mão.** Marcar e depois enviar soltaria o lock antes, mas uma
+  queda entre as duas coisas perderia a mensagem para sempre; enviar sob o lock troca isso por
+  entrega repetida, que o consumidor já tolera. O preço é uma linha travada durante uma chamada de
+  rede;
+- **a ordem de entrega entre instâncias não é preservada** — e não era antes tampouco: o encoder
+  consome a mesma fila com vários operários em paralelo (`ENCODER_WORKERS`, padrão 2), então
+  mensagem que saía em ordem já era processada fora de ordem. O que se perdeu é uma garantia que o
+  sistema nunca teve ponta a ponta.
 
 **Não há codificador neste repositório.** Para ver o ciclo completo, envie um arquivo pela API e publique a
 resposta à mão no painel do RabbitMQ (http://localhost:15672, com as credenciais do `.env`): na aba *Exchanges*,
@@ -383,6 +538,33 @@ docker compose --profile observability up -d
 
 O Elasticsearch pede meio giga de heap, por isso não sobe junto. Uma rede à parte não é necessária: a rede padrão
 do projeto já liga todos pelo nome do serviço.
+
+### O rastro segue para o armazenamento
+
+A chamada ao Garage leva o rastro da requisição que a pediu (`infrastructure/tracing`). Sem isso, o
+sidecar de saída via um pedido sem cabeçalho de rastro e começava um rastro novo — e "o download de
+400 MB levou 30 s" não dizia se o tempo era desta API ou do armazenamento, que é a pergunta de cada
+investigação de mídia deste repositório.
+
+**O rastro entra na camada do cliente HTTP, depois de o SDK assinar, e essa ordem é a única que
+funciona.** A primeira versão usava um `ExecutionInterceptor` com `modifyHttpRequest`, que roda
+**antes** da assinatura. O cabeçalho entrava no SigV4:
+
+```
+SignedHeaders=amz-sdk-invocation-id;amz-sdk-request;host;traceparent;x-amz-content-sha256;...
+```
+
+E o Garage recusava com `403 Invalid signature` em **todo** pedido de mídia. A razão é que o sidecar
+do Istio **reescreve** `traceparent` em trânsito: ele cria um span novo para o salto e troca o valor.
+Assinatura sobre cabeçalho que a malha reescreve nunca corresponde do outro lado.
+
+O teste que havia antes afirmava que a requisição continuava assinada — e continuava, porque dublê
+não confere assinatura. A afirmação era verdadeira e inútil, e quem a desmentiu foi o cluster. O
+teste de agora fixa que `traceparent` **não** está em `SignedHeaders`.
+
+O `S3Client` é síncrono e os dois ramos da rota de mídia chamam o armazenamento na thread da
+requisição, então o `RequestContextHolder` está visível ali — o `writeTo` do fluxo só consome um
+corpo já aberto. No catálogo isso não bastou, e o porquê está no `deploy/README.md`.
 
 ### O caminho do log
 
