@@ -74,6 +74,11 @@ export default defineConfig({
       publicUrl(process.env.PUBLIC_ADMIN_API_URL, process.env.APP_PORT, "8080"),
     ),
     "import.meta.env.VITE_KEYCLOAK_ISSUER": JSON.stringify(keycloakIssuer()),
+    // Para onde mandar quem entra sem o papel de administração: o lugar de um assinante é o
+    // catálogo, não esta tela. A porta 3000 é a do portal, fixada no compose dele.
+    "import.meta.env.VITE_PORTAL_URL": JSON.stringify(
+      publicUrl(process.env.PUBLIC_PORTAL_URL, undefined, "3000"),
+    ),
     "import.meta.env.VITE_KEYCLOAK_CLIENT_ID": JSON.stringify(
       process.env.FRONT_KEYCLOAK_CLIENT_ID ?? "front-codeflix",
     ),
