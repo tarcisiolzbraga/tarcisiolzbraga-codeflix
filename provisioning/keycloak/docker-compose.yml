@@ -68,6 +68,10 @@ services:
       - "${KEYCLOAK_PORT}:${KEYCLOAK_PORT}"
     volumes:
       - ./realm.json:/realm-template.json:ro
+      # O tema de login. Montado em vez de copiado numa imagem própria: com `start-dev` o Keycloak
+      # não guarda tema em cache, então editar o CSS aqui aparece ao recarregar a página — e a
+      # imagem segue sendo a oficial, sem Dockerfile nosso para manter.
+      - ./themes:/opt/keycloak/themes:ro
     # service_healthy, e não started: o Keycloak conecta no banco na subida e sai se não conseguir.
     depends_on:
       keycloak-postgres:
