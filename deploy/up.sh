@@ -8,7 +8,8 @@
 #
 #   1. o cluster existe
 #   2. os nós resolvem DNS            — senão nem a imagem de sandbox chega, e todo pod fica em Init
-#   3. as imagens entram nos nós      — antes do Istio, porque nesta rede os nós não baixam nada
+#   3. as imagens vão para o registro — antes do Istio, porque nesta rede os nós não baixam nada,
+#                                       e as de plataforma também vêm de lá
 #   4. a malha instala                — e só então existe o Service do gateway
 #   5. o DNS do cluster aponta para o gateway  — precisa do IP dele, que acabou de nascer
 #   6. o segredo do .env e as identidades  — tudo depois disto os consome; pod que referencia
@@ -31,11 +32,14 @@ bash deploy/cluster/create-cluster.sh
 passo "2/10 resolvedor dos nós"
 bash deploy/cluster/dns-nodes.sh
 
-passo "3/10 imagens nos nós"
+passo "3/10 imagens no registro"
 # As imagens têm de existir no host, e **construídas para o cluster**: as URLs das APIs são embutidas
 # no build dos fronts. `deploy/build-images.sh` é quem passa os nomes do gateway; um
 # `docker compose build` comum produz fronts apontando para localhost.
-bash deploy/cluster/import-images.sh
+#
+# Push, e não mais carga por tarball: o registro nasceu junto do cluster no passo 1. O script
+# explica por que a troca importa — imagem com origem sobrevive à coleta do kubelet.
+bash deploy/cluster/push-images.sh
 
 passo "4/10 malha e painéis"
 bash deploy/mesh/install-istio.sh

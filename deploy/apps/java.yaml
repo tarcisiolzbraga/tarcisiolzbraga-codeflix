@@ -52,7 +52,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
         - name: admin-api
-          image: admin-codeflix-admin-api:latest
+          image: localhost:5000/admin-codeflix-admin-api:latest
           # As imagens entram no cluster por `k3d image import`, não de um registro: `IfNotPresent`
           # é o que impede o kubelet de tentar buscá-las no Docker Hub e falhar com ErrImagePull.
           imagePullPolicy: IfNotPresent
@@ -177,7 +177,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
         - name: videos-api
-          image: admin-codeflix-videos-api:latest
+          image: localhost:5000/admin-codeflix-videos-api:latest
           imagePullPolicy: IfNotPresent
           envFrom:
             - secretRef: { name: codeflix-env }
@@ -306,7 +306,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
         - name: subscription-api
-          image: admin-codeflix-subscription-api:latest
+          image: localhost:5000/admin-codeflix-subscription-api:latest
           imagePullPolicy: IfNotPresent
           envFrom:
             - secretRef: { name: codeflix-env }

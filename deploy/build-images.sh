@@ -32,4 +32,4 @@ echo "==> imagens"
 docker compose build admin-api videos-api subscription-api encoder-api mail-api portal-codeflix back-office-codeflix
 
 echo
-echo "pronto. Agora: bash deploy/up.sh (ou deploy/cluster/import-images.sh, se o cluster já existe)"
+echo "pronto. Agora: bash deploy/up.sh (ou deploy/cluster/push-images.sh, se o cluster já existe)"
