@@ -25,7 +25,9 @@ metadata:
   name: admin-api
   namespace: codeflix
 spec:
-  replicas: 1
+  # Duas réplicas: o relay da outbox trava a linha com `SKIP LOCKED`, então mais de uma
+  # instância não entrega o mesmo evento duas vezes. Era o impedimento registrado, e ele saiu.
+  replicas: 2
   # **O rollout, declarado em vez de herdado.**
   #
   # `maxUnavailable: 0` com `maxSurge: 1`: o pod antigo **nunca** sai antes de o novo ficar pronto.
@@ -169,7 +171,9 @@ metadata:
   name: videos-api
   namespace: codeflix
 spec:
-  replicas: 1
+  # Duas réplicas, destravadas pelas três partições: com uma só, a segunda instância ficaria
+  # ociosa no consumo do CDC — o grupo não teria o que distribuir.
+  replicas: 2
   # **O rollout, declarado em vez de herdado.**
   #
   # `maxUnavailable: 0` com `maxSurge: 1`: o pod antigo **nunca** sai antes de o novo ficar pronto.
@@ -317,6 +321,11 @@ metadata:
   name: subscription-api
   namespace: codeflix
 spec:
+  # **Fica em uma, e não é esquecimento.** O limitador de requisição conta **por instância**
+  # (Bucket4j em memória), então duas réplicas dobram o teto efetivo — enfraquecendo uma garantia
+  # que o README da raiz descreve como proteção. Destravar pede contador compartilhado, em Redis,
+  # e isso é mudança própria. Enquanto não houver, escalar aqui seria trocar segurança por vazão
+  # sem dizer a ninguém.
   replicas: 1
   # **O rollout, declarado em vez de herdado.**
   #

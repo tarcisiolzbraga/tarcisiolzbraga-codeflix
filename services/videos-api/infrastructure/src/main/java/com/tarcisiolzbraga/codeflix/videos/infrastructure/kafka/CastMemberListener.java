@@ -56,6 +56,13 @@ public class CastMemberListener {
             properties = {"auto.offset.reset=${kafka.consumers.cast-member.auto-offset-reset}"})
     @RetryableTopic(
             attempts = "${kafka.consumers.cast-member.max-attempts}",
+            // **As partições do tópico, e por que isto fica aqui.** Quem cria os tópicos é esta
+            // anotação, na subida — não o Debezium e não o broker. Medido: apagar um tópico e deixar
+            // o broker recriá-lo dava 3 partições, enquanto a subida da aplicação dava 1. Então o
+            // padrão do broker não alcança estes, e a contagem tem de ser dita aqui.
+            //
+            // É o que permite mais de uma réplica consumir: com uma partição, a segunda fica ociosa.
+            numPartitions = "${kafka.topic-partitions}",
             backOff = @BackOff(delay = 1000, multiplier = 2),
             topicSuffixingStrategy = TopicSuffixingStrategy.SUFFIX_WITH_INDEX_VALUE)
     public void onMessage(

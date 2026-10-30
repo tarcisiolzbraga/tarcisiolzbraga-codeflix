@@ -66,7 +66,7 @@ bash deploy/infra/apply-infra.sh
 # O preço é que um `kubectl apply -f` à mão precisa do `TAG` no ambiente. Está dito no README.
 TAG="$(bash deploy/tag.sh)" envsubst '${TAG}' < deploy/apps/java.yaml | kubectl apply -f -
 TAG="$(bash deploy/tag.sh)" envsubst '${TAG}' < deploy/apps/go-and-fronts.yaml | kubectl apply -f -
-kubectl apply -f deploy/apps/fronts-nodeport.yaml
+kubectl apply -f deploy/apps/fronts-nodeport.yaml -f deploy/apps/autoscaling.yaml
 kubectl apply -f deploy/mesh/routes.yaml -f deploy/mesh/dashboards.yaml \
   -f deploy/mesh/peer-authentication.yaml -f deploy/mesh/authorization-policies.yaml
 echo "esperando os pods..."
