@@ -1,0 +1,20 @@
+<section id="dentro" data-transition="fade" style="background:#14161C;color:#F4F2ED;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<h2 style="font-family:'Oswald', Arial, sans-serif;font-size:72px;font-weight:500;line-height:1.1">Dentro de cada serviço Java</h2>
+<div style="display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;gap:40px;align-items:center;background:#1C1F27;padding:40px 48px;border-radius:16px;border-left:6px solid #EE6B50">
+<h3 style="font-family:'Oswald', Arial, sans-serif;font-size:44px;font-weight:500;width:400px">domain</h3>
+<p style="flex:1;font-size:30px;line-height:1.4;color:#A8AEBA">A regra do negócio, sem framework nenhum. Não conhece banco, HTTP nem fila.</p>
+</div>
+<div style="display:flex;gap:40px;align-items:center;background:#1C1F27;padding:40px 48px;border-radius:16px;border-left:6px solid #EE6B50">
+<h3 style="font-family:'Oswald', Arial, sans-serif;font-size:44px;font-weight:500;width:400px">application</h3>
+<p style="flex:1;font-size:30px;line-height:1.4;color:#A8AEBA">Um caso de uso por operação, cada um com entrada e saída próprias.</p>
+</div>
+<div style="display:flex;gap:40px;align-items:center;background:#1C1F27;padding:40px 48px;border-radius:16px;border-left:6px solid #6AA9D6">
+<h3 style="font-family:'Oswald', Arial, sans-serif;font-size:44px;font-weight:500;width:400px">infrastructure</h3>
+<p style="flex:1;font-size:30px;line-height:1.4;color:#A8AEBA">Onde o mundo entra: rotas, banco, fila, armazenamento e segurança.</p>
+</div>
+</div>
+<p style="font-size:30px;line-height:1.45;color:#A8AEBA;width:1500px">As dependências apontam para dentro: a infraestrutura conhece o domínio, e nunca o contrário. São módulos de build separados, então essa regra não depende de disciplina &mdash; o compilador a recusa.</p>
+<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#6A7179">6</p>
+<aside>Os pacotes são por agregado e papel, não por camada técnica: dentro de infrastructure existe video, category, genre — e não controllers, services, repositories. Abrir a pasta diz o que o serviço faz.</aside>
+</section>

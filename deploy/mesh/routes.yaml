@@ -1,0 +1,129 @@
+# **Tempo limite e retentativa, e o cuidado que eles exigem aqui.**
+#
+# Sem `timeout`, uma requisição pendurada fica pendurada: o cliente espera, a conexão ocupa pool, e
+# nada no caminho decide desistir. Com `timeout`, ela vira 504 e o problema aparece.
+#
+# Mas **duas rotas não podem ter timeout**, e esquecer isso cortaria o produto pelo meio: a mídia.
+# O catálogo repassa o vídeo em fluxo e o admin serve e **recebe** o arquivo — um download de 400 MB
+# ou um upload por multipart passa muito do limite de qualquer rota comum. Por isso as duas rotas se
+# dividem: um `match` no caminho da mídia, sem timeout, e a padrão com o limite.
+#
+# **A retentativa é restrita a `connect-failure` e `refused-stream`, e não a 5xx.** O GraphQL do
+# catálogo trafega por `POST`, inclusive mutação, e o admin recebe `POST` de upload: retentar por
+# 5xx duplicaria escrita. Os dois eventos escolhidos acontecem **antes** de a requisição ser
+# entregue ao destino, então são seguros mesmo em método não idempotente.
+
+# As rotas do gateway: um nome por coisa que o browser alcança.
+#
+# `mesh` entra na lista de gateways de cada rota junto do `codeflix` porque os mesmos nomes são
+# usados **de dentro** — o portal busca os planos pelo servidor, e as imagens dos fronts têm esses
+# endereços embutidos. Sem `mesh`, a chamada de um pod ao mesmo nome sairia da malha e voltaria como
+# tráfego externo, e o Kiali a desenharia vindo da internet.
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: { name: portal, namespace: codeflix }
+spec:
+  hosts: ["codeflix.localtest.me"]
+  gateways: [codeflix, mesh]
+  http:
+    - route:
+        - destination: { host: portal.codeflix.svc.cluster.local, port: { number: 3000 } }
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: { name: back-office, namespace: codeflix }
+spec:
+  hosts: ["admin.localtest.me"]
+  gateways: [codeflix, mesh]
+  http:
+    - route:
+        - destination: { host: back-office.codeflix.svc.cluster.local, port: { number: 3001 } }
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: { name: admin-api, namespace: codeflix }
+spec:
+  hosts: ["admin-api.localtest.me"]
+  gateways: [codeflix, mesh]
+  http:
+    # Download **e** upload da mídia: o admin não tem context-path, então o caminho é `/videos/...`.
+    # O upload é multipart e pode ser grande; o download é em fluxo. Nenhum dos dois cabe num
+    # limite de rota comum.
+    - match:
+        - uri: { regex: "^/videos/[^/]+/medias/[^/]+$" }
+      route:
+        - destination: { host: admin-api.codeflix.svc.cluster.local, port: { number: 8080 } }
+      # **A retentativa precisa ser dita aqui também.** Sem `retries`, esta rota herda o padrão do
+      # Istio — que inclui `retriable-status-codes` e `unavailable`, ou seja, **retenta por 503**.
+      # Nesta rota isso é perigoso: no admin ela aceita `POST` de upload por multipart, e retentar
+      # um upload que falhou pode duplicá-lo. Conferido na configuração efetiva do Envoy, que
+      # mostrava o padrão aplicado aqui enquanto a rota padrão tinha o conjunto restrito.
+      #
+      # Sem `perTryTimeout`: a API o recusa em `0s` ("must be greater than 1ms"), e qualquer valor
+      # finito aqui recriaria pela porta dos fundos o limite que esta rota existe para não ter.
+      retries: { attempts: 2, retryOn: "connect-failure,refused-stream" }
+    - route:
+        - destination: { host: admin-api.codeflix.svc.cluster.local, port: { number: 8080 } }
+      timeout: 10s
+      retries: { attempts: 2, perTryTimeout: 4s, retryOn: "connect-failure,refused-stream" }
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: { name: catalogo, namespace: codeflix }
+spec:
+  hosts: ["catalogo.localtest.me"]
+  gateways: [codeflix, mesh]
+  http:
+    # A mídia, em fluxo e sem limite de tempo. O `$` no fim exclui o `/link`, que é JSON curto e
+    # segue pela rota padrão.
+    - match:
+        - uri: { regex: "^/api/videos/[^/]+/medias/[^/]+$" }
+      route:
+        - destination: { host: videos-api.codeflix.svc.cluster.local, port: { number: 8082 } }
+      # **A retentativa precisa ser dita aqui também.** Sem `retries`, esta rota herda o padrão do
+      # Istio — que inclui `retriable-status-codes` e `unavailable`, ou seja, **retenta por 503**.
+      # Nesta rota isso é perigoso: no admin ela aceita `POST` de upload por multipart, e retentar
+      # um upload que falhou pode duplicá-lo. Conferido na configuração efetiva do Envoy, que
+      # mostrava o padrão aplicado aqui enquanto a rota padrão tinha o conjunto restrito.
+      #
+      # Sem `perTryTimeout`: a API o recusa em `0s` ("must be greater than 1ms"), e qualquer valor
+      # finito aqui recriaria pela porta dos fundos o limite que esta rota existe para não ter.
+      retries: { attempts: 2, retryOn: "connect-failure,refused-stream" }
+    - route:
+        - destination: { host: videos-api.codeflix.svc.cluster.local, port: { number: 8082 } }
+      timeout: 10s
+      retries: { attempts: 2, perTryTimeout: 4s, retryOn: "connect-failure,refused-stream" }
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: { name: assinatura, namespace: codeflix }
+spec:
+  hosts: ["assinatura.localtest.me"]
+  gateways: [codeflix, mesh]
+  http:
+    - route:
+        - destination: { host: subscription-api.codeflix.svc.cluster.local, port: { number: 8084 } }
+      timeout: 10s
+      retries: { attempts: 2, perTryTimeout: 4s, retryOn: "connect-failure,refused-stream" }
+---
+# O Mailpit e o painel do RabbitMQ: não são parte do produto, mas são as duas janelas que a gente
+# abre para conferir o que aconteceu.
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: { name: mailpit, namespace: codeflix }
+spec:
+  hosts: ["mailpit.localtest.me"]
+  gateways: [codeflix]
+  http:
+    - route:
+        - destination: { host: mailpit.codeflix.svc.cluster.local, port: { number: 8025 } }
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: { name: rabbitmq, namespace: codeflix }
+spec:
+  hosts: ["rabbitmq.localtest.me"]
+  gateways: [codeflix]
+  http:
+    - route:
+        - destination: { host: rabbitmq.codeflix.svc.cluster.local, port: { number: 15672 } }

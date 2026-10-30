@@ -58,6 +58,13 @@ public class CategoryListener {
             properties = {"auto.offset.reset=${kafka.consumers.category.auto-offset-reset}"})
     @RetryableTopic(
             attempts = "${kafka.consumers.category.max-attempts}",
+            // **As partições do tópico, e por que isto fica aqui.** Quem cria os tópicos é esta
+            // anotação, na subida — não o Debezium e não o broker. Medido: apagar um tópico e deixar
+            // o broker recriá-lo dava 3 partições, enquanto a subida da aplicação dava 1. Então o
+            // padrão do broker não alcança estes, e a contagem tem de ser dita aqui.
+            //
+            // É o que permite mais de uma réplica consumir: com uma partição, a segunda fica ociosa.
+            numPartitions = "${kafka.topic-partitions}",
             // O Spring Kafka 4 não usa mais o spring-retry: o @BackOff é o dele, e o atributo é
             // backOff, com O maiúsculo.
             backOff = @BackOff(delay = 1000, multiplier = 2),

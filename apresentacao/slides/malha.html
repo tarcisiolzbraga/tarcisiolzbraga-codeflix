@@ -1,0 +1,24 @@
+<section id="malha" data-section="O que sustenta: a malha, a medição e os testes." data-transition="fade" style="background:#1C1F27;color:#F4F2ED;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<h2 style="font-family:'Oswald', Arial, sans-serif;font-size:72px;font-weight:500;line-height:1.1">A malha fecha o tráfego</h2>
+<div style="display:flex;gap:24px;align-items:stretch">
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#14161C;padding:40px;border-radius:16px">
+<h3 style="font-family:'Oswald', Arial, sans-serif;font-size:40px;font-weight:500;line-height:1.15;color:#EE6B50">Cifra</h3>
+<p style="font-size:26px;line-height:1.45;color:#A8AEBA">mTLS obrigatório. Texto puro no IP de um pod deixa de ser aceito.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#14161C;padding:40px;border-radius:16px">
+<h3 style="font-family:'Oswald', Arial, sans-serif;font-size:40px;font-weight:500;line-height:1.15;color:#EE6B50">Identidade</h3>
+<p style="font-size:26px;line-height:1.45;color:#A8AEBA">Uma por carga, no certificado. Antes as 18 diziam a mesma coisa.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#14161C;padding:40px;border-radius:16px">
+<h3 style="font-family:'Oswald', Arial, sans-serif;font-size:40px;font-weight:500;line-height:1.15;color:#EE6B50">Permissão</h3>
+<p style="font-size:26px;line-height:1.45;color:#A8AEBA">Nada passa sem regra. Quem chama quem saiu do que foi medido.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#14161C;padding:40px;border-radius:16px">
+<h3 style="font-family:'Oswald', Arial, sans-serif;font-size:40px;font-weight:500;line-height:1.15;color:#6AA9D6">Rastro</h3>
+<p style="font-size:26px;line-height:1.45;color:#A8AEBA">Uma requisição atravessa quatro serviços num rastro só.</p>
+</div>
+</div>
+<p style="font-size:30px;line-height:1.45;color:#A8AEBA;width:1500px">As quatro se sustentam em ordem: sem identidade por carga a permissão é inexprimível, e sem rastro não há como dizer em qual salto o tráfego parou quando uma regra aperta demais. Fechado o acesso, entrou o comportamento sob falha: disjuntor, teto de conexão e tempo limite &mdash; com a mídia de fora, porque lá o limite cortaria o vídeo no meio.</p>
+<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#6A7179">7</p>
+<aside>Istio com sidecar. Cada uma dessas quatro foi aplicada medindo o que quebrava: o mTLS derrubou os fronts servidos por NodePort, que ganharam exceção por porta; a permissão derrubou o Kafka falando com ele mesmo pelo nome de serviço.</aside>
+</section>

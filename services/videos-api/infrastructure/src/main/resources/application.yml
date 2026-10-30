@@ -3,6 +3,16 @@
 # SPRING_PROFILES_ACTIVE.
 server:
   port: ${CATALOG_APP_PORT:8082}
+  # Parada elegante: o Tomcat para de aceitar conexão nova e espera a que está em voo terminar,
+  # em vez de a cortar no meio. **É o padrão do Boot 4** — mudou da `immediate` do Boot 3 —, e fica
+  # declarado pelo mesmo motivo do binlog-format do MySQL: para o comportamento não depender de um
+  # padrão que já mudou uma vez.
+  #
+  # O actuator entra nisto de graça: com os grupos de sonda ligados, a prontidão passa a
+  # OUT_OF_SERVICE assim que a parada começa, então o balanceador para de mandar requisição antes
+  # de a aplicação começar a se desmontar.
+  shutdown: graceful
+
   # Mesmo prefixo da referência, e é por isso que o GraphiQL fica em /api/graphiql.
   servlet:
     context-path: /api
@@ -24,13 +34,22 @@ media:
   signing-secret: ${CATALOG_MEDIA_SIGNING_SECRET}
 
 kafka:
+  # As partições com que os tópicos de CDC e de retentativa nascem.
+  #
+  # **Quem os cria é a aplicação, na subida** — pelo `@RetryableTopic` —, e não o Debezium
+  # nem o padrão do broker. Medido: apagar um tópico e deixar o broker recriá-lo dava 3
+  # partições, enquanto a subida da aplicação dava 1. Por isso a contagem mora aqui também.
+  #
+  # Três é o que permite a segunda réplica do catálogo consumir.
+  topic-partitions: 3
   consumers:
     category:
       id: kafka-listener-category
       topics: adm_videos_mysql.adm_videos.category
       group-id: videos-api-codeflix
-      # Um por tópico: os tópicos do Debezium nascem com uma partição, e concorrência acima do
-      # número de partições só deixa consumidor ocioso.
+      # Um por instância, e a escala vem da réplica, não daqui. Os tópicos nascem com três
+      # partições agora, então caberia concorrência maior — mas com duas réplicas isso daria seis
+      # consumidores para três partições, e três ficariam ociosos. Quem sobe é o número de pods.
       concurrency: 1
       # earliest para o snapshot inicial do Debezium ser consumido na primeira subida: com latest o
       # catálogo nasceria vazio e só veria o que mudasse a partir de então.
@@ -66,6 +85,11 @@ kafka:
 spring:
   profiles:
     default: development
+  # O teto de espera de cada fase da parada, e também o padrão do Boot, declarado pela mesma razão.
+  # 30s é o que a requisição em voo tem para terminar; passou disso, a parada segue e o que
+  # sobrou é cortado — com linha no log, que é o que diferencia isto de um SIGKILL silencioso.
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   threads:
     virtual:
       enabled: true
@@ -102,6 +126,44 @@ spring:
 # devia — ou negado a quem devia.
 keycloak:
   issuer-uri: ${KEYCLOAK_ISSUER_URI}
+
+# Saúde e métricas, **numa porta à parte da aplicação**, pelo mesmo motivo da admin-api: o gateway
+# publica só a porta da aplicação, então /actuator não tem por onde ser alcançado de fora. A
+# proteção é a topologia, e não uma regra de caminho que alguém escreve errado um dia.
+#
+# A 9091 aqui, para não bater com a 9090 da admin-api nem com a 9092 da assinatura quando os três
+# rodam no mesmo host pelo bootRun. A faixa é a 9090 porque a 8090 é do gateway do Istio, publicada
+# no host pelo deploy/cluster/create-cluster.sh.
+#
+# O `context-path: /api` lá em cima **não** vale nesta porta: o servidor de gerenciamento é outro, e
+# a saúde responde em /actuator/health, não em /api/actuator/health. Há teste fixando isso, porque é
+# exatamente o tipo de detalhe que se descobre com a sonda falhando em produção.
+management:
+  server:
+    port: ${CATALOG_MANAGEMENT_PORT:9091}
+  endpoints:
+    web:
+      exposure:
+        # O que se expõe é escolha, e não o padrão do Boot: saúde para as sondas e prometheus para o
+        # coletor. `env` e `configprops` ficam de fora mesmo numa porta interna — eles imprimem as
+        # variáveis de ambiente, e é lá que está o segredo que assina a URL da mídia.
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    # O Elasticsearch entra no /actuator/health e **não** no grupo readiness. Num serviço de leitura
+    # a tentação é a oposta — sem índice não há o que servir —, mas tirar todas as réplicas de
+    # rotação ao mesmo tempo troca "catálogo vazio" por "nada responde", e a segunda é pior.
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    tags:
+      application: videos-api-codeflix
 
 # Identifica a aplicação no log estruturado, que é como o Kibana a separa das outras.
 logging:

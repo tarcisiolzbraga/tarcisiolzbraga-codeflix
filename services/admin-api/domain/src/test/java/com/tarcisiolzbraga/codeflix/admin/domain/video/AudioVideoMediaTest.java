@@ -103,4 +103,19 @@ class AudioVideoMediaTest {
 
         assertEquals("'status' should not be null", actualException.getMessage());
     }
+
+    // Falhar não apaga onde está o arquivo enviado: é dele que uma nova tentativa parte, e é ele que
+    // o operador precisa para decidir se reenvia ou se o arquivo é que está ruim.
+    @Test
+    void givenAPendingMedia_whenCallFailed_thenOnlyTheStatusChanges() {
+        final var media = AudioVideoMedia.with("abc123", "duna.mp4", "raw/video");
+
+        final var actual = media.failed();
+
+        assertEquals(MediaStatus.FAILED, actual.status());
+        assertEquals("abc123", actual.checksum());
+        assertEquals("duna.mp4", actual.name());
+        assertEquals("raw/video", actual.rawLocation());
+        assertEquals("", actual.encodedLocation());
+    }
 }

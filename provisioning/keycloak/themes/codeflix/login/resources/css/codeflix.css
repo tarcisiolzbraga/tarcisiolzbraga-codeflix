@@ -1,0 +1,197 @@
+/*
+ * A cara da Codeflix na tela de login.
+ *
+ * Só cor, tipografia e espaçamento: nenhum seletor aqui muda estrutura, porque a estrutura é do
+ * template herdado do `keycloak.v2`. Isso é o que permite o Keycloak subir de versão sem levar esta
+ * tela junto.
+ *
+ * As classes `pf-v5-*` são do PatternFly 5, que é o que o tema v2 usa — elas vêm do
+ * `theme.properties` do pai, não de adivinhação.
+ */
+
+:root {
+  --codeflix-fundo: #0a0a0a;
+  --codeflix-superficie: #141414;
+  --codeflix-borda: #262626;
+  --codeflix-borda-ativa: #3f3f3f;
+  --codeflix-texto: #f5f5f5;
+  --codeflix-texto-fraco: #a3a3a3;
+  --codeflix-vermelho: #e50914;
+  --codeflix-vermelho-escuro: #b20710;
+}
+
+/* O fundo cobre a página inteira: o `login-pf` é a classe que o tema põe no `html`. */
+html.login-pf,
+html.login-pf body {
+  background: var(--codeflix-fundo);
+  color: var(--codeflix-texto);
+}
+
+/* Um brilho vermelho muito baixo atrás do cartão. Em `body::before` para não entrar no fluxo e não
+   mexer em nenhuma posição. */
+body.login-pf::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(60rem 32rem at 50% -8rem, rgba(229, 9, 20, 0.18), transparent 70%);
+}
+
+/* A marca. O texto vem do `displayNameHtml` do realm — o template o escreve aqui dentro. */
+#kc-header-wrapper {
+  color: var(--codeflix-vermelho);
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  padding: 2.5rem 1rem 1.25rem;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* O cartão. */
+.pf-v5-c-login__main {
+  background: var(--codeflix-superficie);
+  border: 1px solid var(--codeflix-borda);
+  border-radius: 12px;
+  box-shadow: 0 24px 48px -24px rgba(0, 0, 0, 0.8);
+  color: var(--codeflix-texto);
+}
+
+.pf-v5-c-login__main-header,
+.pf-v5-c-login__main-body,
+.pf-v5-c-login__main-footer {
+  background: transparent;
+}
+
+#kc-page-title {
+  color: var(--codeflix-texto);
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+
+/* Rótulos e textos de apoio. */
+.pf-v5-c-form__label-text,
+.pf-v5-c-form__label,
+.pf-v5-c-check__label,
+label {
+  color: var(--codeflix-texto);
+}
+
+.pf-v5-c-helper-text__item-text,
+.pf-v5-u-color-200,
+#kc-registration,
+#kc-registration-container,
+.pf-v5-c-login__main-footer-band-item {
+  color: var(--codeflix-texto-fraco);
+}
+
+/* Os campos. O PatternFly desenha o contorno no próprio `input`, então a cor de fundo e a borda vão
+   nos dois: no grupo e no campo. */
+.pf-v5-c-form-control,
+.pf-v5-c-form-control > input,
+.pf-v5-c-form-control > textarea,
+.pf-v5-c-form-control > select,
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+  background: #0f0f0f;
+  border-radius: 8px;
+  color: var(--codeflix-texto);
+}
+
+.pf-v5-c-form-control {
+  border: 1px solid var(--codeflix-borda-ativa);
+}
+
+.pf-v5-c-form-control::after,
+.pf-v5-c-form-control > input::after {
+  border: 0;
+}
+
+.pf-v5-c-form-control:hover {
+  border-color: #525252;
+}
+
+/* O foco é vermelho, e visível: é o único indício de onde o teclado está para quem não usa mouse. */
+.pf-v5-c-form-control:focus-within {
+  border-color: var(--codeflix-vermelho);
+  box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.25);
+  outline: none;
+}
+
+.pf-v5-c-form-control > input::placeholder {
+  color: #6b6b6b;
+}
+
+/* O botão de entrar. */
+.pf-v5-c-button.pf-m-primary {
+  background: var(--codeflix-vermelho);
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.pf-v5-c-button.pf-m-primary:hover,
+.pf-v5-c-button.pf-m-primary:focus {
+  background: var(--codeflix-vermelho-escuro);
+  color: #fff;
+}
+
+.pf-v5-c-button.pf-m-primary:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* O olho que mostra a senha, e os botões de controle ao lado do campo. */
+.pf-v5-c-button.pf-m-control {
+  background: transparent;
+  border-color: var(--codeflix-borda-ativa);
+  color: var(--codeflix-texto-fraco);
+}
+
+.pf-v5-c-button.pf-m-control:hover {
+  color: var(--codeflix-texto);
+}
+
+/* Os links: "esqueci a senha", "cadastre-se". */
+a,
+.pf-v5-c-button.pf-m-link {
+  color: #ff6b73;
+}
+
+a:hover,
+.pf-v5-c-button.pf-m-link:hover {
+  color: #ff9ba1;
+}
+
+/* O aviso de erro. O PatternFly o desenha claro, e claro sobre escuro aqui vira um bloco branco no
+   meio do cartão. */
+.pf-v5-c-alert {
+  background: #2a1113;
+  border: 1px solid #5c1a1f;
+  border-radius: 8px;
+  color: #ffd7d9;
+}
+
+.pf-v5-c-alert__title,
+.pf-v5-c-alert__description,
+.pf-v5-c-alert__icon {
+  color: #ffd7d9;
+}
+
+.pf-m-error,
+.kc-feedback-text {
+  color: #ff8a90;
+}
+
+/* A caixa de "lembrar de mim". */
+.pf-v5-c-check__input {
+  accent-color: var(--codeflix-vermelho);
+}
+
+/* O seletor de idioma, quando o realm tem mais de um. */
+#kc-locale-dropdown a,
+.pf-v5-c-dropdown__toggle {
+  color: var(--codeflix-texto-fraco);
+}

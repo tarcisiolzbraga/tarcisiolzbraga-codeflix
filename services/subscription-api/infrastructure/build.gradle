@@ -3,6 +3,8 @@ plugins {
     id 'org.springframework.boot'
     id 'io.spring.dependency-management'
     id 'jacoco-report-aggregation'
+    // O piso de cobertura, no build-logic: mexer nele mexe nos três serviços.
+    id 'codeflix.coverage-verification'
 }
 
 tasks.named('bootJar') {
@@ -14,7 +16,30 @@ tasks.named('jar') {
     enabled = false
 }
 
+// O `amqp-client` que o BOM do Boot 4.1.2 fixa é o 5.30.0, e ele carrega quatro CVEs HIGH
+// (CVE-2026-63337, -69219, -69220, -75516), corrigidos a partir do 5.33.0. Subir o Boot não resolve
+// este: ele é o único dos cinco achados do Trivy que o 4.1.2 **não** move.
+//
+// Sobrescrever propriedade do BOM é o caminho suportado pelo plugin de dependency-management, e é
+// preferível a declarar a dependência com versão: assim todo artefato do grupo continua alinhado,
+// inclusive o que entrar transitivo amanhã.
+ext['rabbit-amqp-client.version'] = '5.37.0'
+
 dependencies {
+    // O lz4-java vem do kafka-clients e **não é gerenciado pelo BOM do Boot**, então subir o Boot não
+    // o move: o 4.1.2 trouxe o 1.11.2, que carrega o CVE-2026-106451 (corrigido no 1.11.4).
+    //
+    // Constraint, e não dependência declarada: ninguém aqui usa lz4 diretamente — ele é detalhe de
+    // compressão do cliente Kafka. Declará-lo como dependência diria uma coisa falsa sobre o código;
+    // a constraint diz exatamente o que é, um piso de versão para o que vem transitivo.
+    constraints {
+        implementation('at.yawk.lz4:lz4-java:1.12.1') {
+            because 'CVE-2026-106451 no 1.11.2, que o kafka-clients traz'
+        }
+        implementation('org.xerial.snappy:snappy-java:1.1.10.12') {
+            because 'CVE-2026-108106 e CVE-2026-93451 no 1.1.10.7, que o kafka-clients traz'
+        }
+    }
     implementation project(':domain')
     implementation project(':application')
 
@@ -31,6 +56,16 @@ dependencies {
     // consumidor. Mesma escolha da videos-api, que também consome CDC.
     implementation 'org.springframework.boot:spring-boot-starter-kafka'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    // Saúde e métricas. O registro do Prometheus vem do BOM do Boot, por isso sem versão aqui.
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+    // Limite de requisição. Fora do BOM do Boot: o bucket4j-core é só o algoritmo de token bucket,
+    // sem integração de framework — o filtro e o registro de baldes são escritos aqui.
+    implementation 'com.bucket4j:bucket4j-core:8.10.1'
+    // O cache dos baldes, com teto de tamanho e expiração: sem isso o mapa de IPs cresce sem fim, e
+    // uma enxurrada de origens distintas viraria vazamento de memória em vez de defesa. Vem do BOM
+    // do Boot, por isso sem versão.
+    implementation 'com.github.ben-manes.caffeine:caffeine'
     implementation 'org.springframework.boot:spring-boot-starter-flyway'
     implementation 'org.flywaydb:flyway-mysql'
     // fora do BOM do Boot; a linha 3.x é a compatível com o Boot 4

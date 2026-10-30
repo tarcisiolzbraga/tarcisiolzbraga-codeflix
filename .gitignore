@@ -45,3 +45,9 @@ out/
 
 ### Go (encoder-api) ###
 coverage.out
+
+# Os backups locais do provisioning/backup/backup.sh: dado, não código.
+backups/
+
+# Os resultados do teste de carga: medição, não código.
+perf/resultados/

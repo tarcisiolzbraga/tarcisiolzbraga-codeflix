@@ -2,6 +2,7 @@ package com.tarcisiolzbraga.codeflix.videos.e2e.video;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -13,6 +14,7 @@ import com.tarcisiolzbraga.codeflix.videos.domain.video.VideoFlags;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.E2ETest;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.KeycloakTestToken;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.video.VideoClient;
+import com.tarcisiolzbraga.codeflix.videos.infrastructure.video.models.MediaContent;
 import com.tarcisiolzbraga.codeflix.videos.infrastructure.video.models.VideoMediaFile;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -67,7 +69,7 @@ class VideoMediaE2ETest {
     void givenTheSubscriberRole_whenAsksForTheMedia_thenServeItWithTheOriginalContentType() {
         // Given o admin tendo o arquivo
         when(this.videoClient.mediaOf(any(), any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT, CONTENT.length, null)));
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, null)));
 
         // When quem assina pede a mídia
         final var actual = clientWith(this.token.catalogTest())
@@ -88,7 +90,7 @@ class VideoMediaE2ETest {
     void givenTheSubscriberRole_whenAsksForTheMedia_thenTheDispositionIsInlineWithTheOriginalName() {
         // Given o admin tendo o arquivo
         when(this.videoClient.mediaOf(any(), any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT, CONTENT.length, null)));
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, null)));
 
         // When pede a mídia
         final var actual = clientWith(this.token.catalogTest())
@@ -103,6 +105,41 @@ class VideoMediaE2ETest {
         final var disposition = String.valueOf(actual.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION));
         assertTrue(disposition.startsWith("inline"), disposition);
         assertTrue(disposition.contains("filme.mp4"), disposition);
+    }
+
+    // **Os cabeçalhos de segurança continuam saindo, e este teste existe por causa de uma troca.**
+    //
+    // O `HeaderWriterFilter` passou a escrever **antes** da cadeia, e não depois, porque escrever
+    // depois corrompia a resposta nesta rota: com despacho assíncrono, "depois da cadeia" não é
+    // "depois da resposta", e o filtro ia ler cabeçalho de um `Response` que o Tomcat já reciclou.
+    //
+    // O preço de escrever antes é que um handler que ponha o mesmo cabeçalho depois o sobrescreve,
+    // em vez de o `hasHeader` do writer o respeitar. Nenhuma rota daqui define esses cabeçalhos, mas
+    // sem este teste a troca poderia virar "consertei desligando a proteção" sem nada acusar.
+    //
+    // E é de propósito que ele mede na rota **de mídia**, que é a assíncrona: o irmão na admin-api
+    // mede numa rota síncrona, onde a escrita antecipada nem é exercitada.
+    @Test
+    void givenTheMediaIsRelayed_whenItAnswers_thenTheSecurityHeadersAreThere() {
+        // Given o admin tendo o arquivo
+        when(this.videoClient.mediaOf(any(), any(), any()))
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, null)));
+
+        // When quem assina pede a mídia
+        final var actual = clientWith(this.token.catalogTest())
+                .get()
+                .uri("/videos/{id}/medias/{type}", A_VIDEO, "VIDEO")
+                .retrieve()
+                .toEntity(byte[].class);
+
+        // Then os cabeçalhos padrão do Spring Security vieram junto
+        final var headers = actual.getHeaders();
+        assertEquals("nosniff", headers.getFirst("X-Content-Type-Options"));
+        assertEquals("DENY", headers.getFirst("X-Frame-Options"));
+        assertEquals("0", headers.getFirst("X-XSS-Protection"));
+        assertNotNull(headers.getCacheControl(), "faltou o Cache-Control");
+        assertEquals("no-cache", headers.getFirst("Pragma"));
+        assertEquals("0", headers.getFirst("Expires"));
     }
 
     // Título cadastrado sem upload existe no acervo e não tem o que reproduzir: 404 limpo, e não erro.
@@ -136,7 +173,7 @@ class VideoMediaE2ETest {
     void givenTheAdminRole_whenAsksForTheMedia_thenServeIt() {
         // Given o admin tendo o arquivo
         when(this.videoClient.mediaOf(any(), any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT, CONTENT.length, null)));
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, null)));
 
         // When o administrador pede / Then é servido
         assertEquals(HttpStatus.OK, statusOf(this.token.admin()));
@@ -166,7 +203,7 @@ class VideoMediaE2ETest {
     void givenASignedPath_whenAsksForTheMediaWithoutAnyToken_thenServeIt() {
         // Given o admin tendo o arquivo, e um link assinado emitido a quem assina
         when(this.videoClient.mediaOf(any(), any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT, CONTENT.length, null)));
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, null)));
         final var link = clientWith(this.token.catalogTest())
                 .get()
                 .uri("/videos/{id}/medias/{type}/link", A_VIDEO, "VIDEO")
@@ -218,7 +255,7 @@ class VideoMediaE2ETest {
         // Given um título marcado como aberto no catálogo
         when(this.getVideoUseCase.execute(any())).thenReturn(Optional.of(openTitle()));
         when(this.videoClient.mediaOf(any(), any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT, CONTENT.length, null)));
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, null)));
 
         // When alguém identificado e sem o papel pede / Then é servido
         assertEquals(HttpStatus.OK, statusOf(this.token.bearerOf(KeycloakTestToken.STRANGER)));
@@ -246,7 +283,7 @@ class VideoMediaE2ETest {
     void givenARangeHeader_whenAsksForTheMedia_thenRelayTheRangeAndAnswerPartialContent() {
         // Given o admin devolvendo um trecho, com o Content-Range que o armazenamento calculou
         when(this.videoClient.mediaOf(any(), any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT, CONTENT.length, "bytes 0-9/100")));
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, "bytes 0-9/100")));
 
         // When o player pede um trecho
         final var actual = clientWith(this.token.catalogTest())
@@ -268,7 +305,7 @@ class VideoMediaE2ETest {
     void givenARangeThatTheAdminIgnored_whenAsksForTheMedia_thenAnswerTwoHundredAndNotPartial() {
         // Given o admin devolvendo o arquivo inteiro, sem Content-Range, apesar do pedido
         when(this.videoClient.mediaOf(any(), any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT, CONTENT.length, null)));
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, null)));
 
         // When o player pede um trecho
         final var actual = clientWith(this.token.catalogTest())
@@ -286,7 +323,7 @@ class VideoMediaE2ETest {
     void givenTheMediaServed_whenReadTheHeaders_thenRangesAreAnnounced() {
         // Given o admin devolvendo o arquivo
         when(this.videoClient.mediaOf(any(), any(), any()))
-                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", CONTENT, CONTENT.length, null)));
+                .thenReturn(Optional.of(new VideoMediaFile("video/mp4", "filme.mp4", writing(CONTENT), CONTENT.length, null)));
 
         // When pede a mídia
         final var actual = clientWith(this.token.catalogTest())
@@ -330,5 +367,11 @@ class VideoMediaE2ETest {
         return bearer == null ? builder.build() : builder.defaultHeader(HttpHeaders.AUTHORIZATION, bearer).build();
     }
 
+    // O conteúdo é entregue **escrevendo**: o `VideoMediaFile` carrega uma função, não um arranjo,
+    // porque o arquivo atravessa o catálogo em fluxo. O dublê faz aqui o que a conexão com o admin
+    // faria — e os testes continuam afirmando os mesmos bytes do outro lado.
+    private static MediaContent writing(final byte[] content) {
+        return destination -> destination.write(content);
+    }
 
 }

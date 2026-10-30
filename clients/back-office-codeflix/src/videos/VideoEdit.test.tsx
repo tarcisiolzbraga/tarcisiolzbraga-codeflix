@@ -125,6 +125,18 @@ describe("VideoEdit", () => {
     expect(screen.getByText("PENDING")).toBeInTheDocument();
     expect(screen.getAllByText("Nenhum arquivo enviado.")).toHaveLength(4);
   });
+  // **A falha tem de se ver.** Antes de o domínio ter FAILED, a resposta de erro do encoder só
+  // virava log, e aqui no painel não havia o que mostrar: a mídia ficava em PROCESSING para sempre,
+  // igual a uma codificação lenta. Agora chega FAILED, e o chip sai em vermelho.
+  it("givenUmaMidiaQueFalhouNaCodificacao_whenAbre_thenMostraOStatusEmVermelho", async () => {
+    respondeCom({ ...DUNA, video: { ...DUNA.video, status: "FAILED" } });
+
+    renderiza();
+
+    const chip = await screen.findByText("FAILED");
+    expect(chip.closest(".MuiChip-root")).toHaveClass("MuiChip-colorError");
+  });
+
 
   // **Escolher um arquivo agora o põe na fila**, e é a fila que envia. O POST continua acontecendo —
   // por XHR, porque é o único que reporta progresso de envio.

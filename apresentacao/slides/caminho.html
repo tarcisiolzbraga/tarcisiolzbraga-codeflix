@@ -1,0 +1,33 @@
+<section id="caminho" data-section="Como as peças se ligam, do upload ao play." data-transition="fade" style="background:#14161C;color:#F4F2ED;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<h2 style="font-family:'Oswald', Arial, sans-serif;font-size:72px;font-weight:500;line-height:1.1">O caminho de um vídeo</h2>
+<div style="display:flex;gap:24px;align-items:stretch">
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#1C1F27;padding:32px;border-radius:16px;border-top:4px solid #EE6B50">
+<p style="font-size:24px;font-weight:600;color:#EE6B50">01</p>
+<h3 style="font-family:'Oswald', Arial, sans-serif;font-size:32px;font-weight:500;line-height:1.15">Envio</h3>
+<p style="font-size:24px;line-height:1.45;color:#A8AEBA">A operação sobe o arquivo pelo back-office.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#1C1F27;padding:32px;border-radius:16px;border-top:4px solid #EE6B50">
+<p style="font-size:24px;font-weight:600;color:#EE6B50">02</p>
+<h3 style="font-family:'Oswald', Arial, sans-serif;font-size:32px;font-weight:500;line-height:1.15">Guarda</h3>
+<p style="font-size:24px;line-height:1.45;color:#A8AEBA">O admin grava no armazenamento compatível com S3.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#1C1F27;padding:32px;border-radius:16px;border-top:4px solid #EE6B50">
+<p style="font-size:24px;font-weight:600;color:#EE6B50">03</p>
+<h3 style="font-family:'Oswald', Arial, sans-serif;font-size:32px;font-weight:500;line-height:1.15">Converte</h3>
+<p style="font-size:24px;line-height:1.45;color:#A8AEBA">O encoder pega o trabalho na fila e converte.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#1C1F27;padding:32px;border-radius:16px;border-top:4px solid #6AA9D6">
+<p style="font-size:24px;font-weight:600;color:#6AA9D6">04</p>
+<h3 style="font-family:'Oswald', Arial, sans-serif;font-size:32px;font-weight:500;line-height:1.15">Replica</h3>
+<p style="font-size:24px;line-height:1.45;color:#A8AEBA">A publicação viaja até o índice do catálogo.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#1C1F27;padding:32px;border-radius:16px;border-top:4px solid #6AA9D6">
+<p style="font-size:24px;font-weight:600;color:#6AA9D6">05</p>
+<h3 style="font-family:'Oswald', Arial, sans-serif;font-size:32px;font-weight:500;line-height:1.15">Play</h3>
+<p style="font-size:24px;line-height:1.45;color:#A8AEBA">O portal pede o trecho, e o vídeo atravessa em fluxo.</p>
+</div>
+</div>
+<p style="font-size:30px;line-height:1.45;color:#A8AEBA;width:1400px">O arquivo nunca é copiado inteiro para a memória: o <b>Range</b> que o player pede é repassado até o armazenamento, e o trecho volta em fluxo pelos dois serviços.</p>
+<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#6A7179">4</p>
+<aside>Os dois primeiros passos são síncronos; do terceiro em diante é assíncrono — fila para o encoder, CDC para o catálogo. O play é o único caminho em que os dois serviços ficam no meio do byte, e por isso ele é repasse em fluxo e não cópia.</aside>
+</section>

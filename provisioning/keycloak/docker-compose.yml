@@ -1,5 +1,5 @@
 # Autenticação. O realm, as roles e os clients vêm do realm.json ao lado, então o compose entrega
-# um servidor pronto para emitir token. O realm é um só para os dois serviços — o porquê está no
+# um servidor pronto para emitir token. O realm é um só para todas as aplicações — o porquê está no
 # README desta pasta.
 #
 # Sem volume de propósito: o realm é inteiramente descrito pelo arquivo versionado, então o
@@ -32,6 +32,22 @@ services:
       # A senha do operador de teste do realm. Vem do .env pelo mesmo motivo do segredo acima:
       # credencial não entra em arquivo versionado, nem sendo de desenvolvimento.
       OPERATOR_TEST_PASSWORD: ${OPERATOR_TEST_PASSWORD:-operador-de-teste}
+      # --- O banco do Keycloak -----------------------------------------------------------------
+      # **Isto não é zelo: era perda de dado.** Antes o Keycloak rodava `start-dev`, cujo banco é um
+      # H2 em `/opt/keycloak/data/h2/`, **dentro da camada do container** e sem volume nenhum. Toda
+      # recriação apagava os assinantes criados em execução — e a linha deles em `account`, que está
+      # em volume, sobrevivia: o banco e o provedor de identidade se separavam, a pessoa não
+      # conseguia mais entrar, e o nome e o documento dela continuavam lá.
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/${KEYCLOAK_DB_NAME}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      # O modo de produção exige HTTPS e nome de host declarado. Aqui o tráfego é interno da rede do
+      # compose e o nome tem de ser o mesmo dos dois lados por causa do `iss` do token, então as duas
+      # travas saem explicitamente — e não por descuido de quem copiou um exemplo.
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HEALTH_ENABLED: "true"
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
@@ -40,7 +56,11 @@ services:
         comSegredo="$${template//__KEYCLOAK_CLIENT_SECRET__/$$KEYCLOAK_CLIENT_SECRET}"
         printf '%s' "$${comSegredo//__OPERATOR_TEST_PASSWORD__/$$OPERATOR_TEST_PASSWORD}" \
           > /opt/keycloak/data/import/realm.json
-        exec /opt/keycloak/bin/kc.sh start-dev --import-realm --http-port=${KEYCLOAK_PORT}
+        # Sem `--optimized`: o vendor de banco é opção de **tempo de build** no Keycloak, e
+        # `--optimized` manda confiar numa imagem já aumentada para postgres — que esta não é. Sem a
+        # flag, o próprio `start` reaumenta na subida: custa alguns segundos e dispensa manter uma
+        # imagem derivada só para isso.
+        exec /opt/keycloak/bin/kc.sh start --import-realm --http-port=${KEYCLOAK_PORT}
     ports:
       # A mesma porta dentro e fora de propósito: o `iss` do token é a URL que o cliente usou, então
       # http://keycloak:8081 tem de valer nos dois lados. Com portas diferentes, um token pedido do
@@ -48,3 +68,47 @@ services:
       - "${KEYCLOAK_PORT}:${KEYCLOAK_PORT}"
     volumes:
       - ./realm.json:/realm-template.json:ro
+      # O tema de login. Montado em vez de copiado numa imagem própria: com `start-dev` o Keycloak
+      # não guarda tema em cache, então editar o CSS aqui aparece ao recarregar a página — e a
+      # imagem segue sendo a oficial, sem Dockerfile nosso para manter.
+      - ./themes:/opt/keycloak/themes:ro
+    # service_healthy, e não started: o Keycloak conecta no banco na subida e sai se não conseguir.
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+
+  # O banco do Keycloak, separado do da assinatura e do do encoder pelo mesmo motivo que aqueles são
+  # separados entre si: o estado de um serviço não é assunto do outro.
+  #
+  # Postgres 18, e o do encoder está no 17. A divergência é deliberada e não preguiça: subir o major
+  # do encoder pede dump e restauração, porque os majors do Postgres não são compatíveis no formato
+  # em disco — é mudança própria, com o seu próprio teste, não carona nesta.
+  keycloak-postgres:
+    logging: *logging
+    image: postgres:18-alpine
+    container_name: adm_videos_keycloak_postgres
+    environment:
+      POSTGRES_USER: ${KEYCLOAK_DB_USER}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      POSTGRES_DB: ${KEYCLOAK_DB_NAME}
+    ports:
+      - "${KEYCLOAK_DB_PORT}:5432"
+    # **`/var/lib/postgresql`, e não `/var/lib/postgresql/data`.** O 18 mudou isso: ele põe o PGDATA
+    # numa subpasta por versão e espera um mount único no diretório de cima, para o `pg_upgrade
+    # --link` de um major futuro não atravessar fronteira de mount. Com o caminho antigo a imagem
+    # **recusa subir**, dizendo que o mount está "unused" — medido aqui antes de o conserto existir.
+    #
+    # É também a razão de o Postgres do encoder ficar no 17 nesta mudança: subir o major dele exige
+    # este caminho novo **mais** dump e restauração, porque o formato em disco não é compatível.
+    volumes:
+      - keycloak_postgres_data:/var/lib/postgresql
+    # pg_isready com o usuário e o banco certos: sem -U ele usa o do sistema e responde que não está
+    # pronto mesmo depois de estar.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${KEYCLOAK_DB_USER} -d ${KEYCLOAK_DB_NAME}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  keycloak_postgres_data:

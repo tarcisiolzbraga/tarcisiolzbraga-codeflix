@@ -67,6 +67,22 @@ class VideoEncoderListenerIT {
         assertEquals("", actualMedia.encodedLocation());
     }
 
+    // A regressão que este teste guarda: a mensagem de erro do codificador só virava linha de log, e
+    // a mídia ficava em PROCESSING para sempre — indistinguível de codificação lenta para quem
+    // estava no painel. Agora o estado é gravado, e o arquivo enviado continua onde está.
+    @Test
+    void givenAnErrorMessage_whenTheEncoderSendsIt_thenTheMediaIsMarkedAsFailed() {
+        final var video = givenStoredVideoWithMedia();
+
+        send("""
+                {"status":"ERROR","videoId":"%s","type":"VIDEO","checksum":"abc1","message":"ffmpeg saiu com 1"}"""
+                .formatted(video.getId().getValue()));
+
+        final var actualMedia = awaitMedia(video.getId(), media -> media.status() == MediaStatus.FAILED);
+        assertEquals("raw/video", actualMedia.rawLocation());
+        assertEquals("", actualMedia.encodedLocation());
+    }
+
     @Test
     void givenAnUnreadableMessage_whenTheEncoderSendsIt_thenDropItAndKeepWorking() {
         final var video = givenStoredVideoWithMedia();

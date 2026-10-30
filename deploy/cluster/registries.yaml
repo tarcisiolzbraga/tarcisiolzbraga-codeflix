@@ -1,0 +1,55 @@
+# O espelho que faz **um endereço só** servir ao push e ao pull.
+#
+# O problema, em uma frase: o host empurra a imagem para a porta publicada do registro
+# (`localhost:5000`), e o nó precisa buscá-la pelo nome do container (`k3d-codeflix-registry:5000`).
+# São dois endereços para a mesma imagem, e a referência no manifesto só pode ter um.
+#
+# As saídas possíveis eram duas, e a escolha não é de gosto:
+#
+#   - uma linha em `/etc/hosts` mapeando o nome do container para 127.0.0.1 — descartada, porque
+#     este projeto evita `/etc/hosts` por princípio. O `dns-localtest.sh` registra o porquê: tudo o
+#     que precisa de nome resolve sozinho, e configuração de máquina que não está no git é
+#     exatamente o que faz "funciona aqui" virar "não funciona aí";
+#   - **este espelho**, que é a escolhida: o nó reescreve `localhost:5000` para o container do
+#     registro. Aí `localhost:5000/<imagem>` é o endereço único — o host alcança pela porta
+#     publicada, o nó pelo nome interno, e o manifesto escreve um só.
+#
+# O k3d já cria sozinho a entrada para `codeflix-registry:5000` quando o registro é conectado com
+# `--registry-create`. Este arquivo acrescenta a de `localhost`, que é a que o manifesto usa, e as
+# dos registros de origem.
+#
+# **O nome não leva o prefixo `k3d-`.** Supus que levasse, por analogia com os nós, e o pull falhou
+# com `lookup k3d-codeflix-registry: no such host` — o container do registro se chama
+# `codeflix-registry`, puro. Conferir o nome real custa um `docker ps`; supor custou um ciclo
+# inteiro de deploy.
+#
+# `--enforce-registry-port-match` na criação do cluster garante que a porta interna seja a mesma da
+# externa. Sem ele o k3d pode publicar 5000 por fora e escutar outra por dentro, e aí o número do
+# espelho divergiria do número real — defeito que aparece como ImagePullBackOff sem explicação.
+# **E os registros de origem também são espelhados.** Isto não é zelo: os nós **não têm saída para a
+# internet** nesta rede, e é por isso que as imagens de plataforma (Istio, Kiali, Prometheus,
+# Grafana, Jaeger, metrics-server) vinham por tarball junto com as nossas.
+#
+# Espelhando `docker.io`, `quay.io` e `ghcr.io` para o registro local, elas passam a vir de lá
+# também — e aí **toda** imagem do cluster tem origem, inclusive as de plataforma. É o que torna a
+# coleta de imagem do kubelet inofensiva: sob pressão de disco ele pode remover à vontade, porque
+# sabe de onde buscar de novo. Era exatamente isso que faltava quando um DiskPressure despejou 46
+# pods e as imagens carregadas à mão não tinham de onde voltar.
+#
+# O efeito colateral é bom: imagem que ninguém empurrou falha como "não está no registro", em vez de
+# pendurar tentando alcançar a internet que não existe.
+mirrors:
+  # o endereço que os nossos manifestos usam
+  "localhost:5000":
+    endpoint:
+      - "http://codeflix-registry:5000"
+  # os de origem, para as imagens de plataforma
+  "docker.io":
+    endpoint:
+      - "http://codeflix-registry:5000"
+  "quay.io":
+    endpoint:
+      - "http://codeflix-registry:5000"
+  "ghcr.io":
+    endpoint:
+      - "http://codeflix-registry:5000"
