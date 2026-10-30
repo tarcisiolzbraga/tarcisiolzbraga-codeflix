@@ -21,9 +21,9 @@ como um sistema — quem chama quem, com que latência, e o que acontece quando 
 
 | | |
 |---|---|
-| Cluster | k3d (k3s em Docker), 3 nós, Traefik desligado |
+| Cluster | k3d (k3s em Docker), 3 nós, Traefik desligado, com registro de imagens próprio |
 | Malha | Istio, perfil `demo`, com Prometheus, Kiali, Jaeger e Grafana |
-| Namespace `codeflix` | 17 pods, todos com sidecar |
+| Namespace `codeflix` | 18 workloads e **20 pods**, todos com sidecar — o admin e o catálogo têm duas réplicas |
 | Apoio | mysql ×2, postgres, keycloak, rabbitmq, kafka + connect, elasticsearch, garage, mailpit |
 | Aplicativos | admin-api, videos-api, subscription-api, encoder-api, mail-api, portal, back-office |
 
@@ -97,7 +97,7 @@ Cada uma destas custou tempo e está comentada onde importa:
 | `infra/keycloak.yaml` | o Keycloak espera o Postgres num **initContainer**. Sem ele subia antes do banco, morria com `SQLState: 08001` e era reiniciado — um restart em toda subida a frio, justo quando os sete aplicativos o procuram. O compose resolve isso com `depends_on: service_healthy`; o Kubernetes não tem equivalente |
 | `infra/keycloak.yaml` | o Postgres 18 monta **`/var/lib/postgresql`**, e não `/var/lib/postgresql/data` como o `encoder-postgres` (que é 17). O 18 põe o PGDATA numa subpasta por versão; com o caminho antigo a imagem recusa subir dizendo que o mount está "unused" |
 | `cluster/dns-nodes.sh` | o resolvedor **dos nós**. Sem ele nem a imagem de sandbox chega, e todo pod fica em `Init:0/2` com um evento que fala de imagem, não de DNS |
-| `cluster/import-images.sh` | o kubelet **coleta imagem "não usada"** acima de 85% de disco, e imagem carregada à mão não tem de onde voltar. Por isso elas são fixadas (`io.cri-containerd.pinned=true`) e conferidas uma a uma |
+| `cluster/push-images.sh` | **as imagens têm de ter origem.** O kubelet coleta imagem "não usada" acima de 85% de disco, e a carregada à mão não tinha de onde voltar — o rótulo `pinned` foi tentado e não resistiu. Com registro ele remove e busca de novo |
 | `infra/register-cdc.sh` | o Kafka nasce vazio: sem registrar o conector, o catálogo fica vazio **para sempre**, com tudo saudável |
 
 ## As sondas, e as três gambiarras que elas substituíram
@@ -190,7 +190,7 @@ A ordem importa, e cada passo tem um porquê:
 |---|---|
 | `docker builder prune -f` | o cache de build é o maior pedaço descartável de quem anda construindo imagem. Aqui foram 6,7 GB, e levou o disco de 88% para 83% |
 | `kubectl delete pods --field-selector status.phase=Failed` nos **dois** namespaces | pod despejado não volta sozinho, e o `istio-system` também é despejado — 24 dos 46 eram dele |
-| `bash deploy/cluster/import-images.sh` | **o kubelet coleta as imagens carregadas à mão, e o rótulo `pinned` não resiste à pressão.** Ele não as removeu de um nó só: faltavam 2 num, 6 noutro e 6 no terceiro |
+| ~~reimportar as imagens~~ | **não é mais necessário**, e esta linha fica como registro do que era. As imagens vêm de um registro local agora, então a coleta do kubelet é inofensiva: ele remove e busca de novo. Antes, o rótulo `pinned` não resistia e faltavam 2 imagens num nó, 6 noutro e 6 no terceiro |
 | `kubectl rollout restart` em cada aplicação | **esta é a que custa achar.** O `istiod` reinicia no despejo, e os sidecars precisam de certificado novo; sem o reinício o gateway segue dando 503 com o pod servindo normalmente por dentro. Reiniciar **só** o `istio-ingressgateway` não resolve |
 | `bash deploy/infra/register-cdc.sh` | **esta eu descobri que faltava dias depois.** O Kafka Connect voltou de pé e com os tópicos, e `GET /connectors` devolvia `[]`: os conectores não estavam registrados. Nada acusa — o catálogo simplesmente para de receber mudança nova, e o que já estava indexado continua respondendo. Confira o estado, não o pod |
 
@@ -203,9 +203,9 @@ Dois detalhes que economizam tempo:
   imagem não está mais no nó, e o antigo fica. `kubectl rollout undo` desfaz enquanto a imagem não
   voltar.
 
-O caminho que evita tudo isso é o que o README já aponta como o certo: um **registro local do k3d**,
-em vez de carregar imagem por tarball. Com registro, a coleta do kubelet é inofensiva — a imagem tem
-de onde voltar.
+O caminho que evitava tudo isso **foi feito**: as imagens vêm de um registro local, e a coleta do
+kubelet deixou de ser perigosa — a imagem tem de onde voltar. A seção do registro explica como, e as
+duas armadilhas de endereçamento que apareceram no caminho.
 
 ## O mTLS é obrigatório, com duas exceções medidas
 
@@ -393,6 +393,153 @@ Caminho novo entre serviços precisa de regra nova, e o sintoma de esquecer é u
 agora mostra em qual salto aconteceu.
 
 
+## O registro, e a tag que identifica o que está no ar
+
+As imagens entram no cluster por **push para um registro local**, criado junto dele:
+
+```bash
+bash deploy/build-images.sh        # constrói e marca com o SHA do commit
+bash deploy/up.sh                 # cria, empurra, instala e semeia
+```
+
+A ordem importa: **o `up.sh` não constrói imagem**. Ele sempre exigiu o build antes, mas com
+`latest` o esquecimento passava sem ninguém notar. Com a tag do commit, ele para e diz o que fazer.
+
+### Por que registro, e não carga por tarball
+
+O caminho antigo fazia `docker save` de tudo, copiava uma vez por nó e rodava `ctr images import`
+dentro de cada um. Três cópias por recriação.
+
+O problema maior não era a lentidão: **imagem carregada assim não tem origem**. Quando o disco
+passou de 85%, o kubelet coletou as "não usadas" e elas não tinham de onde voltar — 46 pods
+despejados, e os seguintes em `ImagePullBackOff` buscando no Docker Hub uma imagem que só existia
+naquela máquina. O rótulo `io.cri-containerd.pinned=true` foi tentado e **não resistiu**.
+
+Com registro, a coleta é inofensiva: o kubelet remove e busca de novo.
+
+### Os espelhos, e por que são quatro
+
+O [`registries.yaml`](cluster/registries.yaml) espelha `localhost:5000` **e** `docker.io`,
+`quay.io`, `ghcr.io`. Não é zelo: os nós **não têm saída para a internet** nesta rede, e é por isso
+que as imagens de plataforma (Istio, Kiali, Prometheus, Grafana, Jaeger, metrics-server) também
+vinham no tarball. Espelhando os registros de origem, elas vêm do registro local, e aí **toda**
+imagem do cluster tem origem — não só as nossas.
+
+### Duas armadilhas de endereçamento, medidas
+
+**O container do registro não leva o prefixo `k3d-`.** Ele se chama `codeflix-registry`, puro.
+Supor o prefixo, por analogia com os nós, custou um ciclo inteiro de deploy e falhava com
+`lookup k3d-codeflix-registry: no such host`.
+
+**E o nome não resolve pelo DNS do nó, por desenho.** O [`dns-nodes.sh`](cluster/dns-nodes.sh)
+aponta os nós para resolvedores **públicos** de propósito, para o cluster não parar de subir quando
+se troca de rede — então nome de container nunca resolve ali. O registro entra pelo `/etc/hosts`
+**do nó**, com o IP lido na hora. Nunca no `/etc/hosts` da máquina: configuração de host fora do
+git é o que faz "funciona aqui" virar "não funciona aí".
+
+O sintoma engana: atinge **todas** as nossas imagens de uma vez, num cluster que por fora parece
+saudável — os pods de plataforma de pé, os painéis respondendo, e nenhuma pista de DNS na mensagem.
+
+## O que o `rollout undo` faz agora, e o que ele não faz
+
+A imagem é referenciada pelo **SHA do commit**, e não por `latest`. É isso que torna o rollback
+real: com tag mutável, a revisão anterior aponta para a **mesma** tag, então desfazer não desfaz
+nada. Medido:
+
+```
+implantado      :665375b
+segunda versão  :v2-teste
+rollout undo →  :665375b      a tag VOLTOU
+```
+
+E um rollout quebrado não derruba o que está servindo — `maxUnavailable: 0`:
+
+```
+pod antigo   2/2 Running            continua atendendo
+pod novo     1/2 ImagePullBackOff   nunca entra em rotação
+rollout      exceeded its progress deadline (em 2 min, não em 10)
+```
+
+**O que ele não faz:** o Kubernetes nunca desfaz sozinho — ele marca o rollout como falho e para. E
+o `rollout undo` **não atualiza** a anotação `last-applied-configuration`, o que o próprio kubectl
+avisa: um `kubectl apply` depois de um undo pode se comportar de forma inesperada. O caminho
+previsível é reaplicar o manifesto com a tag anterior.
+
+A tag ganha sufixo `-sujo` quando a árvore tem mudança não commitada: o SHA identifica o commit, não
+o que foi construído, e sem o sufixo a tag estaria mentindo.
+
+### Aplicar à mão
+
+Os manifestos trazem `${TAG}`, substituído na aplicação. Um `apply` manual precisa dela:
+
+```bash
+TAG="$(bash deploy/tag.sh)" envsubst '${TAG}' < deploy/apps/java.yaml | kubectl apply -f -
+```
+
+A substituição é restrita a `${TAG}` de propósito: os manifestos têm outros `${...}` que **precisam**
+chegar intactos ao pod.
+
+## Réplica, escala e o comportamento sob falha
+
+| serviço | réplica | HPA | ejeção de pod doente |
+|---|---|---|---|
+| `admin-api` | 2 | 2–4, CPU 70% | sim, até 50% |
+| `videos-api` | 2 | 2–4, CPU 70% | sim, até 50% |
+| `subscription-api` | 1 | não | **não** |
+| `encoder-api`, `mail-api` | 1 | não | não |
+
+O balanceamento existia no papel antes disto — Service e sidecar distribuindo — e não tinha o que
+distribuir. Medido depois: as duas réplicas do catálogo com partição atribuída, 48 e 52, então o
+grupo de consumo de fato dividiu o trabalho entre os dois pods.
+
+**A ejeção só entra onde há mais de uma réplica**, e isso não é detalhe: ejetar o único endpoint de
+um serviço é auto-infligir a indisponibilidade que a ejeção evita. `maxEjectionPercent: 50` porque
+com o padrão de 10% nada seria ejetado de duas réplicas — a configuração pareceria proteção e não
+seria.
+
+**CPU e não memória**, e a razão é a JVM: heap generoso ocupa o que lhe deram e não devolve, então
+escalar por memória dispararia na primeira coleta e nunca recolheria.
+
+### As partições, e onde elas tiveram de ser ditas
+
+O catálogo não escalava porque os tópicos tinham uma partição. Pôr `partitions: 3` no conector do
+Debezium e `KAFKA_NUM_PARTITIONS: 3` no broker **não bastou**: quem cria esses tópicos é a
+aplicação, na subida, pelo `@RetryableTopic`. O experimento que separou as hipóteses:
+
+```
+na subida da aplicação      -> 1 partição
+apagado e recriado sozinho  -> 3 partições
+```
+
+A contagem passou a morar também na aplicação, numa propriedade só. O `adm_videos.dbhistory` fica
+com uma de propósito: é o histórico de esquema do Debezium, que exige partição única.
+
+### O tempo limite não vale para a mídia, e isso é deliberado
+
+As rotas não tinham `match` nenhum — eram pega-tudo por host. Um `timeout` no catálogo mataria o
+download de vídeo em fluxo; no admin, mataria o upload por multipart. Por isso as duas se dividem:
+
+```
+catalogo   ^/api/videos/[^/]+/medias/[^/]+$   sem timeout
+catalogo   /                                  10s
+admin-api  ^/videos/[^/]+/medias/[^/]+$       sem timeout
+admin-api  /                                  10s
+```
+
+**A retentativa é restrita a `connect-failure` e `refused-stream`, nunca a 5xx**, porque o GraphQL
+trafega por `POST` e o admin recebe `POST` de upload: retentar por 5xx duplicaria escrita. Os dois
+eventos escolhidos acontecem antes de a requisição ser entregue.
+
+E isso **precisa ser dito na rota de mídia também**. Com `retries` só na rota padrão, a de mídia
+herda o padrão do Istio — que inclui `retriable-status-codes` — e passaria a retentar por 503 num
+caminho que aceita upload. Só apareceu lendo a configuração efetiva:
+
+```bash
+istioctl -n istio-system proxy-config route <pod-do-gateway> -o json
+```
+
+A resposta 200 da mídia não teria revelado nada.
+
 ## O que ainda depende de rede
 
 Nesta máquina os nós **não têm saída TCP para a internet** (ICMP passa, 443 não). As imagens de
@@ -403,7 +550,7 @@ plataforma — Istio, Kiali, Prometheus, Grafana, Jaeger, metrics-server — che
 bash deploy/cluster/export-platform-images.sh   # tira as imagens de um cluster vivo para o host
 ```
 
-Com elas no host, `import-images.sh` as devolve a qualquer cluster novo, e a recriação não depende de
+Com elas no host, `push-images.sh` as devolve a qualquer cluster novo, e a recriação não depende de
 ninguém. Se faltar alguma, ele falha dizendo **qual** e como trazê-la.
 
 ## O ferramental
@@ -557,26 +704,27 @@ kubectl -n istio-system patch telemetry rastreamento --type=merge \
 
 - **O Kafka não tem volume.** MySQL, Elasticsearch e Garage têm PVC; ele não, então todo reinício do
   pod leva os tópicos. Isso não perde dado de negócio — o que está no MySQL e no índice sobrevive, e
-  o CDC reconstrói —, mas **deixa o Kafka Connect preso**: os tópicos internos dele são recriados com
-  1 partição pelo padrão do broker enquanto o worker espera 5, e ele fica em laço buscando
-  `connect_statuses-1..4`. A recuperação está na seção "Quem pode chamar quem"; o conserto é dar
-  volume a ele.
+  o CDC reconstrói —, mas **deixa o Kafka Connect preso**: os tópicos internos dele voltam com 1
+  partição enquanto o worker espera 5, e ele fica em laço buscando `connect_statuses-1..4`. A
+  recuperação está na seção "Quem pode chamar quem"; o conserto é dar volume a ele.
 - **O rastreamento das filas.** O das requisições HTTP está fechado: os spans chegam e as
   requisições atravessam os serviços num trace só, medido acima. O que continua solto é o que passa
   por Kafka e RabbitMQ — o encoder e os listeners de CDC. Ligá-los é propagar o rastro **pela
   mensagem**, que é outro problema: o Istio não rastreia AMQP nem o protocolo do Kafka, então o
   contexto teria de ir num cabeçalho da própria mensagem e ser lido pelo consumidor.
-- **Nenhum HPA**, mas o caminho encurtou. O terreno estava pronto (metrics-server responde, todos os
-  Deployments têm `requests.cpu`) e as três aplicações Java ganharam prontidão de verdade, que é o
-  que faz réplica nova entrar em rotação na hora certa. O impedimento da `admin-api` **saiu**: o
-  relay da outbox trava a linha com `SKIP LOCKED` e roda em mais de uma instância.
-  Sobram dois: os tópicos de CDC têm uma partição só (réplica extra do catálogo fica ociosa no
-  consumo), e o encoder pede escala **por profundidade de fila**, não por CPU. Ou seja, a `admin-api`
-  e a `subscription-api` já podem escalar; o catálogo e o encoder não.
-- **O limitador de requisição da `subscription-api` conta por instância.** Com réplica, o teto
-  efetivo multiplica. Contador compartilhado pediria Redis; está dito no README da raiz.
-- **Carregamento de imagem por tarball** é o ponto frágil: três cópias de 429 MB por recriação. O
-  certo é um registro local do k3d, que exige recriar o cluster — por isso está documentado e não
-  feito.
+- **O limitador de requisição da `subscription-api` conta por instância**, e é por isso que ela é a
+  única aplicação que fica em uma réplica. Contador compartilhado pediria Redis. Enquanto não
+  houver, escalá-la seria trocar segurança por vazão sem dizer a ninguém — e o porquê está ao lado
+  do `replicas: 1` no manifesto.
+- **A escala do encoder pede profundidade de fila**, não CPU: ele passa a maior parte do tempo
+  ocioso esperando trabalho, e o CPU médio não diz nada sobre quantos vídeos estão na fila.
+  Exigiria KEDA ou métrica externa.
+- **Canário de verdade.** Os rótulos `version: v1` estão em todo pod e **não há `subset` nenhum**,
+  então a divisão de tráfego que eles existem para habilitar segue sem uso. Com tag imutável a base
+  existe; a divisão em si é outro passo.
 - **Sem cluster autoscaler**: três nós fixos, e a máquina com 31 GB. Aqui a escala serve para provar
   comportamento, não para ganhar capacidade.
+- **O `up.sh` não constrói imagem.** Ele sempre exigiu `build-images.sh` antes, mas com `latest` o
+  esquecimento passava sem ninguém notar; com a tag do commit, ele para. Parar é o certo —
+  construir sete imagens dentro de um script que a pessoa chamou para "subir o cluster" é surpresa
+  cara —, mas a ordem agora importa de verdade, e está dita na seção do registro.

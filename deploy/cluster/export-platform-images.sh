@@ -8,7 +8,7 @@
 # Recriar o cluster sem elas no host deixaria a malha sem subir, e aí o conserto dependeria de
 # liberar a rede ou reiniciar o daemon do Docker com sudo.
 #
-# Com elas no host, `import-images.sh` as devolve a qualquer cluster novo — e a recriação passa a não
+# Com elas no host, `push-images.sh` as empurra para o registro de qualquer cluster novo — e a recriação passa a não
 # depender de ninguém.
 #
 # `--platform linux/amd64`, e **não** `--all-platforms`: o containerd do nó guarda só a plataforma que
