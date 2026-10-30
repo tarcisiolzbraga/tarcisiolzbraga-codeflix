@@ -28,12 +28,13 @@ Os serviços não são independentes, e tratá-los como tal custava caro:
 - **O realm é um só.** Dar um papel ao assinante do catálogo era mudança em dois repositórios, e a
   `videos-api` mantinha uma cópia mínima do realm só para os testes dela, que podia divergir da de
   verdade. Hoje [`provisioning/keycloak/realm.json`](provisioning/keycloak/) é o único, e os
-  testes dos dois leem dele.
+  testes dos **três** serviços Java leem dele.
 - **O contrato do CDC atravessa os dois.** O nome do tópico está na configuração da `videos-api`, o
   conector está na `admin-api`, e as mensagens de teste da `videos-api` foram capturadas da saída
   real da `admin-api`. Renomear uma tabela de um lado quebra o outro, e agora um push só roda as
   duas suítes.
-- **A infraestrutura é compartilhada.** MySQL, Keycloak, Kafka e RabbitMQ servem aos dois.
+- **A infraestrutura é compartilhada.** MySQL, Keycloak, Kafka e RabbitMQ servem a mais de um
+  serviço — o Keycloak, a todos.
 - **O build é o mesmo.** Mesma toolchain, mesmo JUnit, mesmas tasks de teste. Eram dois `buildSrc`
   iguais que já tinham começado a divergir; hoje são um [`build-logic/`](build-logic/) só, que cada
   serviço inclui pelo `settings.gradle`.
@@ -70,7 +71,7 @@ provisioning/
 ├── mysql/                  banco da admin-api, e a origem do binlog
 ├── garage/                 armazenamento das mídias, compatível com S3
 ├── rabbitmq/               fila da conversa com o codificador
-├── keycloak/               autenticação dos dois, com um realm só
+├── keycloak/               autenticação de todos, com um realm só
 ├── catalog-elasticsearch/  índice de leitura do catálogo
 ├── cdc/                    Kafka e Kafka Connect, mais o conector do Debezium
 └── observability/          Elasticsearch de log, Kibana, Logstash e Filebeat
@@ -488,8 +489,8 @@ constroem e varrem: os Java, os dois em Go e os dois fronts.
 
 ## Integração contínua
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) é um workflow só, com os dois serviços Java
-numa matriz: testes sem container, build completo com Testcontainers, e a imagem Docker de cada um.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) é um workflow só, com os **três** serviços
+Java numa matriz: testes sem container, build completo com Testcontainers, e a imagem Docker de cada um.
 
 O `build` de cada serviço confere um **piso de cobertura** antes de passar: 90% de instrução e 70%
 de ramo, sobre o relatório agregado dos três módulos. O piso vive no
