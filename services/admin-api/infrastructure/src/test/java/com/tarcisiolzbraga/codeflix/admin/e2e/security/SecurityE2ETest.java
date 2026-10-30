@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.E2ETest;
 import com.tarcisiolzbraga.codeflix.admin.infrastructure.KeycloakTestToken;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -26,6 +28,11 @@ class SecurityE2ETest {
 
     // A origem do front no perfil development, que é o que vale nos testes.
     private static final String FRONT_ORIGIN = "http://localhost:3000";
+
+    // O back-office roda na 3001, e a origem dele faltava na lista: o painel dizia "não foi possível
+    // falar com a admin-api" com a API no ar, porque o preflight voltava 403 e o browser escondia a
+    // resposta. Afirmar só a 3000 era afirmar metade do que esta API serve.
+    private static final String BACK_OFFICE_ORIGIN = "http://localhost:3001";
 
     @Value("${local.server.port}")
     private int port;
@@ -122,19 +129,20 @@ class SecurityE2ETest {
     // prova que continua sendo, e o CorsConfigTest da subscription-api exercita a política inteira. O
     // que este teste prova é a **ligação** dela na cadeia de filtros deste serviço, com Tomcat de
     // verdade: é a linha que se esquece de repetir ao configurar o terceiro serviço.
-    @Test
-    void givenTheFrontOrigin_whenAskPreflightWithoutToken_thenBeAllowed() {
+    @ParameterizedTest
+    @ValueSource(strings = {FRONT_ORIGIN, BACK_OFFICE_ORIGIN})
+    void givenAFrontOrigin_whenAskPreflightWithoutToken_thenBeAllowed(final String origin) {
         final var client = clientWithout();
 
         final var actualHeaders = client.method(HttpMethod.OPTIONS)
                 .uri(VIDEOS_PATH)
-                .header(HttpHeaders.ORIGIN, FRONT_ORIGIN)
+                .header(HttpHeaders.ORIGIN, origin)
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET")
                 .retrieve()
                 .toBodilessEntity()
                 .getHeaders();
 
-        assertEquals(FRONT_ORIGIN, actualHeaders.getFirst(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
+        assertEquals(origin, actualHeaders.getFirst(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
     }
 
     private RestClient clientWithout() {

@@ -16,4 +16,6 @@ logging:
 # As origens do front que o browser confere. O localhost continua na lista de propósito: é aqui que
 # se aponta um front rodando na máquina para a API de homologação, que é o teste local de verdade.
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:https://h.tarcisiolzbraga.codeflix.com,http://localhost:3000}
+  # A 3001 entra pelo mesmo motivo da 3000: apontar um front da máquina para a API de
+  # homologação é o teste local que se quer poder fazer, e o back-office roda nessa porta.
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:https://h.tarcisiolzbraga.codeflix.com,http://localhost:3000,http://localhost:3001}
