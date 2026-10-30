@@ -10,6 +10,25 @@ metadata:
   namespace: codeflix
 spec:
   replicas: 1
+  # **O rollout, declarado em vez de herdado.**
+  #
+  # `maxUnavailable: 0` com `maxSurge: 1`: o pod antigo **nunca** sai antes de o novo ficar pronto.
+  # Com uma réplica o padrão de 25% já arredonda para isso, então hoje não muda nada — e é
+  # exatamente por isso que vale declarar: quando a réplica subir para dois, o padrão passaria a
+  # permitir derrubar uma antes da hora, e ninguém ligaria a mudança de comportamento a isso.
+  #
+  # `progressDeadlineSeconds` bem abaixo do padrão de 600: rollout travado tem de aparecer em dois
+  # minutos, não em dez. O Kubernetes não desfaz sozinho — ele marca como falho e para —, então o
+  # valor aqui é quanto tempo alguém fica sem saber.
+  #
+  # `revisionHistoryLimit` explícito porque é dele que o `rollout undo` vive: sem revisão guardada
+  # não há para onde voltar. Cinco porque a imagem é imutável agora, então cada revisão aponta para
+  # bytes diferentes e voltar significa alguma coisa.
+  progressDeadlineSeconds: 120
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
   selector:
     matchLabels: { app: encoder-api }
   template:
@@ -61,6 +80,25 @@ metadata:
   namespace: codeflix
 spec:
   replicas: 1
+  # **O rollout, declarado em vez de herdado.**
+  #
+  # `maxUnavailable: 0` com `maxSurge: 1`: o pod antigo **nunca** sai antes de o novo ficar pronto.
+  # Com uma réplica o padrão de 25% já arredonda para isso, então hoje não muda nada — e é
+  # exatamente por isso que vale declarar: quando a réplica subir para dois, o padrão passaria a
+  # permitir derrubar uma antes da hora, e ninguém ligaria a mudança de comportamento a isso.
+  #
+  # `progressDeadlineSeconds` bem abaixo do padrão de 600: rollout travado tem de aparecer em dois
+  # minutos, não em dez. O Kubernetes não desfaz sozinho — ele marca como falho e para —, então o
+  # valor aqui é quanto tempo alguém fica sem saber.
+  #
+  # `revisionHistoryLimit` explícito porque é dele que o `rollout undo` vive: sem revisão guardada
+  # não há para onde voltar. Cinco porque a imagem é imutável agora, então cada revisão aponta para
+  # bytes diferentes e voltar significa alguma coisa.
+  progressDeadlineSeconds: 120
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
   selector:
     matchLabels: { app: mail-api }
   template:
@@ -110,6 +148,25 @@ metadata:
   namespace: codeflix
 spec:
   replicas: 1
+  # **O rollout, declarado em vez de herdado.**
+  #
+  # `maxUnavailable: 0` com `maxSurge: 1`: o pod antigo **nunca** sai antes de o novo ficar pronto.
+  # Com uma réplica o padrão de 25% já arredonda para isso, então hoje não muda nada — e é
+  # exatamente por isso que vale declarar: quando a réplica subir para dois, o padrão passaria a
+  # permitir derrubar uma antes da hora, e ninguém ligaria a mudança de comportamento a isso.
+  #
+  # `progressDeadlineSeconds` bem abaixo do padrão de 600: rollout travado tem de aparecer em dois
+  # minutos, não em dez. O Kubernetes não desfaz sozinho — ele marca como falho e para —, então o
+  # valor aqui é quanto tempo alguém fica sem saber.
+  #
+  # `revisionHistoryLimit` explícito porque é dele que o `rollout undo` vive: sem revisão guardada
+  # não há para onde voltar. Cinco porque a imagem é imutável agora, então cada revisão aponta para
+  # bytes diferentes e voltar significa alguma coisa.
+  progressDeadlineSeconds: 120
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
   selector:
     matchLabels: { app: portal }
   template:
@@ -164,6 +221,25 @@ metadata:
   namespace: codeflix
 spec:
   replicas: 1
+  # **O rollout, declarado em vez de herdado.**
+  #
+  # `maxUnavailable: 0` com `maxSurge: 1`: o pod antigo **nunca** sai antes de o novo ficar pronto.
+  # Com uma réplica o padrão de 25% já arredonda para isso, então hoje não muda nada — e é
+  # exatamente por isso que vale declarar: quando a réplica subir para dois, o padrão passaria a
+  # permitir derrubar uma antes da hora, e ninguém ligaria a mudança de comportamento a isso.
+  #
+  # `progressDeadlineSeconds` bem abaixo do padrão de 600: rollout travado tem de aparecer em dois
+  # minutos, não em dez. O Kubernetes não desfaz sozinho — ele marca como falho e para —, então o
+  # valor aqui é quanto tempo alguém fica sem saber.
+  #
+  # `revisionHistoryLimit` explícito porque é dele que o `rollout undo` vive: sem revisão guardada
+  # não há para onde voltar. Cinco porque a imagem é imutável agora, então cada revisão aponta para
+  # bytes diferentes e voltar significa alguma coisa.
+  progressDeadlineSeconds: 120
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
   selector:
     matchLabels: { app: back-office }
   template:
