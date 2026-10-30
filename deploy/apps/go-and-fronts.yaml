@@ -23,7 +23,7 @@ spec:
       serviceAccountName: encoder-api
       containers:
         - name: encoder
-          image: localhost:5000/admin-codeflix-encoder-api:latest
+          image: localhost:5000/admin-codeflix-encoder-api:${TAG}
           imagePullPolicy: IfNotPresent
           envFrom:
             - secretRef: { name: codeflix-env }
@@ -74,7 +74,7 @@ spec:
       serviceAccountName: mail-api
       containers:
         - name: mail
-          image: localhost:5000/admin-codeflix-mail-api:latest
+          image: localhost:5000/admin-codeflix-mail-api:${TAG}
           imagePullPolicy: IfNotPresent
           envFrom:
             - secretRef: { name: codeflix-env }
@@ -123,7 +123,7 @@ spec:
       serviceAccountName: portal
       containers:
         - name: portal
-          image: localhost:5000/admin-codeflix-portal-codeflix:latest
+          image: localhost:5000/admin-codeflix-portal-codeflix:${TAG}
           imagePullPolicy: IfNotPresent
           # **Sem variável de ambiente aqui, e isso é a correção de um problema do compose.**
           #
@@ -177,7 +177,7 @@ spec:
       serviceAccountName: back-office
       containers:
         - name: back-office
-          image: localhost:5000/admin-codeflix-back-office-codeflix:latest
+          image: localhost:5000/admin-codeflix-back-office-codeflix:${TAG}
           imagePullPolicy: IfNotPresent
           ports:
             - { name: http, containerPort: 3001 }

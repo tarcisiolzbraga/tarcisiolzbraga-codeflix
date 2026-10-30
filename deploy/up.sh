@@ -59,7 +59,14 @@ bash deploy/infra/apply-keycloak.sh
 
 passo "8/10 infra, aplicativos e rotas"
 bash deploy/infra/apply-infra.sh
-kubectl apply -f deploy/apps/java.yaml -f deploy/apps/go-and-fronts.yaml -f deploy/apps/fronts-nodeport.yaml
+# **`envsubst`, porque os manifestos trazem `${TAG}`.** A tag é a do commit, e é ela que torna o
+# `rollout undo` real: sem isso a revisão anterior apontaria para a mesma `latest`, e desfazer não
+# desfaria nada.
+#
+# O preço é que um `kubectl apply -f` à mão precisa do `TAG` no ambiente. Está dito no README.
+TAG="$(bash deploy/tag.sh)" envsubst '${TAG}' < deploy/apps/java.yaml | kubectl apply -f -
+TAG="$(bash deploy/tag.sh)" envsubst '${TAG}' < deploy/apps/go-and-fronts.yaml | kubectl apply -f -
+kubectl apply -f deploy/apps/fronts-nodeport.yaml
 kubectl apply -f deploy/mesh/routes.yaml -f deploy/mesh/dashboards.yaml \
   -f deploy/mesh/peer-authentication.yaml -f deploy/mesh/authorization-policies.yaml
 echo "esperando os pods..."
