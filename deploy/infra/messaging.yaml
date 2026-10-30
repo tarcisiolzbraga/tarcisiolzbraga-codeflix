@@ -127,6 +127,20 @@ spec:
             - { name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, value: "1" }
             - { name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR, value: "1" }
             - { name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS, value: "0" }
+            # **Três partições por padrão, e é isto que permite o catálogo escalar.**
+            #
+            # Pôr `topic.creation.default.partitions: 3` no conector do Debezium **não bastou**, e a
+            # razão é a ordem: o `up.sh` sobe as aplicações antes de registrar o CDC, então quem
+            # cria os tópicos são os **consumidores** do catálogo, com o padrão do broker — que era
+            # 1. O conector chegava depois, num tópico que já existia, e não o reparticiona.
+            #
+            # No broker cobre mais que no conector: os tópicos de retentativa e de fila morta que o
+            # Spring Kafka cria sozinho também nascem com 3. Sem eles, uma réplica extra do catálogo
+            # ficaria ociosa justamente no consumo que mais importa quando algo falha.
+            #
+            # Três, e não mais: são três nós, e a réplica do catálogo vai a dois. Partição ociosa
+            # não custa, mas também não compra nada.
+            - { name: KAFKA_NUM_PARTITIONS, value: "3" }
           ports:
             - { name: tcp-kafka, containerPort: 9092 }
             - { name: tcp-controller, containerPort: 9093 }
