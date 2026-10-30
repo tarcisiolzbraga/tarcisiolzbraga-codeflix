@@ -29,6 +29,29 @@ for no in $(docker ps --format '{{.Names}}' --filter "label=k3d.cluster=${CLUSTE
   echo "  $no: $(docker exec "$no" sh -c 'tr "\n" " " < /etc/resolv.conf')"
 done
 
+# **O registro do cluster entra pelo /etc/hosts do nó, e não pelo DNS.**
+#
+# Pelo resolvedor não dá, e a razão é esta mesma função: os nós apontam para DNS **público** de
+# propósito (acima), então nome de container nunca resolve ali — nem o do registro. O sintoma é um
+# `ImagePullBackOff` com `lookup codeflix-registry: no such host`, e ele atinge **todas** as nossas
+# imagens de uma vez, num cluster que parece saudável por fora.
+#
+# Vai no `/etc/hosts` **do nó**, nunca no da máquina: configuração de host que não está no git é
+# exatamente o que este projeto evita, e o `dns-localtest.sh` registra o porquê.
+#
+# O IP é lido na hora, da rede do cluster: ele muda a cada recriação, então fixá-lo no arquivo seria
+# trocar um defeito por outro mais silencioso.
+REGISTRO="${REGISTRO:-codeflix-registry}"
+if docker inspect "$REGISTRO" >/dev/null 2>&1; then
+  IP_REGISTRO="$(docker inspect "$REGISTRO" \
+    --format "{{(index .NetworkSettings.Networks \"k3d-${CLUSTER}\").IPAddress}}")"
+  for no in $(docker ps --format '{{.Names}}' --filter "label=k3d.cluster=${CLUSTER}"); do
+    case "$no" in *serverlb*) continue;; esac
+    docker exec "$no" sh -c "sed -i '/ ${REGISTRO}\$/d' /etc/hosts; echo '${IP_REGISTRO} ${REGISTRO}' >> /etc/hosts"
+  done
+  echo "  registro '${REGISTRO}' em ${IP_REGISTRO}, no /etc/hosts de cada nó"
+fi
+
 # O CoreDNS leu o resolv.conf na subida; sem reiniciar, ele segue encaminhando para o endereço morto.
 kubectl -n kube-system rollout restart deployment coredns >/dev/null
 kubectl -n kube-system rollout status deployment coredns --timeout=120s

@@ -8,7 +8,37 @@
 set -euo pipefail
 
 VERSAO="${VERSAO:-1.31.3}"
-PACOTE="${PACOTE:-/tmp/claude-1000/istio-${VERSAO}}"
+
+# **O pacote mora em cache durável, e é baixado se faltar.**
+#
+# Ele apontava para um diretório sob `/tmp`, e isso quebrou: o caminho era o temporário de uma
+# sessão, que some na limpeza. O `up.sh` ia até o passo 4, instalava a malha e morria no primeiro
+# addon com "does not exist" — num cluster já criado, no meio do caminho.
+#
+# `~/.cache` porque é o lugar certo para arquivo grande que se rebaixa sozinho: não polui o
+# repositório, sobrevive a reinício, e apagar não perde nada além de um download.
+#
+# **Só os addons precisam do pacote.** O `istioctl install` não o usa — o binário basta. Mas os
+# painéis são YAML de exemplo que só vem no tarball, e tem de ser o da **mesma versão** da malha:
+# misturar versão de addon com versão de Istio é a origem de "o Kiali não vê nada" com tudo
+# aparentemente certo.
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/codeflix"
+PACOTE="${PACOTE:-${CACHE}/istio-${VERSAO}}"
+
+if [ ! -d "${PACOTE}/samples/addons" ]; then
+  echo "==> baixando o pacote do Istio ${VERSAO} (só os painéis precisam dele)"
+  mkdir -p "$CACHE"
+  TAR="${CACHE}/istio-${VERSAO}.tar.gz"
+  curl -fsSL --retry 3 -o "$TAR" \
+    "https://github.com/istio/istio/releases/download/${VERSAO}/istio-${VERSAO}-linux-amd64.tar.gz"
+  tar -xzf "$TAR" -C "$CACHE"
+  rm -f "$TAR"
+  # Confere o que vai ser usado, e não que o tar terminou: tarball truncado extrai sem erro.
+  [ -d "${PACOTE}/samples/addons" ] || {
+    echo "o pacote baixou mas não tem samples/addons em ${PACOTE}" >&2
+    exit 1
+  }
+fi
 
 istioctl install --set profile=demo --skip-confirmation
 
