@@ -14,7 +14,7 @@ include:
   # fila da conversa com o codificador
   - path: rabbitmq/docker-compose.yml
 
-  # autenticação dos dois serviços, com um realm só
+  # autenticação de todas as aplicações, com um realm só
   - path: keycloak/docker-compose.yml
 
   # índice de leitura do catálogo

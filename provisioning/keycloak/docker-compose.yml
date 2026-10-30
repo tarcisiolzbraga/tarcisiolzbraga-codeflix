@@ -1,5 +1,5 @@
 # Autenticação. O realm, as roles e os clients vêm do realm.json ao lado, então o compose entrega
-# um servidor pronto para emitir token. O realm é um só para os dois serviços — o porquê está no
+# um servidor pronto para emitir token. O realm é um só para todas as aplicações — o porquê está no
 # README desta pasta.
 #
 # Sem volume de propósito: o realm é inteiramente descrito pelo arquivo versionado, então o

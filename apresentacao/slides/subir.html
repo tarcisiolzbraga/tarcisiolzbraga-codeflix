@@ -4,18 +4,18 @@
 <div style="flex:1;display:flex;flex-direction:column;gap:28px">
 <p style="font-family:'Oswald', Arial, sans-serif;font-size:44px;font-weight:500;background:#1C1F27;padding:32px 40px;border-radius:12px;color:#6AA9D6">bash deploy/up.sh</p>
 <p style="font-size:30px;line-height:1.45;color:#A8AEBA">Dez passos em ordem, e a ordem não é arbitrária: cada um depende do anterior de um jeito que não é óbvio &mdash; o DNS dos nós antes das imagens, a malha antes do gateway existir, o Keycloak antes de tudo que valida token.</p>
-<p style="font-size:30px;line-height:1.45;color:#A8AEBA">No fim, o cluster semeado e as páginas abertas no navegador.</p>
+<p style="font-size:30px;line-height:1.45;color:#A8AEBA">As imagens vão para um <b>registro do próprio cluster</b>, marcadas com o commit &mdash; é o que permite saber qual versão está no ar e desfazer um deploy. Construir vem antes: <b>o script não constrói</b>.</p>
 </div>
 <div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#1C1F27;padding:48px;border-radius:16px">
 <h3 style="font-family:'Oswald', Arial, sans-serif;font-size:40px;font-weight:500;color:#EE6B50">O que falta, dito</h3>
 <ul style="font-size:28px;line-height:1.5;color:#A8AEBA">
-<li>registro de imagens: hoje elas entram no cluster por arquivo, à mão</li>
 <li>backup fora da máquina, e agendado</li>
 <li>volume no Kafka: reiniciar o pod dele prende o conector de replicação</li>
-<li>rastro dentro das mensagens de fila</li>
+<li>rastro dentro das mensagens de fila, que o Istio não alcança</li>
+<li>escala do encoder por profundidade de fila, e não por CPU</li>
 </ul>
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#6A7179">11</p>
-<aside>O que falta está escrito no README da pasta deploy, com o motivo de cada um. O projeto é de aprendizado, então o critério não foi entregar rápido: foi não deixar afirmação sem medida e não deixar decisão sem o porquê registrado.</aside>
+<aside>O carregamento de imagem por arquivo saiu desta lista porque foi feito: as imagens agora vêm de um registro local, e isso também curou a fragilidade que já derrubou 46 pods quando o disco encheu — imagem carregada à mão não tinha de onde voltar. O que falta está escrito no README da pasta deploy, com o motivo de cada um. O projeto é de aprendizado, então o critério não foi entregar rápido: foi não deixar afirmação sem medida e não deixar decisão sem o porquê registrado.</aside>
 </section>
