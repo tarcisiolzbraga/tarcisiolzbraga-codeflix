@@ -27,6 +27,12 @@ ARG MEDIA_MAX_FILE_SIZE
 RUN npm run build
 
 FROM nginx:1.29-alpine AS runner
+
+# Pega as correções de segurança publicadas depois de a base ser construída. Aqui isso não é
+# detalhe: o Trivy achou 46 CVEs HIGH/CRITICAL nos pacotes de sistema desta base — curl, pcre2,
+# brotli e companhia —, todos com correção já publicada no repositório do Alpine.
+RUN apk -U upgrade --no-cache
+
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 3001

@@ -50,13 +50,28 @@ tasks.withType(Test).configureEach {
     systemProperty 'codeflix.rootDir', rootDir.absolutePath
 }
 
-// O test continua rodando tudo, e é ele que o build usa como porta de entrada dos commits.
+// O `test` roda tudo **menos** o estresse, e é ele que o `build` usa. A exclusão é o ponto: o teste
+// de estresse mede uma corrida, então ele falha por projeto quando a corrida acontece — pô-lo no
+// caminho de todo commit transformaria o build num sorteio, que é o problema que ele existe para
+// investigar.
+//
+// A exclusão fica **aqui, no `test`**, e não num `tasks.withType(Test).configureEach`: ali ela
+// alcançaria o próprio `stressTests`, e o Gradle avisa o que acontece — "the tag 'stressTest' is
+// both included and excluded... will result in the tag being excluded". A task passava verde em 4
+// segundos sem rodar nada.
+tasks.named('test', Test) {
+    useJUnitPlatform {
+        excludeTags 'stressTest'
+    }
+}
+
+// O test continua rodando tudo o mais, e é ele que o build usa como porta de entrada dos commits.
 // As tasks abaixo servem ao ciclo de escrita: unitTests dispensa o Docker, as outras não.
 tasks.register('unitTests', Test) {
     group = 'verification'
     description = 'Roda os testes que não sobem container: domain, application e as fatias do Spring sem infraestrutura.'
     useJUnitPlatform {
-        excludeTags 'integrationTest', 'e2eTest'
+        excludeTags 'integrationTest', 'e2eTest', 'stressTest'
     }
 }
 
@@ -74,4 +89,28 @@ tasks.register('e2eTests', Test) {
     useJUnitPlatform {
         includeTags 'e2eTest'
     }
+}
+
+// Fora do `build` de propósito, e só roda quando alguém o chama pelo nome.
+//
+// Ele não verifica comportamento: **mede uma taxa de falha**. A intermitência do fluxo de mídia
+// aparece em cerca de 1 commit em 4 no CI, e o README da admin-api registra que "um build verde não
+// prova nada" — quatro builds inteiros verdes já conviveram com CI vermelho. Sem um instrumento que
+// reproduza sob demanda, nenhuma tentativa de conserto é avaliável.
+//
+// `--rerun` porque o Gradle consideraria a task atualizada e a saltaria na segunda chamada, e repetir
+// é exatamente o que se quer aqui.
+tasks.register('stressTests', Test) {
+    group = 'verification'
+    description = 'Mede a taxa de falha do fluxo de mídia sob carga. Fora do build; chame pelo nome.'
+    useJUnitPlatform {
+        includeTags 'stressTest'
+    }
+    // Repassa os `-Dstress.*` para o JVM de teste. Sem isto o `-Dstress.threads=32` da linha de
+    // comando ficaria no JVM do Gradle, o teste leria o padrão e a execução pareceria obedecer sem
+    // obedecer — o pior tipo de parâmetro, o que mente.
+    systemProperties System.properties.findAll { chave, valor -> chave.toString().startsWith('stress.') }
+    // Repetir é exatamente o que se quer aqui: sem isto o Gradle consideraria a task atualizada e a
+    // saltaria na segunda chamada.
+    outputs.upToDateWhen { false }
 }

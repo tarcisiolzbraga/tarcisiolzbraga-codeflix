@@ -1,0 +1,286 @@
+# Quem pode chamar quem. O par da `PeerAuthentication`: ela diz que o chamador tem identidade
+# verificável, e isto decide o que ele pode fazer com ela.
+#
+# **O grafo não foi adivinhado.** Ele saiu das métricas do Istio, do que de fato aconteceu neste
+# cluster — 16 pares HTTP em `istio_requests_total` e 14 pares TCP em
+# `istio_tcp_connections_opened_total`:
+#
+#     kubectl -n istio-system exec deploy/prometheus -c prometheus-server -- \
+#       wget -qO- 'http://localhost:9090/api/v1/query?query=sum(istio_requests_total)by(source_workload,destination_workload)'
+#
+# Os **pares TCP são a parte que mais importa**, e quase me escaparam: eles não aparecem em
+# `istio_requests_total`. Uma política escrita só a partir do HTTP bloquearia todo banco, toda fila e
+# o índice — e o sintoma seria a aplicação subindo e não conseguindo falar com nada.
+#
+# **O risco desta abordagem, dito antes de alguém descobrir.** Métrica mostra o que **rodou**, não o
+# que **existe**. Caminho que ninguém exercitou na janela medida não entra na lista e passa a ser
+# recusado. Foi por isso que, além das métricas, cada regra abaixo foi conferida contra o que o README
+# de cada serviço declara depender — e o `deploy/README.md` registra o que foi exercitado para
+# validar.
+#
+# **Nada passa sem regra.** Esta primeira política é um `ALLOW` **sem regra nenhuma**, que é o idioma
+# do Istio para negar tudo: a partir daqui, workload sem política própria não recebe chamada.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: nada-passa-sem-regra
+  namespace: codeflix
+spec: {}
+---
+# **As APIs: só o gateway, e o catálogo que repassa mídia.**
+#
+# O admin tem dois chamadores: o gateway, para quem usa o back-office, e o catálogo, que busca o
+# registro completo depois do aviso do CDC e repassa o arquivo de mídia. Nenhum outro — e hoje o
+# portal poderia abrir conexão nele.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: admin-api-aceita
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels: { app: admin-api }
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account
+              - cluster.local/ns/codeflix/sa/videos-api
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: videos-api-aceita
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels: { app: videos-api }
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: subscription-api-aceita
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels: { app: subscription-api }
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
+---
+# **O Keycloak é o mais chamado do cluster**, e é esperado: o gateway o publica para quem faz login,
+# e as três APIs pedem a chave pública para validar token e o token de client_credentials para
+# falar entre si.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: keycloak-aceita
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels: { app: keycloak }
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account
+              - cluster.local/ns/codeflix/sa/admin-api
+              - cluster.local/ns/codeflix/sa/videos-api
+              - cluster.local/ns/codeflix/sa/subscription-api
+---
+# **Os bancos: um dono cada, mais o CDC onde ele lê.**
+#
+# O Debezium é o segundo chamador dos dois MySQL, e tem de ser: é ele que lê o binlog. O Postgres do
+# Keycloak e o do encoder têm dono único.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: mysql-aceita
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels: { app: mysql }
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/codeflix/sa/admin-api
+              - cluster.local/ns/codeflix/sa/kafka-connect
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: subscription-mysql-aceita
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels: { app: subscription-mysql }
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/codeflix/sa/subscription-api
+              - cluster.local/ns/codeflix/sa/kafka-connect
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: keycloak-postgres-aceita
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels: { app: keycloak-postgres }
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/codeflix/sa/keycloak"]
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: encoder-postgres-aceita
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels: { app: encoder-postgres }
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/codeflix/sa/encoder-api"]
+---
+# **As filas e o índice.**
+#
+# O RabbitMQ tem o painel publicado pelo gateway, por isso ele aparece aqui junto dos quatro
+# serviços que produzem ou consomem. O Mailpit, idem: painel pelo gateway, e o mail-api entregando.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: rabbitmq-aceita
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels: { app: rabbitmq }
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account
+              - cluster.local/ns/codeflix/sa/admin-api
+              - cluster.local/ns/codeflix/sa/subscription-api
+              - cluster.local/ns/codeflix/sa/encoder-api
+              - cluster.local/ns/codeflix/sa/mail-api
+---
+# **O Kafka está na própria lista, e isso não é descuido.** O `advertised.listeners` dele é
+# `INTERNAL://kafka:9092`, então todo cliente — inclusive o `kafka-topics.sh` rodando **dentro** do
+# pod — pede metadado e reconecta **pelo nome do serviço**. Essa reconexão sai pelo sidecar com a
+# identidade `sa/kafka`, e sem esta linha ela é recusada:
+#
+#     kafka-topics.sh --bootstrap-server localhost:9092 --list
+#     -> Timed out waiting for a node assignment. Call: listTopics
+#
+# O quórum do controlador **não** precisa de regra: ele é `1@localhost:9093`, e tráfego de localhost
+# não passa pelo sidecar. Foi a primeira coisa que eu suspeitei, e estava errado — o problema era o
+# listener anunciado, não o controlador.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: kafka-aceita
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels: { app: kafka }
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/codeflix/sa/videos-api
+              - cluster.local/ns/codeflix/sa/subscription-api
+              - cluster.local/ns/codeflix/sa/kafka-connect
+              - cluster.local/ns/codeflix/sa/kafka
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: mailpit-aceita
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels: { app: mailpit }
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account
+              - cluster.local/ns/codeflix/sa/mail-api
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: catalog-elasticsearch-aceita
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels: { app: catalog-elasticsearch }
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/codeflix/sa/videos-api"]
+---
+# **O armazenamento: quem guarda e quem converte.**
+#
+# O admin guarda e serve o arquivo; o encoder o lê para converter. Ninguém mais toca no Garage.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: garage-aceita
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels: { app: garage }
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/codeflix/sa/admin-api
+              - cluster.local/ns/codeflix/sa/encoder-api
+---
+# **Os fronts, e a única regra sem identidade.**
+#
+# Eles têm **duas** entradas: o gateway, para `codeflix.localtest.me` e `admin.localtest.me`, e o
+# NodePort, para `localhost:3000` e `localhost:3001` — que existe porque o login precisa de contexto
+# seguro. O tráfego de NodePort entra pelo nó em texto puro e **não tem principal nenhum**, então
+# exigir identidade aqui o recusaria, como a `PeerAuthentication` já registra.
+#
+# A regra é `from` ausente — qualquer origem —, restrita à porta que serve a página. É o mesmo
+# alcance da exceção de mTLS, pela mesma razão, e sai junto com ela quando os fronts forem servidos
+# por https no gateway.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: portal-aceita
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels: { app: portal }
+  rules:
+    - to:
+        - operation:
+            ports: ["3000"]
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: back-office-aceita
+  namespace: codeflix
+spec:
+  selector:
+    matchLabels: { app: back-office }
+  rules:
+    - to:
+        - operation:
+            ports: ["3001"]

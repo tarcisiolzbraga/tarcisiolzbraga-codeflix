@@ -1,0 +1,53 @@
+# A escala automática, e **só onde ela é segura**.
+#
+# Duas das cinco aplicações entram, e as outras três ficam de fora por motivos diferentes — todos
+# registrados abaixo, porque "não tem HPA" sem o porquê vira dívida invisível.
+#
+# O terreno já estava pronto antes disto: o metrics-server responde, todo Deployment declara
+# `requests.cpu`, e as três aplicações Java têm prontidão de verdade — que é o que faz réplica nova
+# entrar em rotação na hora certa, e não antes.
+#
+# **CPU, e não memória.** JVM com heap generoso ocupa o que lhe deram e não devolve: escalar por
+# memória dispararia na primeira coleta e nunca recolheria. CPU reflete trabalho.
+#
+# **O piso é a réplica declarada**, nunca menos: o HPA não deve desfazer a decisão do manifesto, só
+# acrescentar em cima dela. E o teto é 4 porque são três nós com 31 GB — aqui a escala serve para
+# provar comportamento, não para ganhar capacidade.
+#
+# Quem **não** entra:
+#
+#   subscription-api  o limitador de requisição conta por instância, então réplica multiplica o
+#                     teto efetivo. Pede contador compartilhado (Redis) antes.
+#   encoder-api       pede escala por **profundidade de fila**, não por CPU: ele passa a maior
+#                     parte do tempo ocioso esperando trabalho, e o CPU médio não diz nada sobre
+#                     quantos vídeos estão na fila. Exigiria KEDA ou métrica externa.
+#   bancos, fila, índice   volume único; duas instâncias no mesmo volume corrompem.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: admin-api
+  namespace: codeflix
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: admin-api }
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: videos-api
+  namespace: codeflix
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: videos-api }
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }

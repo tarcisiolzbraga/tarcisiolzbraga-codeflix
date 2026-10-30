@@ -1,0 +1,451 @@
+# As três aplicações Java.
+#
+# **`SPRING_PROFILES_ACTIVE=homolog`, e não `development`.** O motivo é o `iss` do token, outra vez:
+# o perfil de desenvolvimento monta o emissor como `http://${KEYCLOAK_HOST}:${KEYCLOAK_PORT}/realms/...`,
+# e aqui o Keycloak atende na porta 80 — `http://keycloak.localtest.me:80/realms/codeflix` **não é**
+# a string que ele assina (`http://keycloak.localtest.me/realms/codeflix`), e token com `iss`
+# diferente por dois caracteres é token recusado. O perfil `homolog` lê `KEYCLOAK_ISSUER_URI` inteiro,
+# que é o que se quer quando o endereço vem de fora.
+#
+# De quebra ele é o perfil pensado para container: log em ECS no stdout, sem arquivo.
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin-api
+  namespace: codeflix
+  labels: { app: admin-api }
+spec:
+  selector: { app: admin-api }
+  ports:
+    - { name: http, port: 8080, targetPort: 8080 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-api
+  namespace: codeflix
+spec:
+  # Duas réplicas: o relay da outbox trava a linha com `SKIP LOCKED`, então mais de uma
+  # instância não entrega o mesmo evento duas vezes. Era o impedimento registrado, e ele saiu.
+  replicas: 2
+  # **O rollout, declarado em vez de herdado.**
+  #
+  # `maxUnavailable: 0` com `maxSurge: 1`: o pod antigo **nunca** sai antes de o novo ficar pronto.
+  # Com uma réplica o padrão de 25% já arredonda para isso, então hoje não muda nada — e é
+  # exatamente por isso que vale declarar: quando a réplica subir para dois, o padrão passaria a
+  # permitir derrubar uma antes da hora, e ninguém ligaria a mudança de comportamento a isso.
+  #
+  # `progressDeadlineSeconds` bem abaixo do padrão de 600: rollout travado tem de aparecer em dois
+  # minutos, não em dez. O Kubernetes não desfaz sozinho — ele marca como falho e para —, então o
+  # valor aqui é quanto tempo alguém fica sem saber.
+  #
+  # `revisionHistoryLimit` explícito porque é dele que o `rollout undo` vive: sem revisão guardada
+  # não há para onde voltar. Cinco porque a imagem é imutável agora, então cada revisão aponta para
+  # bytes diferentes e voltar significa alguma coisa.
+  progressDeadlineSeconds: 120
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels: { app: admin-api }
+  template:
+    metadata:
+      labels: { app: admin-api, version: v1 }
+      # O Prometheus da malha descobre o que raspar por estas anotações, e o sidecar **junta** as
+      # métricas da aplicação com as dele num endereço só. Sem elas, o painel teria latência e
+      # código de resposta vindos do Envoy e nada de dentro da JVM — nem heap, nem pool do Hikari,
+      # nem profundidade de fila.
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: /actuator/prometheus
+    spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: admin-api
+      # A janela entre o SIGTERM e o SIGKILL, igual à do compose e pelo mesmo motivo: a aplicação
+      # espera até 30s pela requisição em voo, e o padrão do Kubernetes é 30 — sem margem, quem
+      # decide é o relógio do kubelet e não o `timeout-per-shutdown-phase`, que ao menos registra o
+      # que abandonou.
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: admin-api
+          image: localhost:5000/admin-codeflix-admin-api:${TAG}
+          # As imagens entram no cluster por `k3d image import`, não de um registro: `IfNotPresent`
+          # é o que impede o kubelet de tentar buscá-las no Docker Hub e falhar com ErrImagePull.
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef: { name: codeflix-env }
+          env:
+            - { name: SPRING_PROFILES_ACTIVE, value: homolog }
+            - { name: DB_HOST, value: mysql }
+            - { name: DB_PORT, value: "3306" }
+            - { name: AMQP_HOST, value: rabbitmq }
+            - { name: AMQP_PORT, value: "5672" }
+            - { name: STORAGE_HOST, value: garage }
+            # O `homolog` pede o endereço **inteiro** do armazenamento; é o `development` que o monta
+            # de host e porta. A diferença é deliberada do projeto: fora do desenvolvimento, variável
+            # faltando derruba a subida em vez de apontar para lugar nenhum.
+            - { name: STORAGE_ENDPOINT, value: "http://garage:3900" }
+            - { name: KEYCLOAK_ISSUER_URI, value: "http://keycloak.localtest.me/realms/codeflix" }
+            # As duas origens dos fronts atrás do gateway. Sem isto valeria a lista do perfil
+            # homolog, que fala de localhost e do domínio de homologação — e o browser esconderia a
+            # resposta do painel com a API no ar, que é defeito difícil de ler.
+            - { name: CORS_ALLOWED_ORIGINS, value: "http://localhost:3000,http://localhost:3001" }
+            # **A JVM só usa 25% do limite como heap, e escolhe o coletor serial.** Medido no
+            # container, antes desta linha existir:
+            #
+            #     MaxHeapSize      = 268435456  (256 MB de 1 GiB)   {ergonomic}
+            #     MaxRAMPercentage = 25.0                           {default}
+            #     UseSerialGC      = true                           {ergonomic}
+            #     pools: "Eden Space" / "Survivor Space" / "Tenured Gen"
+            #
+            # Duas consequências: 768 MB do limite não são usados pelo heap, e o coletor é
+            # stop-the-world de **uma thread**. No teste de carga do catálogo isso dava 1.209 pausas
+            # somando 3,6 s em 50 s de medição — cerca de 7% do tempo parado.
+            #
+            # `UseG1GC` precisa ser **explícito**: a escolha do serial é por memória, não por CPU —
+            # abaixo de 1792 MB de memória disponível a JVM classifica o container como "client
+            # class", e 70% de 1 GiB continua abaixo disso. Subir só o percentual deixaria o
+            # coletor como está.
+            #
+            # 70%, e não 75 ou 80: sobram ~300 MB para metaspace, cache de código, pilhas e buffers
+            # diretos. Errar para cima aqui troca pausa de GC por OOMKill, que é pior.
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=70 -XX:+UseG1GC"
+          ports:
+            - { name: http, containerPort: 8080 }
+            # A porta do actuator. Entra aqui para o kubelet e o Prometheus a alcançarem; ela **não**
+            # está no Service nem no gateway, então segue sem rota de fora — a proteção dela é a
+            # topologia, como no compose.
+            - { name: http-management, containerPort: 9090 }
+          # Três sondas, e a divisão de trabalho entre elas é o ponto.
+          #
+          # A `startupProbe` é quem tolera a subida lenta: enquanto ela não passa, as outras duas nem
+          # correm. Isso substitui o `initialDelaySeconds: 30` com `failureThreshold: 30` que a
+          # prontidão carregava — aquele arranjo dava 30 tentativas **para sempre**, e não só na
+          # subida, então uma aplicação travada levava 5 minutos para sair de rotação.
+          #
+          # Ela consulta o grupo `readiness`, e não um grupo `startup`: o Spring cria só `liveness` e
+          # `readiness` com o `probes.enabled`. Conferido no container — `/actuator/health/startup`
+          # responde **404**, e uma startupProbe apontada para lá nunca passaria: o pod entraria em
+          # CrashLoopBackOff com a aplicação de pé.
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 9090 }
+            periodSeconds: 10
+            failureThreshold: 30
+          # Prontidão: tira de rotação sem matar. Fica apertada porque a startupProbe já cobriu a
+          # subida, e porque é ela que o Spring põe em OUT_OF_SERVICE quando a parada começa.
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 9090 }
+            periodSeconds: 10
+            failureThreshold: 3
+          # Vivacidade: mata e reinicia. Consulta o grupo `liveness`, que de propósito **não** inclui
+          # banco nem broker — reiniciar não traz nenhum dos dois de volta, só acrescenta uma subida
+          # a frio no pior momento. Ela responde a uma pergunta só: esta JVM ainda está sã?
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 9090 }
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: { memory: 512Mi, cpu: 200m }
+            limits: { memory: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: videos-api
+  namespace: codeflix
+  labels: { app: videos-api }
+spec:
+  selector: { app: videos-api }
+  ports:
+    - { name: http, port: 8082, targetPort: 8082 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: videos-api
+  namespace: codeflix
+spec:
+  # Duas réplicas, destravadas pelas três partições: com uma só, a segunda instância ficaria
+  # ociosa no consumo do CDC — o grupo não teria o que distribuir.
+  replicas: 2
+  # **O rollout, declarado em vez de herdado.**
+  #
+  # `maxUnavailable: 0` com `maxSurge: 1`: o pod antigo **nunca** sai antes de o novo ficar pronto.
+  # Com uma réplica o padrão de 25% já arredonda para isso, então hoje não muda nada — e é
+  # exatamente por isso que vale declarar: quando a réplica subir para dois, o padrão passaria a
+  # permitir derrubar uma antes da hora, e ninguém ligaria a mudança de comportamento a isso.
+  #
+  # `progressDeadlineSeconds` bem abaixo do padrão de 600: rollout travado tem de aparecer em dois
+  # minutos, não em dez. O Kubernetes não desfaz sozinho — ele marca como falho e para —, então o
+  # valor aqui é quanto tempo alguém fica sem saber.
+  #
+  # `revisionHistoryLimit` explícito porque é dele que o `rollout undo` vive: sem revisão guardada
+  # não há para onde voltar. Cinco porque a imagem é imutável agora, então cada revisão aponta para
+  # bytes diferentes e voltar significa alguma coisa.
+  progressDeadlineSeconds: 120
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels: { app: videos-api }
+  template:
+    metadata:
+      labels: { app: videos-api, version: v1 }
+      # O Prometheus da malha descobre o que raspar por estas anotações, e o sidecar **junta** as
+      # métricas da aplicação com as dele num endereço só. Sem elas, o painel teria latência e
+      # código de resposta vindos do Envoy e nada de dentro da JVM — nem heap, nem pool do Hikari,
+      # nem profundidade de fila.
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        prometheus.io/path: /actuator/prometheus
+    spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: videos-api
+      # A janela entre o SIGTERM e o SIGKILL, igual à do compose e pelo mesmo motivo: a aplicação
+      # espera até 30s pela requisição em voo, e o padrão do Kubernetes é 30 — sem margem, quem
+      # decide é o relógio do kubelet e não o `timeout-per-shutdown-phase`, que ao menos registra o
+      # que abandonou.
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: videos-api
+          image: localhost:5000/admin-codeflix-videos-api:${TAG}
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef: { name: codeflix-env }
+          env:
+            - { name: SPRING_PROFILES_ACTIVE, value: homolog }
+            - { name: KAFKA_BOOTSTRAP_SERVERS, value: "kafka:9092" }
+            - { name: ELASTIC_URIS, value: "http://catalog-elasticsearch:9200" }
+            # Em desenvolvimento este segredo tem um padrão com "nao-usar-fora-daqui" no nome; no
+            # `homolog` ele é obrigatório. Vem do `.env` pelo Secret, como todo segredo aqui — e
+            # precisa ser **estável**, porque é ele que assina os endereços de mídia que o player já
+            # tem em mãos.
+            - name: CATALOG_MEDIA_SIGNING_SECRET
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: CATALOG_MEDIA_SIGNING_SECRET } }
+            # **Pelo nome do Service, e não pelo gateway.** Chamada de serviço para serviço dentro da
+            # malha é o que o Kiali desenha como aresta entre os dois; passando pelo gateway, a mesma
+            # chamada apareceria como tráfego vindo de fora.
+            - { name: ADMIN_API_BASE_URL, value: "http://admin-api:8080" }
+            - { name: KEYCLOAK_ISSUER_URI, value: "http://keycloak.localtest.me/realms/codeflix" }
+            # O catálogo **pede token** para chamar a admin-api quando consome um evento de CDC, e no
+            # `homolog` o endereço do token é obrigatório. Sem ele o consumo falhava com
+            # "Not enough variable values available to expand 'KEYCLOAK_TOKEN_URI'", as retentativas
+            # se esgotavam e **todos** os eventos iam para a fila morta — com o conector e o Kafka
+            # saudáveis, e o catálogo respondendo vazio. O sintoma não aponta para a causa.
+            - { name: KEYCLOAK_TOKEN_URI, value: "http://keycloak.localtest.me/realms/codeflix/protocol/openid-connect/token" }
+            - { name: CORS_ALLOWED_ORIGINS, value: "http://localhost:3000,http://localhost:3001" }
+            # **A JVM só usa 25% do limite como heap, e escolhe o coletor serial.** Medido no
+            # container, antes desta linha existir:
+            #
+            #     MaxHeapSize      = 268435456  (256 MB de 1 GiB)   {ergonomic}
+            #     MaxRAMPercentage = 25.0                           {default}
+            #     UseSerialGC      = true                           {ergonomic}
+            #     pools: "Eden Space" / "Survivor Space" / "Tenured Gen"
+            #
+            # Duas consequências: 768 MB do limite não são usados pelo heap, e o coletor é
+            # stop-the-world de **uma thread**. No teste de carga do catálogo isso dava 1.209 pausas
+            # somando 3,6 s em 50 s de medição — cerca de 7% do tempo parado.
+            #
+            # `UseG1GC` precisa ser **explícito**: a escolha do serial é por memória, não por CPU —
+            # abaixo de 1792 MB de memória disponível a JVM classifica o container como "client
+            # class", e 70% de 1 GiB continua abaixo disso. Subir só o percentual deixaria o
+            # coletor como está.
+            #
+            # 70%, e não 75 ou 80: sobram ~300 MB para metaspace, cache de código, pilhas e buffers
+            # diretos. Errar para cima aqui troca pausa de GC por OOMKill, que é pior.
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=70 -XX:+UseG1GC"
+          ports:
+            - { name: http, containerPort: 8082 }
+            # A porta do actuator. Entra aqui para o kubelet e o Prometheus a alcançarem; ela **não**
+            # está no Service nem no gateway, então segue sem rota de fora — a proteção dela é a
+            # topologia, como no compose.
+            - { name: http-management, containerPort: 9091 }
+          # Três sondas, e a divisão de trabalho entre elas é o ponto.
+          #
+          # A `startupProbe` é quem tolera a subida lenta: enquanto ela não passa, as outras duas nem
+          # correm. Isso substitui o `initialDelaySeconds: 30` com `failureThreshold: 30` que a
+          # prontidão carregava — aquele arranjo dava 30 tentativas **para sempre**, e não só na
+          # subida, então uma aplicação travada levava 5 minutos para sair de rotação.
+          #
+          # Ela consulta o grupo `readiness`, e não um grupo `startup`: o Spring cria só `liveness` e
+          # `readiness` com o `probes.enabled`. Conferido no container — `/actuator/health/startup`
+          # responde **404**, e uma startupProbe apontada para lá nunca passaria: o pod entraria em
+          # CrashLoopBackOff com a aplicação de pé.
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 9091 }
+            periodSeconds: 10
+            failureThreshold: 30
+          # Prontidão: tira de rotação sem matar. Fica apertada porque a startupProbe já cobriu a
+          # subida, e porque é ela que o Spring põe em OUT_OF_SERVICE quando a parada começa.
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 9091 }
+            periodSeconds: 10
+            failureThreshold: 3
+          # Vivacidade: mata e reinicia. Consulta o grupo `liveness`, que de propósito **não** inclui
+          # banco nem broker — reiniciar não traz nenhum dos dois de volta, só acrescenta uma subida
+          # a frio no pior momento. Ela responde a uma pergunta só: esta JVM ainda está sã?
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 9091 }
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: { memory: 512Mi, cpu: 200m }
+            limits: { memory: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: subscription-api
+  namespace: codeflix
+  labels: { app: subscription-api }
+spec:
+  selector: { app: subscription-api }
+  ports:
+    - { name: http, port: 8084, targetPort: 8084 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subscription-api
+  namespace: codeflix
+spec:
+  # **Fica em uma, e não é esquecimento.** O limitador de requisição conta **por instância**
+  # (Bucket4j em memória), então duas réplicas dobram o teto efetivo — enfraquecendo uma garantia
+  # que o README da raiz descreve como proteção. Destravar pede contador compartilhado, em Redis,
+  # e isso é mudança própria. Enquanto não houver, escalar aqui seria trocar segurança por vazão
+  # sem dizer a ninguém.
+  replicas: 1
+  # **O rollout, declarado em vez de herdado.**
+  #
+  # `maxUnavailable: 0` com `maxSurge: 1`: o pod antigo **nunca** sai antes de o novo ficar pronto.
+  # Com uma réplica o padrão de 25% já arredonda para isso, então hoje não muda nada — e é
+  # exatamente por isso que vale declarar: quando a réplica subir para dois, o padrão passaria a
+  # permitir derrubar uma antes da hora, e ninguém ligaria a mudança de comportamento a isso.
+  #
+  # `progressDeadlineSeconds` bem abaixo do padrão de 600: rollout travado tem de aparecer em dois
+  # minutos, não em dez. O Kubernetes não desfaz sozinho — ele marca como falho e para —, então o
+  # valor aqui é quanto tempo alguém fica sem saber.
+  #
+  # `revisionHistoryLimit` explícito porque é dele que o `rollout undo` vive: sem revisão guardada
+  # não há para onde voltar. Cinco porque a imagem é imutável agora, então cada revisão aponta para
+  # bytes diferentes e voltar significa alguma coisa.
+  progressDeadlineSeconds: 120
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels: { app: subscription-api }
+  template:
+    metadata:
+      labels: { app: subscription-api, version: v1 }
+      # O Prometheus da malha descobre o que raspar por estas anotações, e o sidecar **junta** as
+      # métricas da aplicação com as dele num endereço só. Sem elas, o painel teria latência e
+      # código de resposta vindos do Envoy e nada de dentro da JVM — nem heap, nem pool do Hikari,
+      # nem profundidade de fila.
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9092"
+        prometheus.io/path: /actuator/prometheus
+    spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: subscription-api
+      # A janela entre o SIGTERM e o SIGKILL, igual à do compose e pelo mesmo motivo: a aplicação
+      # espera até 30s pela requisição em voo, e o padrão do Kubernetes é 30 — sem margem, quem
+      # decide é o relógio do kubelet e não o `timeout-per-shutdown-phase`, que ao menos registra o
+      # que abandonou.
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: subscription-api
+          image: localhost:5000/admin-codeflix-subscription-api:${TAG}
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef: { name: codeflix-env }
+          env:
+            - { name: SPRING_PROFILES_ACTIVE, value: homolog }
+            - { name: SUBSCRIPTION_DB_HOST, value: subscription-mysql }
+            - { name: SUBSCRIPTION_DB_PORT, value: "3306" }
+            # Esta API **também** consome Kafka (a replicação das contas), e sem este endereço ela
+            # herdava o `localhost:29092` do `.env` — os consumidores ficavam reconectando em silêncio
+            # (WARN, não ERROR), e a confirmação de cadastro respondia 500 sem dizer por quê.
+            - { name: KAFKA_BOOTSTRAP_SERVERS, value: "kafka:9092" }
+            - { name: AMQP_HOST, value: rabbitmq }
+            - { name: AMQP_PORT, value: "5672" }
+            - { name: KEYCLOAK_ISSUER_URI, value: "http://keycloak.localtest.me/realms/codeflix" }
+            # O link que vai no e-mail de confirmação: tem de abrir no browser de quem recebe, então
+            # é o nome do gateway, não o nome interno do Service.
+            - { name: SIGNUP_CONFIRMATION_URL, value: "http://localhost:3000/cadastro/confirmar" }
+            - { name: CORS_ALLOWED_ORIGINS, value: "http://localhost:3000,http://localhost:3001" }
+            # **A JVM só usa 25% do limite como heap, e escolhe o coletor serial.** Medido no
+            # container, antes desta linha existir:
+            #
+            #     MaxHeapSize      = 268435456  (256 MB de 1 GiB)   {ergonomic}
+            #     MaxRAMPercentage = 25.0                           {default}
+            #     UseSerialGC      = true                           {ergonomic}
+            #     pools: "Eden Space" / "Survivor Space" / "Tenured Gen"
+            #
+            # Duas consequências: 768 MB do limite não são usados pelo heap, e o coletor é
+            # stop-the-world de **uma thread**. No teste de carga do catálogo isso dava 1.209 pausas
+            # somando 3,6 s em 50 s de medição — cerca de 7% do tempo parado.
+            #
+            # `UseG1GC` precisa ser **explícito**: a escolha do serial é por memória, não por CPU —
+            # abaixo de 1792 MB de memória disponível a JVM classifica o container como "client
+            # class", e 70% de 1 GiB continua abaixo disso. Subir só o percentual deixaria o
+            # coletor como está.
+            #
+            # 70%, e não 75 ou 80: sobram ~300 MB para metaspace, cache de código, pilhas e buffers
+            # diretos. Errar para cima aqui troca pausa de GC por OOMKill, que é pior.
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=70 -XX:+UseG1GC"
+          ports:
+            - { name: http, containerPort: 8084 }
+            # A porta do actuator. Entra aqui para o kubelet e o Prometheus a alcançarem; ela **não**
+            # está no Service nem no gateway, então segue sem rota de fora — a proteção dela é a
+            # topologia, como no compose.
+            - { name: http-management, containerPort: 9092 }
+          # Três sondas, e a divisão de trabalho entre elas é o ponto.
+          #
+          # A `startupProbe` é quem tolera a subida lenta: enquanto ela não passa, as outras duas nem
+          # correm. Isso substitui o `initialDelaySeconds: 30` com `failureThreshold: 30` que a
+          # prontidão carregava — aquele arranjo dava 30 tentativas **para sempre**, e não só na
+          # subida, então uma aplicação travada levava 5 minutos para sair de rotação.
+          #
+          # Ela consulta o grupo `readiness`, e não um grupo `startup`: o Spring cria só `liveness` e
+          # `readiness` com o `probes.enabled`. Conferido no container — `/actuator/health/startup`
+          # responde **404**, e uma startupProbe apontada para lá nunca passaria: o pod entraria em
+          # CrashLoopBackOff com a aplicação de pé.
+          startupProbe:
+            httpGet: { path: /actuator/health/readiness, port: 9092 }
+            periodSeconds: 10
+            failureThreshold: 30
+          # Prontidão: tira de rotação sem matar. Fica apertada porque a startupProbe já cobriu a
+          # subida, e porque é ela que o Spring põe em OUT_OF_SERVICE quando a parada começa.
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 9092 }
+            periodSeconds: 10
+            failureThreshold: 3
+          # Vivacidade: mata e reinicia. Consulta o grupo `liveness`, que de propósito **não** inclui
+          # banco nem broker — reiniciar não traz nenhum dos dois de volta, só acrescenta uma subida
+          # a frio no pior momento. Ela responde a uma pergunta só: esta JVM ainda está sã?
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 9092 }
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests: { memory: 512Mi, cpu: 200m }
+            limits: { memory: 1Gi }

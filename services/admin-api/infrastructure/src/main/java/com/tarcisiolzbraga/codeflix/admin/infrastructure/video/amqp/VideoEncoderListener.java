@@ -71,7 +71,13 @@ public class VideoEncoderListener {
         switch (result) {
             case VideoEncoderCompleted completed -> execute(completed, type.get(), MediaStatus.COMPLETED, message);
             case VideoEncoderProcessing processing -> execute(processing, type.get(), MediaStatus.PROCESSING, message);
-            case VideoEncoderError _ -> log.error(ENCODER_ERROR_MESSAGE, message);
+            // O log fica, **e** o estado passa a ser gravado. Antes era só o log: a mídia seguia em
+            // PROCESSING para sempre, indistinguível de codificação lenta para quem olhava o
+            // painel, e o único jeito de saber era procurar a linha no Kibana.
+            case VideoEncoderError error -> {
+                log.error(ENCODER_ERROR_MESSAGE, message);
+                execute(error, type.get(), MediaStatus.FAILED, message);
+            }
         }
     }
 

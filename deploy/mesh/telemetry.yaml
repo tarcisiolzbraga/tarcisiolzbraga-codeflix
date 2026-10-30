@@ -1,0 +1,27 @@
+# O rastreamento da malha.
+#
+# **Por que este arquivo existe.** O Jaeger já subia com o perfil `demo`, e o meshconfig já declarava
+# o provedor `jaeger` apontando para `jaeger-collector:4317`. Faltava o que liga uma coisa à outra:
+# sem um recurso `Telemetry`, nenhum sidecar manda span, e `defaultProviders` do meshconfig lista só
+# métricas. O resultado era um Jaeger de pé, alcançável pelo gateway, **vazio** — que é pior que não
+# ter, porque parece instalado.
+#
+# Mora em `istio-system` de propósito: é o `rootNamespace` da malha, e um `Telemetry` ali vale para
+# todos os namespaces. Um por namespace seria repetição, e um em `codeflix` deixaria o próprio
+# gateway de fora — ele mora em `istio-system`, e é o primeiro salto de toda requisição que entra.
+#
+# **100% de amostragem, e o porquê de não ser o padrão de 1%.** Num cluster de desenvolvimento o
+# valor de rastreamento é abrir uma requisição específica que acabou de falhar; com 1% ela
+# praticamente nunca está lá. O preço é real e tem nome: o addon do Jaeger guarda os traces **em
+# memória**, então um teste de carga a centenas de requisições por segundo o enche e começa a
+# descartar. Antes de rodar `perf/`, baixe isto — a linha está no README da malha.
+apiVersion: telemetry.istio.io/v1
+kind: Telemetry
+metadata:
+  name: rastreamento
+  namespace: istio-system
+spec:
+  tracing:
+    - providers:
+        - name: jaeger
+      randomSamplingPercentage: 100.0

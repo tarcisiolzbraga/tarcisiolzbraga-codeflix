@@ -14,6 +14,8 @@ Os serviços de back-end do Codeflix, num repositório só. Cada serviço tem o 
 | [`clients/back-office-codeflix/`](clients/back-office-codeflix/) | não é serviço: o front de quem administra o catálogo. | 3001 |
 | [`build-logic/`](build-logic/) | não é serviço: a configuração de build que os serviços Java dividem. | — |
 | [`provisioning/`](provisioning/) | não é serviço: os containers de apoio, um compose por parte. | — |
+| [`deploy/`](deploy/) | não é serviço: o cluster em Kubernetes com Istio, do zero em um comando. | — |
+| [`perf/`](perf/) | não é serviço: o teste de carga do catálogo, e o que ele mediu. | — |
 
 A leitura de cada um está no README da própria pasta. Comece pelo
 [`services/admin-api/README.md`](services/admin-api/README.md) se quer entender de onde o dado vem, ou pelo
@@ -26,12 +28,13 @@ Os serviços não são independentes, e tratá-los como tal custava caro:
 - **O realm é um só.** Dar um papel ao assinante do catálogo era mudança em dois repositórios, e a
   `videos-api` mantinha uma cópia mínima do realm só para os testes dela, que podia divergir da de
   verdade. Hoje [`provisioning/keycloak/realm.json`](provisioning/keycloak/) é o único, e os
-  testes dos dois leem dele.
+  testes dos **três** serviços Java leem dele.
 - **O contrato do CDC atravessa os dois.** O nome do tópico está na configuração da `videos-api`, o
   conector está na `admin-api`, e as mensagens de teste da `videos-api` foram capturadas da saída
   real da `admin-api`. Renomear uma tabela de um lado quebra o outro, e agora um push só roda as
   duas suítes.
-- **A infraestrutura é compartilhada.** MySQL, Keycloak, Kafka e RabbitMQ servem aos dois.
+- **A infraestrutura é compartilhada.** MySQL, Keycloak, Kafka e RabbitMQ servem a mais de um
+  serviço — o Keycloak, a todos.
 - **O build é o mesmo.** Mesma toolchain, mesmo JUnit, mesmas tasks de teste. Eram dois `buildSrc`
   iguais que já tinham começado a divergir; hoje são um [`build-logic/`](build-logic/) só, que cada
   serviço inclui pelo `settings.gradle`.
@@ -68,7 +71,7 @@ provisioning/
 ├── mysql/                  banco da admin-api, e a origem do binlog
 ├── garage/                 armazenamento das mídias, compatível com S3
 ├── rabbitmq/               fila da conversa com o codificador
-├── keycloak/               autenticação dos dois, com um realm só
+├── keycloak/               autenticação de todos, com um realm só
 ├── catalog-elasticsearch/  índice de leitura do catálogo
 ├── cdc/                    Kafka e Kafka Connect, mais o conector do Debezium
 └── observability/          Elasticsearch de log, Kibana, Logstash e Filebeat
@@ -180,10 +183,335 @@ O CORS e o Keycloak decidem coisas diferentes, e as duas listas precisam estar c
 Esquecer a segunda dá erro na tela de login do Keycloak; esquecer a primeira dá uma chamada que
 chegou, respondeu, e o front não pode ler.
 
+## O Keycloak tem banco, e por que isso foi conserto e não zelo
+
+Ele rodava `kc.sh start-dev`, cujo banco é um **H2 dentro da camada do container**, sem volume
+nenhum. Medido: o arquivo ficava em `/opt/keycloak/data/h2/keycloakdb.mv.db`, e o único mount do
+container era o `realm.json`, somente-leitura.
+
+A consequência não era "faltar backup". Era **perda de dado a cada recriação**: quem se cadastrou
+pelo fluxo de sign-up desaparecia, enquanto a linha dele em `account` — que está em volume —
+sobrevivia. O banco e o provedor de identidade se separavam: a pessoa não conseguia mais entrar, e
+o nome e o documento dela continuavam guardados. No cluster era pior, porque pod reinicia muito
+mais que container, e lá era um `Deployment` sem PVC.
+
+Agora há um Postgres próprio, com volume no compose e PVC no cluster, e o Keycloak roda `start` em
+vez de `start-dev` — `Profile prod activated` no log.
+
+Conferido nos dois ambientes, criando um usuário pela API administrativa e derrubando o que o
+servia:
+
+| | o que foi derrubado | o usuário |
+|---|---|---|
+| compose | `up -d --force-recreate keycloak` | sobreviveu |
+| cluster | `kubectl delete pod -l app=keycloak` | sobreviveu |
+
+E o H2 deixou de existir: `ls /opt/keycloak/data/h2/` responde "No such file or directory".
+
+### O preço: o `realm.json` deixa de ser reimportado sozinho
+
+Esta é a troca, e ela é real. O import usa a estratégia que o próprio log declara:
+
+```
+KC-SERVICES0030: Full model import requested. Strategy: IGNORE_EXISTING
+```
+
+Antes, cada recriação começava com banco vazio, então **toda** edição do
+[`realm.json`](provisioning/keycloak/) era aplicada na subida seguinte. Agora o realm persiste, e um
+realm que já existe é ignorado no import: papel novo, client novo ou mudança de `redirectUris`
+**não aplicam** até o banco ser zerado.
+
+```bash
+docker compose down -v        # zera o volume; o realm.json volta a valer na próxima subida
+```
+
+No cluster, o equivalente é apagar o PVC `keycloak-postgres-dados`.
+
+Não há como ter as duas coisas com import por arquivo: a estratégia que sobrescreve apaga e recria
+o realm, e isso levaria os usuários junto. O caminho que resolve de verdade é o realm aplicado pela
+API administrativa (um `keycloak-config-cli` ou equivalente) em vez de importado de arquivo — e isso
+está em aberto.
+
+### Os testes continuam em `start-dev`, de propósito
+
+O `KeycloakContainerConfiguration` dos três serviços Java sobe o próprio container com
+`start-dev --import-realm`, lendo o mesmo `realm.json`. Ali o efêmero é o que se quer: cada execução
+começa limpa, e o import tem de valer sempre.
+
+## O teto de requisição
+
+A `subscription-api` limita requisição por origem, em três degraus — um por preço do que a rota
+custa:
+
+| Degrau | Rotas | Teto |
+|---|---|---|
+| `sign-up` | `POST /accounts/sign-up` | 10 por 10 min |
+| `confirm` | `POST /accounts/sign-up/confirm` | 20 por 10 min |
+| `general` | todo o resto | 120 por min |
+
+Só este serviço, e isso é escolha. A `admin-api` é inteira autenticada por papel — quem chama é
+operador, não anônimo. E a `videos-api` serve mídia: um `<video src>` abre muitas requisições de
+faixa por segundo, e limitar por origem ali recusaria reprodução legítima.
+
+### Por que degraus separados
+
+As duas rotas do cadastro são as únicas abertas, e não poderiam ser outra coisa: quem se cadastra
+ainda não tem usuário no Keycloak para pedir token. Mas elas custam coisas diferentes — pedir o
+cadastro cria usuário no provedor e põe e-mail na fila; confirmar só confere um token. Com balde
+único, quem se cadastra e clica no link gasta do mesmo saldo, e quanto cabe passa a depender da
+mistura.
+
+### De onde vêm os números
+
+Não de gosto. O primeiro teto foi 5, e a [coleção do Postman](services/subscription-api/.postman/)
+— que é a regressão manual desta API e tem de rodar inteira e repetidas vezes — faz **4** chamadas a
+`sign-up` e **2** a `confirm`: ela tomava 429 em si mesma, na sexta requisição. Os números atuais a
+deixam rodar duas vezes seguidas e ainda limitam abuso a 60 cadastros por hora e por origem. Há
+teste fixando essa conta, para ninguém apertar o teto e quebrar a regressão manual sem perceber.
+
+### Os dois limites, ditos em vez de escondidos
+
+- **O contador é por instância.** Com duas réplicas, o teto efetivo dobra, porque cada uma tem os
+  seus baldes. Contador compartilhado pediria Redis, que este projeto não tem; o bucket4j o suporta,
+  e a troca seria da implementação do registro, não do filtro. Para o que isto protege — cadastro em
+  massa e adivinhação de token —, dobrar 10 em 10 minutos ainda é um teto.
+- **A origem vem do `X-Forwarded-For` atrás do gateway**, e quem controla esse cabeçalho escolhe a
+  própria chave e escapa do balde. Quem o sanitiza é o gateway, e é nele que a defesa de borda mora;
+  este filtro é a de base. Sem o `forward-headers-strategy` dos perfis `homolog` e `production`, o
+  `getRemoteAddr()` devolveria o IP do gateway e o limite viraria **global** — defeito que não
+  aparece em teste nenhum, porque no development não há proxy.
+
+O limite fica **ligado em todos os perfis**, inclusive o development, pela mesma razão da segurança
+deste serviço: desligado no perfil em que se desenvolve, ele nunca é exercitado onde se trabalha.
+As jornadas de teste declaram um teto alto em vez de o desligar, e quem o exercita é um teste
+próprio, com tetos apertados.
+
+## Saúde e métricas
+
+Os três serviços Java expõem o actuator, e **numa porta diferente da aplicação**:
+
+| Serviço | Aplicação | Gerenciamento |
+|---|---|---|
+| `admin-api` | 8080 | 9090 |
+| `videos-api` | 8082 | 9091 |
+| `subscription-api` | 8084 | 9092 |
+
+A porta de gerenciamento **não é publicada** pelo compose nem roteada pelo gateway. Essa é a
+decisão, e não um detalhe de arrumação: quem protege `/actuator` é a topologia, não uma regra de
+caminho. Regra de caminho alguém escreve errado um dia, e ninguém percebe até o `/actuator/env`
+estar na internet com as variáveis de ambiente dentro. Por isso, além da porta, a lista do que se
+expõe é fechada em `health`, `info` e `prometheus`.
+
+Para ver de fora, de dentro do container:
+
+```bash
+docker compose exec admin-api wget -qO- localhost:9090/actuator/health
+```
+
+### O que as sondas medem, e o que elas deliberadamente não medem
+
+`/actuator/health/liveness` e `/actuator/health/readiness` são os dois caminhos que um orquestrador
+consulta. Banco, broker e Elasticsearch aparecem no `/actuator/health` geral e **ficam fora do grupo
+`readiness`** — é o padrão do Spring, e aqui é escolha consciente nas duas pontas:
+
+- **Na prontidão**, porque banco fora do ar tiraria todas as réplicas de rotação ao mesmo tempo, e
+  isso troca uma degradação por uma queda total. Quem espera conexão já falha rápido pelo
+  `connection-timeout` do Hikari.
+- **Na vivacidade**, por um motivo mais forte: reiniciar a aplicação não traz o banco de volta, só
+  acrescenta uma subida a frio no pior momento possível.
+
+### A cadeia de segurança do actuator não é formalidade
+
+O filtro de segurança da aplicação **atravessa** o contexto filho do servidor de gerenciamento. Sem
+uma cadeia própria liberando os endpoints, a regra geral da `admin-api` pedia role de administrador
+às sondas — e o kubelet não carrega token. O resultado seria um pod eternamente "não pronto" com a
+aplicação perfeitamente de pé. Foi medido: as sondas respondiam 401, e cada serviço tem teste
+fixando os quatro fatos, inclusive o de que a porta da aplicação **não** serve `/actuator` nem para
+quem apresenta credencial que abre tudo.
+
+### A parada, e a janela que o Docker dava
+
+`server.shutdown: graceful` **já é o padrão do Spring Boot 4** — mudou da `immediate` do Boot 3. Ele
+está declarado nos três `application.yml` assim mesmo, junto do
+`spring.lifecycle.timeout-per-shutdown-phase: 30s`, pela mesma razão do `binlog-format` do MySQL:
+para o comportamento não depender de um padrão que já mudou uma vez.
+
+O que **não** estava certo era a janela do lado de fora. O Docker dá 10 segundos entre o `SIGTERM` e
+o `SIGKILL`, e a aplicação espera até 30 pela requisição em voo:
+
+```
+Docker:  SIGTERM ──────────10s─────────→ SIGKILL
+Spring:  SIGTERM ──────────────────30s──────────→ desiste e registra
+                            ↑
+                   aqui o Docker matava
+```
+
+Com o padrão, o que a parada elegante protege era cortado no meio aos 10 segundos — e cortado
+**calado**, porque o `SIGKILL` não deixa linha de log. Os três serviços agora declaram
+`stop_grace_period: 60s`, que põe a decisão de volta no `timeout-per-shutdown-phase`: ele ao menos
+registra o que abandonou.
+
+Parada saudável leva pouco mais de um segundo. Medido no `adm_videos_app`: 1406ms, nesta ordem —
+o consumidor do Rabbit drena os workers, os **dois** servidores Tomcat (o da aplicação e o do
+actuator) fecham com "Graceful shutdown complete", e só então a JPA e o Hikari. Este número só
+importa quando algo travou.
+
+A prontidão entra nisto de graça: com os grupos de sonda ligados, ela passa a `OUT_OF_SERVICE`
+assim que a parada começa, então o balanceador para de mandar requisição antes de a aplicação
+começar a se desmontar.
+
+Os dois serviços em Go já tratavam `SIGTERM` com `signal.NotifyContext` e esperavam os operários no
+`WaitGroup`. Eles ficam com o `stop_grace_period` padrão de propósito: o `exec.CommandContext` mata
+o ffmpeg no cancelamento em vez de esperar a conversão terminar, então janela maior não compraria
+nada — a mensagem volta para a fila e outro operário a pega.
+
+### Os dois serviços em Go ficam de fora
+
+`encoder-api` e `mail-api` não expõem HTTP — consomem fila. Não há porta onde pôr uma sonda, e o
+que o compose sabe deles é o processo estar de pé. Medi-los pede outro instrumento (profundidade de
+fila, idade da mensagem mais velha), e isso não está feito.
+
+## Quanto ele aguenta
+
+Até medir, ninguém sabia. A leitura paginada do catálogo, com as relações resolvidas, satura assim:
+
+| VUs | req/s | mediana | p99 | erro |
+|---:|---:|---:|---:|---:|
+| 10 | 701 | 12,1ms | 20,9ms | 0% |
+| 20 | **769** | 23,2ms | 37,0ms | 0% |
+| 40 | 723 | 52,0ms | 75,4ms | 0% |
+| 80 | 578 | 129,8ms | 242,9ms | 0% |
+
+**O joelho está entre 10 e 20 VUs**, e passado o pico de ~770 req/s a vazão **cai** enquanto a
+latência cresce. Zero erro em todos os níveis: o serviço degrada, não quebra.
+
+E o custo tem nome: **resolver `categories`, `genres` e `castMembers` custa 2,4× da vazão** — a mesma
+consulta sem elas chega a 1.870 req/s. Não é N+1 (o `@BatchMapping` já existe): são três idas extras
+ao Elasticsearch por página, e o caminho é cache curto ou desnormalizar o nome no documento.
+
+Os números vêm de uma máquina onde o gerador de carga divide CPU com o cluster que ele mede, então
+não são capacidade de produção — o que vale é a comparação. O método, as ressalvas e o que **não** foi
+medido estão em [`perf/README.md`](perf/).
+
+## Backup, e o que deliberadamente não se copia
+
+```bash
+bash provisioning/backup/backup.sh                 # copia para backups/<data>/
+bash provisioning/backup/restore.sh backups/<data> # devolve (pede confirmação)
+```
+
+Dos **onze** volumes do compose, só **quatro** guardam coisa que não volta de lugar nenhum: o MySQL
+do catálogo, o da assinatura, o Postgres do Keycloak e os objetos do Garage. Os outros sete ficam de
+fora de propósito — o índice do catálogo é réplica que o Debezium refaz, o Kafka é transporte, o
+Postgres do encoder é histórico de tentativas, e o Elasticsearch de log tem retenção própria.
+Copiá-los daria sensação de proteção e aumentaria o que há para restaurar errado.
+
+A classificação volume por volume, o motivo de cada exclusão e os dois limites do que existe hoje
+(destino local, sem agendamento) estão em
+[`provisioning/backup/README.md`](provisioning/backup/).
+
+## Dependências e vulnerabilidades
+
+Duas coisas diferentes, com ferramentas diferentes, porque respondem perguntas diferentes:
+
+| | Pergunta | Onde |
+|---|---|---|
+| **Dependabot** | há versão mais nova? | [`.github/dependabot.yml`](.github/dependabot.yml), semanal |
+| **Trivy** | o que eu publico tem CVE conhecido? | job de imagem do CI, em todo push |
+
+O Dependabot cobre os cinco ecossistemas — Gradle, Go, npm, as imagens base dos sete `Dockerfile` e
+as actions do próprio CI — com patch e minor agrupados num PR por ecossistema. Agrupar não é
+estética: sem isso, dezenove diretórios dariam dezenas de PRs por semana, e PR que ninguém lê é
+pior que nenhuma. Major vem sozinho, porque é o que precisa de leitura.
+
+O Trivy varre a imagem construída, e **barra o push** em HIGH ou CRITICAL com correção publicada
+(`ignore-unfixed`, porque CVE sem correção não é acionável: barrar por ela pararia o trabalho sem
+dar o que fazer).
+
+### A única exceção, e o que ela exige para existir
+
+O [`.trivyignore`](.trivyignore) tem **uma** linha, e o arquivo é a exceção **registrada** — não um
+silenciador. Cada linha tem de dizer o que foi medido, por que não há conserto, e o que a faria sair.
+
+A que está lá é o `CVE-2026-102554` do guava, e vale como exemplo do padrão: o guava não é
+dependência deste projeto, vem **shadado dentro** do `graphql-java`. Baixei os jares das três versões
+publicadas mais recentes e as três embutem o mesmo guava vulnerável, então **não há versão para onde
+subir** — e uma restrição de dependência não ajudaria, porque traria um jar ao lado sem remover os
+bytes shadados. Além disso a CVE exige desserialização de fluxo Java não confiável, que este projeto
+não faz em lugar nenhum.
+
+A diferença entre registrar e silenciar aparece na medida: as outras duas CVEs que apareceram junto
+— as do `snappy-java` — **tinham** correção publicada, e foram corrigidas por restrição de versão.
+Varrida sem o `.trivyignore`, a imagem do catálogo acusa exatamente **1** achado, e a da assinatura
+**nenhum**. A exceção cobre só o que não tem conserto.
+
+### Por que as duas, e não uma
+
+Porque uma não vê o que a outra vê. Medido neste projeto: o `npm audit` do portal dizia **zero**
+enquanto a imagem dele tinha **cinco CVEs HIGH**.
+
+```
+npm audit  ->  olha o package-lock.json        ->  0
+trivy      ->  olha o que está DENTRO da imagem ->  5 HIGH
+```
+
+Os cinco não eram deste projeto: `undici`, `brace-expansion` e `http-cache-semantics`, todos em
+`/usr/local/lib/node_modules/npm/node_modules/` — dependências do **próprio npm** na imagem base.
+Confiar só no gerenciador de pacote é não ver o que se publica.
+
+### A medição que motivou tudo isto
+
+Antes de configurar qualquer coisa, medi o que ela acharia. As sete imagens somavam **104**
+vulnerabilidades HIGH/CRITICAL:
+
+| Imagem | Antes | Depois |
+|---|---|---|
+| `admin-api` | 18 | 0 |
+| `videos-api` | 15 | 0 |
+| `subscription-api` | 19 | 0 |
+| `encoder-api` | 1 | 0 |
+| `mail-api` | 0 | 0 |
+| `portal` | 5 | 0 |
+| `back-office` | 46 | 0 |
+
+Dezessete sumiram com uma linha (Spring Boot 4.1.1 → 4.1.2) e quarenta e sete eram base
+desatualizada, resolvidas por um `apk -U upgrade` que pega o que o repositório do Alpine já tinha
+publicado. O portão estrito do CI só é possível porque o número é zero: foi o conserto que o
+habilitou, não o contrário.
+
+### O CI constrói as sete imagens, e isso é novo
+
+Antes havia job de imagem só para as três aplicações Java. A consequência apareceu: a imagem do
+`mail-api` ficou **meses sem construir** sem ninguém saber — o `alpine` passou a trazer um usuário
+`mail` de fábrica, o `addgroup -S mail` começou a falhar, e o defeito só aparecia para quem tentasse
+subir o projeto do zero, derrubando a subida inteira. Agora os três jobs que produzem imagem
+constroem e varrem: os Java, os dois em Go e os dois fronts.
+
 ## Integração contínua
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) é um workflow só, com os dois serviços Java
-numa matriz: testes sem container, build completo com Testcontainers, e a imagem Docker de cada um.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) é um workflow só, com os **três** serviços
+Java numa matriz: testes sem container, build completo com Testcontainers, e a imagem Docker de cada um.
+
+O `build` de cada serviço confere um **piso de cobertura** antes de passar: 90% de instrução e 70%
+de ramo, sobre o relatório agregado dos três módulos. O piso vive no
+[`build-logic`](build-logic/src/main/groovy/), então mexer nele mexe nos três serviços de uma vez.
+
+É piso contra regressão, e não meta. Os números de hoje:
+
+| Serviço | Instrução | Ramo | Linha |
+|---|---|---|---|
+| `admin-api` | 94,9% | **72,0%** | 95,0% |
+| `videos-api` | 92,8% | 80,1% | 91,2% |
+| `subscription-api` | 96,5% | 84,9% | 96,3% |
+
+O ramo da `admin-api` é o mais apertado, a dois pontos do piso, e isso é informação: é lá que falta
+teste de caminho alternativo, e é o primeiro lugar onde vale subir cobertura em vez de baixar o
+piso. A cobertura da `videos-api` **não era medida por ninguém** até agora — faltava a agregação
+naquele serviço, e só naquele, então `testCodeCoverageReport` nem existia lá.
+
+O relatório sobe como artefato do CI com `if: always()`, pelo mesmo motivo do de testes: quando o
+piso é violado o build falha, e é aí que alguém quer o relatório — a mensagem do gate diz o número,
+não diz a classe.
 
 **Não há filtro por caminho, de propósito.** Filtrar teste pelo que mudou daria push verde com
 contrato quebrado: mexer só na `admin-api` quebra a `videos-api`, que replica o dado dela. O filtro

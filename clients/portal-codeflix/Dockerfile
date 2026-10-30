@@ -46,6 +46,18 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
+# Pega as correções de segurança publicadas depois de a base ser construída.
+RUN apk -U upgrade --no-cache
+
+# **O npm sai da imagem de execução.** O CMD abaixo é `node server.js`: npm não roda aqui, e o que
+# ele deixava para trás eram cinco CVEs HIGH medidos pelo Trivy — undici, brace-expansion e
+# http-cache-semantics, todos em `node_modules/npm/node_modules/`, isto é, dependências **do npm**,
+# não deste projeto.
+#
+# É por isso que `npm audit` dizia zero enquanto a imagem tinha cinco: as duas ferramentas respondem
+# perguntas diferentes — uma olha o package-lock, a outra olha o que está dentro da imagem.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
 # Usuário sem privilégio: o container não precisa de root para servir arquivo.
 RUN addgroup -S portal && adduser -S portal -G portal
 USER portal

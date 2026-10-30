@@ -59,6 +59,19 @@ class UpdateMediaStatusUseCaseTest {
         assertEquals(ENCODED_PATH, actualMedia.encodedLocation());
     }
 
+    // O `move` mandava tudo que não era COMPLETED para `processing`, então FAILED viraria PROCESSING
+    // — a falha gravada como "está codificando". Este teste é o que impede isso de voltar.
+    @Test
+    void givenFailed_whenCallExecute_thenMarkTheMediaAsFailedAndSaveTheVideo() {
+        final var video = givenVideoWithMedia();
+        when(videoGateway.update(any())).thenAnswer(returnsFirstArg());
+
+        useCase.execute(commandWith(video.getId(), MediaStatus.FAILED));
+
+        assertEquals(MediaStatus.FAILED, video.getVideo().orElseThrow().status());
+        verify(videoGateway).update(video);
+    }
+
     @Test
     void givenPending_whenCallExecute_thenNotEvenLookForTheVideo() {
         final var command = commandWith(VideoID.unique(), MediaStatus.PENDING);

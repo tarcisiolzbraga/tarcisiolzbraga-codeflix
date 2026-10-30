@@ -399,6 +399,54 @@ O vencimento é de um mês, então à mão só se vê a cobrança recusar por n�
 virada do estado, a pasta `3. Assinatura` da coleção cobre as respostas, e a jornada automatizada
 (`SubscriptionE2ETest`) adianta o relógio e passa por trial → ativa → incompleta → cancelada.
 
+## O dado pessoal, e por quanto tempo ele fica
+
+Este é o serviço que guarda dado pessoal, e vale dizer onde:
+
+| Tabela | O que guarda |
+|---|---|
+| `account` | e-mail, nome, documento, endereço de cobrança e a referência do meio de pagamento |
+| `pending_sign_up` | e-mail, nome e documento de quem **pediu** o cadastro, antes de confirmar |
+
+A segunda é a que tinha problema. Ela existe porque a conta só nasce na confirmação, então o nome e
+o documento ficam ali nesse meio-tempo — e saíam **só** quando a mesma pessoa pedisse o cadastro de
+novo com o mesmo e-mail. Quem pedisse uma vez e nunca confirmasse deixava nome completo e número de
+documento no banco **para sempre**, sem nunca ter virado cliente.
+
+O `ExpiredPendingSignUpsJob` roda de madrugada e apaga por um limiar só, com duas condições:
+
+```sql
+WHERE (confirmed_at IS NULL     AND expires_at   < :limiar)   -- o link já não funciona
+   OR (confirmed_at IS NOT NULL AND confirmed_at < :limiar)   -- a conta já existe
+```
+
+### Por que a janela não é zero
+
+Apagar no instante do vencimento parece mais limpo e é pior: hoje um link vencido responde **422**
+("o link venceu"), e sem a linha ele passaria a responder **404**. Qual das duas o cliente recebe
+dependeria de o limpador ter rodado — resposta que muda sozinha é pior que resposta imperfeita.
+
+A `signup.retention` (padrão **7 dias**) é contada **depois** de a linha deixar de servir, não
+depois de criada. Com o link valendo um dia e a retenção de uma semana:
+
+- quem clica num link de ontem recebe 422, deterministicamente;
+- quem clica no mesmo link já confirmado recebe a mesma conta de volta por uma semana;
+- quem clica num link de um mês recebe 404, que é a resposta honesta para aquela idade.
+
+Há teste para os quatro casos, sobre MySQL de verdade, e um que fixa que a retenção é maior que o
+prazo do link — se alguém inverter os dois, a suíte diz.
+
+### O que isto **não** resolve
+
+Não há **exclusão de conta a pedido**. A `account` de quem já confirmou segue com e-mail, nome e
+documento, e não existe rota para a pessoa pedir que saiam. Isso é o outro lado da LGPD, pede
+decisão sobre o que anonimizar e o que retener por obrigação contábil, e está em aberto.
+
+O que já está certo é a auditoria da `admin-api`: ela grava o `sub` do token, que é opaco, em vez do
+nome ou do e-mail — então apagar a pessoa no provedor rompe o vínculo sem mexer num histórico que
+não se reescreve. A regra vale como regra: identidade que for parar em registro duradouro entra pelo
+identificador opaco.
+
 ## Autenticação
 
 O realm é o mesmo dos outros serviços, em `../../provisioning/keycloak/realm.json`, e as roles que
@@ -445,6 +493,22 @@ coleção de requisições usa o token de client, cujo `sub` não é pessoa nenh
 respondem `404` para ele. A jornada automatizada precisa de token de pessoa de verdade, e cria um
 client só para isso **dentro do container de teste**; ele não existe em
 `../../provisioning/keycloak/realm.json`.
+
+## O rastro segue para o Keycloak
+
+As chamadas ao provedor de identidade — criar conta, confirmar, trocar senha — levam o rastro da
+requisição que as originou (`infrastructure/tracing`). Sem isso, "o cadastro do cliente X demorou"
+não dizia se o tempo era desta API ou do Keycloak, que é exatamente a pergunta de quem recebe a
+reclamação.
+
+É um gancho só, diferente do catálogo: todas as saídas HTTP daqui vão ao Keycloak e passam pelo mesmo
+`RestClient`. O banco e o armazenamento deste serviço não falam HTTP.
+
+Fora de requisição — o job da outbox, os listeners de evento — não há rastro para continuar, e o
+repasse não faz nada. Há teste fixando que isso não quebra, porque um erro ali derrubaria a entrega
+de eventos, que é pior que rastro fragmentado.
+
+Os números e as armadilhas estão no `deploy/README.md`.
 
 ## Os eventos, e como eles saem daqui
 

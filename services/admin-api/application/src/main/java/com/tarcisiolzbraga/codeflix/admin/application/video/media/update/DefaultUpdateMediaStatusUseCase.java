@@ -30,11 +30,18 @@ public class DefaultUpdateMediaStatusUseCase extends UpdateMediaStatusUseCase {
         this.videoGateway.update(video);
     }
 
+    // Switch exaustivo, e não um `if` com `else`: o `else` mandava **tudo** que não era COMPLETED
+    // para `processing`, e com FAILED isso gravaria a falha como "está codificando". Sem ramo
+    // coringa, status novo no enum passa a ser erro de compilação aqui — que é onde se quer
+    // descobrir, e não em produção.
     private void move(final Video video, final UpdateMediaStatusCommand input) {
-        if (input.status() == MediaStatus.COMPLETED) {
-            video.completed(input.type(), input.checksum(), input.encodedPath());
-        } else {
-            video.processing(input.type(), input.checksum());
+        switch (input.status()) {
+            case COMPLETED -> video.completed(input.type(), input.checksum(), input.encodedPath());
+            case PROCESSING -> video.processing(input.type(), input.checksum());
+            case FAILED -> video.failed(input.type(), input.checksum());
+            case PENDING -> {
+                // inalcançável: o execute devolve antes de chegar aqui
+            }
         }
     }
 }

@@ -1,0 +1,23 @@
+# A porta de entrada da malha.
+#
+# Um Gateway só, com os nomes de todos os fronts e do Keycloak: separar em vários não traria nada —
+# o Envoy do gateway é o mesmo — e multiplicaria o lugar onde um nome novo precisa ser lembrado.
+#
+# `*.localtest.me` em vez dos nomes um por um: o DNS do cluster (deploy/cluster/dns-localtest.sh)
+# responde por qualquer nome no domínio, então o curinga aqui mantém as duas pontas com a mesma
+# regra. Acrescentar um serviço passa a ser só um VirtualService.
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: codeflix
+  namespace: codeflix
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*.localtest.me"

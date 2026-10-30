@@ -1,0 +1,21 @@
+<section id="testes" data-transition="fade" style="background:#1C1F27;color:#F4F2ED;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<h2 style="font-family:'Oswald', Arial, sans-serif;font-size:72px;font-weight:500;line-height:1.1">Cinco níveis de teste</h2>
+<table style="font-family:'IBM Plex Sans', Arial, sans-serif;font-size:30px;color:#F4F2ED;padding:16px 20px">
+<tr style="background:#14161C">
+<th style="width:30%;text-align:left;font-weight:600">Nível</th>
+<th style="width:48%;text-align:left;font-weight:600">Cobre</th>
+<th style="width:22%;text-align:left;font-weight:600">Precisa de</th>
+</tr>
+<tr><td style="color:#EE6B50">unitário</td><td style="color:#A8AEBA">domínio e casos de uso</td><td style="color:#A8AEBA">nada</td></tr>
+<tr style="background:#171A21"><td style="color:#EE6B50">fatia do schema</td><td style="color:#A8AEBA">o contrato que o front consome</td><td style="color:#A8AEBA">nada</td></tr>
+<tr><td style="color:#EE6B50">integração</td><td style="color:#A8AEBA">gateway e listener, com banco e fila reais</td><td style="color:#A8AEBA">Docker</td></tr>
+<tr style="background:#171A21"><td style="color:#EE6B50">ponta a ponta</td><td style="color:#A8AEBA">a jornada por HTTP, com token de verdade</td><td style="color:#A8AEBA">Docker</td></tr>
+<tr><td style="color:#6AA9D6">estresse</td><td style="color:#A8AEBA">a taxa de falha sob carga &mdash; <b>fora</b> do build</td><td style="color:#A8AEBA">Docker</td></tr>
+</table>
+<div style="display:flex;gap:48px">
+<p style="flex:1;font-size:30px;line-height:1.45;color:#A8AEBA">O portão de cobertura barra abaixo de <b>90%</b> de instrução e <b>70%</b> de ramo, e o Trivy barra a imagem com CVE que tenha correção publicada.</p>
+<p style="flex:1;font-size:30px;line-height:1.45;color:#A8AEBA">O estresse fica fora do build de propósito: ele mede uma corrida, então falharia por projeto e transformaria o build num sorteio.</p>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;font-size:24px;color:#6A7179">10</p>
+<aside>Quem precisa de Docker é marcado por tag na própria anotação, nunca classe por classe, e o nível unitário é por exclusão: teste novo sem tag entra nele sozinho. Os nomes dos testes são Given/When/Then, e o corpo também.</aside>
+</section>

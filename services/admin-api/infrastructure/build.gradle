@@ -3,6 +3,8 @@ plugins {
     id 'org.springframework.boot'
     id 'io.spring.dependency-management'
     id 'jacoco-report-aggregation'
+    // O piso de cobertura, no build-logic: mexer nele mexe nos três serviços.
+    id 'codeflix.coverage-verification'
 }
 
 tasks.named('bootJar') {
@@ -14,6 +16,15 @@ tasks.named('jar') {
     enabled = false
 }
 
+// O `amqp-client` que o BOM do Boot 4.1.2 fixa é o 5.30.0, e ele carrega quatro CVEs HIGH
+// (CVE-2026-63337, -69219, -69220, -75516), corrigidos a partir do 5.33.0. Subir o Boot não resolve
+// este: ele é o único dos cinco achados do Trivy que o 4.1.2 **não** move.
+//
+// Sobrescrever propriedade do BOM é o caminho suportado pelo plugin de dependency-management, e é
+// preferível a declarar a dependência com versão: assim todo artefato do grupo continua alinhado,
+// inclusive o que entrar transitivo amanhã.
+ext['rabbit-amqp-client.version'] = '5.37.0'
+
 dependencies {
     implementation project(':domain')
     implementation project(':application')
@@ -24,6 +35,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-amqp'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    // Saúde e métricas. O registro do Prometheus vem do BOM do Boot, por isso sem versão aqui.
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
     // fora do BOM do Boot; a linha 3.x é a compatível com o Boot 4
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
     implementation 'org.springframework.boot:spring-boot-starter-flyway'
@@ -31,8 +45,17 @@ dependencies {
     // Fora do BOM do Boot: o arquivo de mídia vai para um armazenamento que fala S3.
     implementation platform('software.amazon.awssdk:bom:2.55.7')
     implementation 'software.amazon.awssdk:s3'
+    // Declarado, e não herdado: ele já vinha no classpath de execução — é o cliente HTTP síncrono
+    // que o `S3Client` resolve sozinho —, mas o de compilação não o tinha. O repasse do rastro
+    // embrulha o builder dele, para o cabeçalho entrar depois da assinatura.
+    implementation 'software.amazon.awssdk:apache5-client'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
+    // O Apache HttpClient 5 já vinha transitivo **em runtime**, e é ele que o RestClient usa nos
+    // E2E — a `ParseException` da intermitência de mídia é do parser dele. Aqui ele passa a ser
+    // declarado porque o teste de estresse monta o pool de conexões à mão: é o pool compartilhado
+    // que reproduz a corrida, e sem acesso de compilação não há como montá-lo. Versão do BOM do Boot.
+    testImplementation 'org.apache.httpcomponents.client5:httpclient5'
     testImplementation testFixtures(project(':domain'))
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'

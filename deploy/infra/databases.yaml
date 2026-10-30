@@ -1,0 +1,224 @@
+# Os bancos e o armazenamento.
+#
+# Uma convenção atravessa este arquivo e vale ler antes do resto: **toda porta que não é HTTP se
+# chama `tcp-algo`**. O Istio decide por esse nome como tratar a conexão; porta sem nome, ou com nome
+# que ele leia como HTTP, faz o sidecar farejar protocolo — e MySQL, Postgres e AMQP **falam
+# primeiro, do lado do servidor**. O farejamento espera bytes do cliente que nunca vêm, a conexão
+# estoura no tempo limite, e o sintoma é "o banco não responde" com o banco de pé.
+#
+# Volume por PVC na classe padrão do k3d (local-path). Dado de desenvolvimento: o cluster é
+# descartável, e recriá-lo recria vazio — a semeadura está em deploy/README.md.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: codeflix
+  labels: { app: mysql }
+spec:
+  selector: { app: mysql }
+  ports:
+    - { name: tcp-mysql, port: 3306, targetPort: 3306 }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-dados
+  namespace: codeflix
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 4Gi }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: codeflix
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: mysql }
+  template:
+    metadata:
+      labels: { app: mysql, version: v1 }
+    spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: mysql
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          # O binlog em ROW com imagem completa: é o que o Debezium lê para replicar o catálogo. O
+          # compose declara isto no `my.cnf` do serviço; aqui vai como argumento, que é o mesmo.
+          args: ["--binlog-format=ROW", "--binlog-row-image=FULL"]
+          envFrom:
+            - secretRef: { name: codeflix-env }
+          env:
+            - { name: MYSQL_DATABASE, value: adm_videos }
+            - { name: MYSQL_USER, value: codeflix }
+            - name: MYSQL_PASSWORD
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: DB_PASSWORD } }
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: DB_ROOT_PASSWORD } }
+          ports:
+            - { name: tcp-mysql, containerPort: 3306 }
+          volumeMounts:
+            - { name: dados, mountPath: /var/lib/mysql }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d, readOnly: true }
+          readinessProbe:
+            exec: { command: ["mysqladmin", "ping", "-h", "127.0.0.1"] }
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 30
+          resources:
+            requests: { memory: 512Mi, cpu: 200m }
+            limits: { memory: 1536Mi }
+      volumes:
+        - name: dados
+          persistentVolumeClaim: { claimName: mysql-dados }
+        - name: init
+          configMap:
+            name: mysql-init
+            # O entrypoint da imagem só executa o que tiver bit de execução; 0755 no modo do volume.
+            defaultMode: 0755
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: subscription-mysql
+  namespace: codeflix
+  labels: { app: subscription-mysql }
+spec:
+  selector: { app: subscription-mysql }
+  ports:
+    - { name: tcp-mysql, port: 3306, targetPort: 3306 }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: subscription-mysql-dados
+  namespace: codeflix
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 2Gi }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subscription-mysql
+  namespace: codeflix
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: subscription-mysql }
+  template:
+    metadata:
+      labels: { app: subscription-mysql, version: v1 }
+    spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: subscription-mysql
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          args: ["--binlog-format=ROW", "--binlog-row-image=FULL"]
+          envFrom:
+            - secretRef: { name: codeflix-env }
+          env:
+            - { name: MYSQL_DATABASE, value: subscription }
+            - { name: MYSQL_USER, value: subscription }
+            - name: MYSQL_PASSWORD
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: SUBSCRIPTION_DB_PASSWORD } }
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: SUBSCRIPTION_DB_ROOT_PASSWORD } }
+          ports:
+            - { name: tcp-mysql, containerPort: 3306 }
+          volumeMounts:
+            - { name: dados, mountPath: /var/lib/mysql }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d, readOnly: true }
+          readinessProbe:
+            exec: { command: ["mysqladmin", "ping", "-h", "127.0.0.1"] }
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 30
+          resources:
+            requests: { memory: 384Mi, cpu: 100m }
+            limits: { memory: 1Gi }
+      volumes:
+        - name: dados
+          persistentVolumeClaim: { claimName: subscription-mysql-dados }
+        - name: init
+          configMap: { name: subscription-mysql-init, defaultMode: 0755 }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: encoder-postgres
+  namespace: codeflix
+  labels: { app: encoder-postgres }
+spec:
+  selector: { app: encoder-postgres }
+  ports:
+    - { name: tcp-postgres, port: 5432, targetPort: 5432 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: encoder-postgres
+  namespace: codeflix
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: encoder-postgres }
+  template:
+    metadata:
+      labels: { app: encoder-postgres, version: v1 }
+    spec:
+      # A identidade desta carga na malha, e não o `default` que todas compartilhavam. É sobre
+      # ela que a `AuthorizationPolicy` decide: com um service account só, "apenas o catálogo
+      # pode chamar o admin" é inexprimível, porque o certificado de todo pod dizia a mesma
+      # coisa. O `deploy/mesh/service-accounts.yaml` explica por quê.
+      serviceAccountName: encoder-postgres
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          env:
+            - { name: POSTGRES_DB, value: encoder }
+            - { name: POSTGRES_USER, value: encoder }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: codeflix-env, key: ENCODER_DB_PASSWORD } }
+            # O diretório de dados num subdiretório do volume: o `lost+found` que alguns provisionadores
+            # criam na raiz faz o initdb recusar o diretório por "não está vazio".
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          ports:
+            - { name: tcp-postgres, containerPort: 5432 }
+          volumeMounts:
+            - { name: dados, mountPath: /var/lib/postgresql/data }
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "encoder", "-d", "encoder"] }
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests: { memory: 128Mi, cpu: 50m }
+            limits: { memory: 512Mi }
+      volumes:
+        - name: dados
+          persistentVolumeClaim: { claimName: encoder-postgres-dados }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: encoder-postgres-dados
+  namespace: codeflix
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 1Gi }

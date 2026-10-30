@@ -1,4 +1,4 @@
-# Os containers de apoio dos dois serviços. Cada um mora na própria pasta, junto dos arquivos que
+# Os containers de apoio das aplicações. Cada um mora na própria pasta, junto dos arquivos que
 # monta — o realm do Keycloak, o definitions do RabbitMQ, o garage.toml — para que mexer num
 # container seja abrir uma pasta só.
 #
@@ -14,7 +14,7 @@ include:
   # fila da conversa com o codificador
   - path: rabbitmq/docker-compose.yml
 
-  # autenticação dos dois serviços, com um realm só
+  # autenticação de todas as aplicações, com um realm só
   - path: keycloak/docker-compose.yml
 
   # índice de leitura do catálogo
