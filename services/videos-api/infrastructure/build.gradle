@@ -24,7 +24,7 @@ dependencies {
     // compressão do cliente Kafka. Declará-lo como dependência diria uma coisa falsa sobre o código;
     // a constraint diz exatamente o que é, um piso de versão para o que vem transitivo.
     constraints {
-        implementation('at.yawk.lz4:lz4-java:1.12.1') {
+        implementation('at.yawk.lz4:lz4-java:1.13.0') {
             because 'CVE-2026-106451 no 1.11.2, que o kafka-clients traz'
         }
         implementation('org.xerial.snappy:snappy-java:1.1.10.12') {
